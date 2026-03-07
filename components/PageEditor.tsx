@@ -19,6 +19,7 @@ import { ToggleBlock } from "./extensions/ToggleBlock";
 import { CalloutBlock } from "./extensions/CalloutBlock";
 import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import MonthPageManager from "./MonthPageManager";
 
 const EMOJIS = [
   "📄", "📝", "📚", "📋", "🗂️", "📁", "🗃️", "📌", "📍", "🔖",
@@ -412,6 +413,9 @@ export default function PageEditor({ pageId }: { pageId: string }) {
               {saveStatus === "saving" ? "저장 중..." : "저장됨"}
             </span>
           </div>
+
+          {/* Month page manager — shown only when this is a year page (e.g. "2026년 고객관리양식") */}
+          <MonthPageManager pageId={pageId} />
 
           {/* Editor */}
           <div className="tiptap-editor">
