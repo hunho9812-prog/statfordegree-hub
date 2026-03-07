@@ -181,6 +181,7 @@ const customerDefaults: Partial<Customer> = {
   route: "",
   settlement_amount: null,
   alba: "",
+  monthPageId: null,
 };
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -533,17 +534,32 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
       name: "statfordegree-hub-storage",
-      version: 3,
-      migrate: () => ({
-        pages: initialPages,
-        rootPageIds: [MENU_IDS.MANUAL, MENU_IDS.TAX, MENU_IDS.ADMATCH, MENU_IDS.STATGENIE],
-        tasks: initialTasks,
-        customers: initialCustomers,
-        customerStatuses: initialCustomerStatuses,
-        manualPages: {},
-        sidebarCollapsed: false,
-        darkMode: false,
-      }),
+      version: 4,
+      migrate: (persistedState: unknown, version: number) => {
+        if (version === 3) {
+          // v3 → v4: non-destructive — just add monthPageId:null to existing customers
+          const s = persistedState as Record<string, unknown>;
+          return {
+            ...s,
+            customers: ((s.customers as Customer[]) ?? []).map((c) => ({
+              ...customerDefaults,
+              ...c,
+              monthPageId: (c as Customer).monthPageId ?? null,
+            })),
+          };
+        }
+        // Older versions: reset to fresh state
+        return {
+          pages: initialPages,
+          rootPageIds: [MENU_IDS.MANUAL, MENU_IDS.TAX, MENU_IDS.ADMATCH, MENU_IDS.STATGENIE],
+          tasks: initialTasks,
+          customers: initialCustomers,
+          customerStatuses: initialCustomerStatuses,
+          manualPages: {},
+          sidebarCollapsed: false,
+          darkMode: false,
+        };
+      },
     }
   )
 );

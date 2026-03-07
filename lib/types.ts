@@ -54,6 +54,7 @@ export interface Customer {
   submit_date: string;
   status: string;                 // references a StatusOption id or label
   memo: string;
+  monthPageId: string | null;     // associates customer with a month page (null = global)
   created_at: string;
   updated_at: string;
 }

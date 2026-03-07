@@ -442,6 +442,7 @@ const EMPTY_FORM = {
   submit_date: "",
   status: "",
   memo: "",
+  monthPageId: null as string | null,
 };
 
 function AddCustomerRow({
@@ -691,11 +692,30 @@ function DataRow({
 
 // ─── Main CRMPage ─────────────────────────────────────────────────────────────
 
-export default function CRMPage() {
+/**
+ * monthPageId — when provided, shows only customers belonging to that month page.
+ * embedded    — when true, renders without the full-page flex wrapper (for use
+ *               inside PageEditor's scroll area).
+ */
+export default function CRMPage({
+  monthPageId = null,
+  embedded = false,
+}: {
+  monthPageId?: string | null;
+  embedded?: boolean;
+}) {
   const { customers, customerStatuses, createCustomer, updateCustomer, deleteCustomer } =
     useWorkspaceStore();
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // Filter customers by month page when monthPageId is provided
+  const visibleCustomers = monthPageId
+    ? customers.filter((c) => c.monthPageId === monthPageId)
+    : customers;
+
+  // Monthly / total revenue (전체금액 기준)
+  const totalRevenue = visibleCustomers.reduce((sum, c) => sum + (c.total_amount ?? 0), 0);
 
   const HEADERS = [
     "이름", "담당자", "Tags", "알바", "정산금액",
@@ -704,73 +724,98 @@ export default function CRMPage() {
   ];
 
   const handleSave = (data: Omit<Customer, "id" | "created_at" | "updated_at">) => {
-    createCustomer(data);
+    createCustomer({ ...data, monthPageId: monthPageId ?? null });
     setShowAddForm(false);
   };
 
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#191919]">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
-        <div>
+  const header = (
+    <div className={`flex items-center justify-between border-b border-[#e9e9e7] dark:border-[#2f2f2f] ${embedded ? "px-4 py-3" : "px-6 py-4"}`}>
+      <div>
+        {!embedded && (
           <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">고객 관리</h1>
-          <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b]">총 {customers.length}명</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            <Plus size={15} /> 고객 추가
-          </button>
-          <button
-            onClick={() => setShowStatusEditor(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#9b9a97] dark:text-[#6b6b6b] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] rounded-lg transition-colors"
-          >
-            <Settings size={15} /> Status 편집
-          </button>
+        )}
+        <div className="flex items-center gap-3 text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
+          <span>총 {visibleCustomers.length}명</span>
+          {totalRevenue > 0 && (
+            <>
+              <span>·</span>
+              <span className="font-semibold text-blue-500">
+                매출 ₩{totalRevenue.toLocaleString()}
+              </span>
+            </>
+          )}
         </div>
       </div>
-
-      {/* Table */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse text-[#37352f] dark:text-[#e6e6e4] text-sm">
-          <thead className="sticky top-0 bg-[#f7f6f3] dark:bg-[#252525] z-10">
-            <tr>
-              {HEADERS.map((h, i) => (
-                <th
-                  key={i}
-                  className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {customers.map((c) => (
-              <DataRow
-                key={c.id}
-                customer={c}
-                statuses={customerStatuses}
-                onUpdate={(updates) => updateCustomer(c.id, updates)}
-                onDelete={() => deleteCustomer(c.id)}
-              />
-            ))}
-            {showAddForm ? (
-              <AddCustomerRow
-                statuses={customerStatuses}
-                onSave={handleSave}
-                onCancel={() => setShowAddForm(false)}
-              />
-            ) : (
-              <AddTriggerRow onAdd={() => setShowAddForm(true)} />
-            )}
-          </tbody>
-        </table>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+        >
+          <Plus size={15} /> 고객 추가
+        </button>
+        <button
+          onClick={() => setShowStatusEditor(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#9b9a97] dark:text-[#6b6b6b] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] rounded-lg transition-colors"
+        >
+          <Settings size={15} /> Status 편집
+        </button>
       </div>
-
-      {showStatusEditor && <StatusEditor onClose={() => setShowStatusEditor(false)} />}
     </div>
+  );
+
+  const table = (
+    <div className={embedded ? "overflow-x-auto" : "flex-1 overflow-auto"}>
+      <table className="w-full border-collapse text-[#37352f] dark:text-[#e6e6e4] text-sm">
+        <thead className="sticky top-0 bg-[#f7f6f3] dark:bg-[#252525] z-10">
+          <tr>
+            {HEADERS.map((h, i) => (
+              <th
+                key={i}
+                className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {visibleCustomers.map((c) => (
+            <DataRow
+              key={c.id}
+              customer={c}
+              statuses={customerStatuses}
+              onUpdate={(updates) => updateCustomer(c.id, updates)}
+              onDelete={() => deleteCustomer(c.id)}
+            />
+          ))}
+          {showAddForm ? (
+            <AddCustomerRow
+              statuses={customerStatuses}
+              onSave={handleSave}
+              onCancel={() => setShowAddForm(false)}
+            />
+          ) : (
+            <AddTriggerRow onAdd={() => setShowAddForm(true)} />
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <>
+      {embedded ? (
+        <div className="bg-white dark:bg-[#191919]">
+          {header}
+          {table}
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#191919]">
+          {header}
+          {table}
+        </div>
+      )}
+      {showStatusEditor && <StatusEditor onClose={() => setShowStatusEditor(false)} />}
+    </>
   );
 }

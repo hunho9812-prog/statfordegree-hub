@@ -11,7 +11,7 @@ const MONTH_NAMES = [
 ];
 
 function getMonthNum(title: string): number {
-  return parseInt(title.match(/(\d{1,2})월$/)?.[1] ?? "0");
+  return parseInt(title.match(/\(\d{2}년\s*(\d{1,2})월\)$/)?.[1] ?? "0");
 }
 
 export default function MonthPageManager({ pageId }: { pageId: string }) {
@@ -26,22 +26,23 @@ export default function MonthPageManager({ pageId }: { pageId: string }) {
   const yearMatch = page?.title.match(/^(\d{4})년/);
   if (!yearMatch) return null;
   const year = parseInt(yearMatch[1]);
+  const shortYear = year % 100;
 
   // Sorted month-page children of this year page
   const monthPages = useMemo(() => {
-    const monthPattern = new RegExp(`^${year}년\\s*\\d{1,2}월$`);
+    const monthPattern = new RegExp(`^고객관리양식\\(${shortYear}년\\s*\\d{1,2}월\\)$`);
     return page.children
       .map((id) => pages[id])
       .filter(Boolean)
       .filter((p) => monthPattern.test(p.title))
       .sort((a, b) => getMonthNum(a.title) - getMonthNum(b.title));
-  }, [page.children, pages, year]);
+  }, [page.children, pages, shortYear]);
 
   const existingMonthNums = new Set(monthPages.map((p) => getMonthNum(p.title)));
   const availableMonths = MONTH_NAMES.filter((_, i) => !existingMonthNums.has(i + 1));
 
   const handleAddMonth = (monthNum: number) => {
-    const title = `${year}년 ${monthNum}월`;
+    const title = `고객관리양식(${shortYear}년 ${monthNum}월)`;
     const id = createPage(pageId);
     updatePage(id, { title, emoji: "📄" });
 

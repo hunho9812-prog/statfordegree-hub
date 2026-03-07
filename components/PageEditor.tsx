@@ -20,6 +20,8 @@ import { CalloutBlock } from "./extensions/CalloutBlock";
 import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical } from "lucide-react";
 import { useRouter } from "next/navigation";
 import MonthPageManager from "./MonthPageManager";
+import CRMPage from "./CRMPage";
+import YearRevenueDashboard from "./YearRevenueDashboard";
 
 const EMOJIS = [
   "📄", "📝", "📚", "📋", "🗂️", "📁", "🗃️", "📌", "📍", "🔖",
@@ -179,6 +181,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           const domNode = editor.view.nodeDOM(offset);
           if (!(domNode instanceof HTMLElement)) return;
           const rect = domNode.getBoundingClientRect();
+          if (rect.width === 0 && rect.height === 0) return; // hidden element
           const relTop = rect.top - containerRect.top + scrollTop;
           // 3 buttons × 18 px + 2 gaps × 2 px = 58 px; keep ≥ 4 px from container edge
           const groupLeft = Math.max(4, rect.left - containerRect.left - 62);
@@ -379,6 +382,10 @@ export default function PageEditor({ pageId }: { pageId: string }) {
     );
   }
 
+  // Page type detection
+  const isMonthPage = /^고객관리양식\(\d{2}년\s*\d{1,2}월\)$/.test(page.title);
+  const isYearPage = /^(\d{4})년/.test(page.title);
+
   // Build breadcrumb
   const breadcrumb: { id: string; title: string; emoji: string }[] = [];
   let cur: string | null = page.parentId;
@@ -525,14 +532,26 @@ export default function PageEditor({ pageId }: { pageId: string }) {
             </span>
           </div>
 
-          {/* Month page manager — shown only when this is a year page (e.g. "2026년 고객관리양식") */}
-          <MonthPageManager pageId={pageId} />
+          {/* Year page: bar chart + month manager */}
+          {isYearPage && (
+            <>
+              <YearRevenueDashboard pageId={pageId} />
+              <MonthPageManager pageId={pageId} />
+            </>
+          )}
 
-          {/* Editor */}
-          <div className="tiptap-editor">
+          {/* Editor — hidden on month pages */}
+          <div className={isMonthPage ? "hidden" : "tiptap-editor"}>
             <EditorContent editor={editor} />
           </div>
         </div>
+
+        {/* Month page: full-width embedded CRM outside max-w-3xl */}
+        {isMonthPage && (
+          <div className="px-4 pb-12">
+            <CRMPage monthPageId={pageId} embedded />
+          </div>
+        )}
 
         {/* Per-block control group: ⋮⋮ drag · ➕ add · 🗑️ delete
             key=docStart for stable identity across re-renders. */}
