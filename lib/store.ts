@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuidv4 } from "uuid";
-import type { WorkspaceState, Page, Task, Customer } from "./types";
+import type { WorkspaceState, Page, Task, Customer, StatusOption } from "./types";
 
 // Fixed IDs for the 5 main menu sections
 export const MENU_IDS = {
@@ -168,10 +168,18 @@ const initialTasks: Task[] = [
 
 const initialCustomers: Customer[] = [];
 
+const initialCustomerStatuses: StatusOption[] = [
+  { id: "status-1", label: "분석전작업", color: "#f3f0ff", textColor: "#7c3aed", category: "할 일" },
+  { id: "status-2", label: "프리랜서응대", color: "#fef9c3", textColor: "#854d0e", category: "진행 중" },
+  { id: "status-3", label: "A/S중", color: "#fff7ed", textColor: "#9a3412", category: "진행 중" },
+  { id: "status-4", label: "외주or분석중", color: "#eff6ff", textColor: "#1d4ed8", category: "진행 중" },
+  { id: "status-5", label: "제출완료", color: "#f0fdf4", textColor: "#166534", category: "완료" },
+];
+
 // Default fields for Customer (handles migration from old schema)
 const customerDefaults: Partial<Customer> = {
   route: "",
-  tags: "",
+  settlement_amount: null,
   alba: "",
 };
 
@@ -182,6 +190,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       rootPageIds: [MENU_IDS.MANUAL, MENU_IDS.TAX, MENU_IDS.ADMATCH, MENU_IDS.STATGENIE],
       tasks: initialTasks,
       customers: initialCustomers,
+      customerStatuses: initialCustomerStatuses,
       sidebarCollapsed: false,
       darkMode: false,
 
@@ -354,6 +363,26 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }));
       },
 
+      upsertCustomerStatus: (status) => {
+        set((state) => {
+          const exists = state.customerStatuses.find((s) => s.id === status.id);
+          if (exists) {
+            return {
+              customerStatuses: state.customerStatuses.map((s) =>
+                s.id === status.id ? status : s
+              ),
+            };
+          }
+          return { customerStatuses: [...state.customerStatuses, status] };
+        });
+      },
+
+      deleteCustomerStatus: (id) => {
+        set((state) => ({
+          customerStatuses: state.customerStatuses.filter((s) => s.id !== id),
+        }));
+      },
+
       toggleSidebar: () => {
         set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed }));
       },
@@ -370,12 +399,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
       name: "statfordegree-hub-storage",
-      version: 2,
+      version: 3,
       migrate: () => ({
         pages: initialPages,
         rootPageIds: [MENU_IDS.MANUAL, MENU_IDS.TAX, MENU_IDS.ADMATCH, MENU_IDS.STATGENIE],
         tasks: initialTasks,
         customers: initialCustomers,
+        customerStatuses: initialCustomerStatuses,
         sidebarCollapsed: false,
         darkMode: false,
       }),
