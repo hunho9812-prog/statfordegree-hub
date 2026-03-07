@@ -1,7 +1,7 @@
 "use client";
 
 import { Node, mergeAttributes } from "@tiptap/core";
-import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from "@tiptap/react";
+import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, type NodeViewProps } from "@tiptap/react";
 import { useState } from "react";
 
 const CALLOUT_COLORS: Record<string, { bg: string; border: string; dark: string }> = {
@@ -16,15 +16,11 @@ const CALLOUT_COLORS: Record<string, { bg: string; border: string; dark: string 
 const CALLOUT_EMOJIS = ["💡", "⚠️", "📌", "✅", "❌", "🔥", "📝", "💬", "🚀", "🎯", "ℹ️", "🔑"];
 const COLOR_KEYS = Object.keys(CALLOUT_COLORS);
 
-function CalloutView({
-  node,
-  updateAttributes,
-}: {
-  node: { attrs: { emoji: string; color: string } };
-  updateAttributes: (attrs: Partial<{ emoji: string; color: string }>) => void;
-}) {
+function CalloutView({ node, updateAttributes }: NodeViewProps) {
+  const emoji = node.attrs.emoji as string;
+  const color = node.attrs.color as string;
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const colors = CALLOUT_COLORS[node.attrs.color] ?? CALLOUT_COLORS.yellow;
+  const colors = CALLOUT_COLORS[color] ?? CALLOUT_COLORS.yellow;
 
   return (
     <NodeViewWrapper>
@@ -37,7 +33,7 @@ function CalloutView({
             onClick={() => setShowEmojiPicker((v) => !v)}
             className="text-xl leading-6 hover:bg-black/10 dark:hover:bg-white/10 rounded px-0.5 transition-colors"
           >
-            {node.attrs.emoji}
+            {emoji}
           </button>
           {showEmojiPicker && (
             <div className="absolute left-0 top-8 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-lg p-3 w-64">
@@ -58,7 +54,7 @@ function CalloutView({
                     key={c}
                     onClick={() => { updateAttributes({ color: c }); setShowEmojiPicker(false); }}
                     className={`w-5 h-5 rounded-full border-2 ${CALLOUT_COLORS[c].bg} ${
-                      node.attrs.color === c ? "border-blue-500" : "border-transparent"
+                      color === c ? "border-blue-500" : "border-transparent"
                     }`}
                     title={c}
                   />
@@ -104,7 +100,7 @@ export const CalloutBlock = Node.create({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(CalloutView as Parameters<typeof ReactNodeViewRenderer>[0]);
+    return ReactNodeViewRenderer(CalloutView);
   },
 
   addCommands() {

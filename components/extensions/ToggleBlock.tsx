@@ -1,22 +1,17 @@
 "use client";
 
 import { Node, mergeAttributes } from "@tiptap/core";
-import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from "@tiptap/react";
+import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, type NodeViewProps } from "@tiptap/react";
 import { useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 
 // ─── React NodeView ───────────────────────────────────────────────────────────
 
-function ToggleView({
-  node,
-  updateAttributes,
-}: {
-  node: { attrs: { isOpen: boolean; title: string } };
-  updateAttributes: (attrs: Partial<{ isOpen: boolean; title: string }>) => void;
-}) {
-  const isOpen = node.attrs.isOpen;
+function ToggleView({ node, updateAttributes }: NodeViewProps) {
+  const isOpen = node.attrs.isOpen as boolean;
+  const title = node.attrs.title as string;
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(node.attrs.title);
+  const [draft, setDraft] = useState(title);
 
   return (
     <NodeViewWrapper>
@@ -53,10 +48,10 @@ function ToggleView({
           ) : (
             <span
               contentEditable={false}
-              onClick={() => { setDraft(node.attrs.title); setEditing(true); }}
+              onClick={() => { setDraft(title); setEditing(true); }}
               className="flex-1 cursor-text text-base font-medium text-[#37352f] dark:text-[#e6e6e4] leading-6 min-h-[24px]"
             >
-              {node.attrs.title || <span className="text-gray-300 dark:text-gray-600 font-normal text-sm">토글 제목 입력...</span>}
+              {title || <span className="text-gray-300 dark:text-gray-600 font-normal text-sm">토글 제목 입력...</span>}
             </span>
           )}
         </div>
@@ -99,7 +94,7 @@ export const ToggleBlock = Node.create({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(ToggleView as Parameters<typeof ReactNodeViewRenderer>[0]);
+    return ReactNodeViewRenderer(ToggleView);
   },
 
   addCommands() {
