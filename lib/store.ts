@@ -168,6 +168,13 @@ const initialTasks: Task[] = [
 
 const initialCustomers: Customer[] = [];
 
+// Default fields for Customer (handles migration from old schema)
+const customerDefaults: Partial<Customer> = {
+  route: "",
+  tags: "",
+  alba: "",
+};
+
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set) => ({
@@ -322,6 +329,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const id = uuidv4();
         const customer: Customer = {
           id,
+          ...customerDefaults,
           ...customerData,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
