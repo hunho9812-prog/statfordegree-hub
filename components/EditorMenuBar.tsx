@@ -19,6 +19,9 @@ import {
   Link,
   Undo,
   Redo,
+  ChevronRight,
+  Lightbulb,
+  Code2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -131,10 +134,22 @@ export default function EditorMenuBar({ editor }: EditorMenuBarProps) {
       isActive: editor.isActive("blockquote"),
     },
     {
-      icon: <Code size={15} className="opacity-70" />,
+      icon: <Code2 size={15} />,
       title: "코드 블록",
       action: () => editor.chain().focus().toggleCodeBlock().run(),
       isActive: editor.isActive("codeBlock"),
+    },
+    {
+      icon: <ChevronRight size={15} />,
+      title: "토글 블록",
+      action: () => (editor.commands as Record<string, () => boolean>).insertToggleBlock?.(),
+      isActive: editor.isActive("toggleBlock"),
+    },
+    {
+      icon: <Lightbulb size={15} />,
+      title: "콜아웃",
+      action: () => (editor.commands as Record<string, () => boolean>).insertCalloutBlock?.(),
+      isActive: editor.isActive("calloutBlock"),
     },
     {
       icon: <Minus size={15} />,
