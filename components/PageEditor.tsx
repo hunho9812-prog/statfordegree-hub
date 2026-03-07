@@ -33,6 +33,12 @@ interface SlashMenuState {
   range: { from: number; to: number };
 }
 
+interface BlockButton {
+  top: number;
+  left: number;
+  docEnd: number;
+}
+
 export default function PageEditor({ pageId }: { pageId: string }) {
   const router = useRouter();
   const { pages, updatePage } = useWorkspaceStore();
@@ -48,31 +54,18 @@ export default function PageEditor({ pageId }: { pageId: string }) {
     range: { from: 0, to: 0 },
   });
 
-  const [blockHandle, setBlockHandle] = useState<{
-    top: number;
-    left: number;
-    blockPos: number;
-    blockEndPos: number;
-  } | null>(null);
+  const [blockButtons, setBlockButtons] = useState<BlockButton[]>([]);
   const [blockMenuOpen, setBlockMenuOpen] = useState(false);
   const [blockMenuCoords, setBlockMenuCoords] = useState({ x: 0, y: 0 });
 
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
-  const hideHandleTimeout = useRef<NodeJS.Timeout | null>(null);
-  const editorAreaRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
 
   const closeSlashMenu = useCallback(() => {
     setSlashMenu((s) => ({ ...s, open: false }));
-  }, []);
-
-  const startHideHandle = useCallback(() => {
-    hideHandleTimeout.current = setTimeout(() => setBlockHandle(null), 120);
-  }, []);
-
-  const cancelHideHandle = useCallback(() => {
-    if (hideHandleTimeout.current) clearTimeout(hideHandleTimeout.current);
   }, []);
 
   const editor = useEditor({
@@ -110,7 +103,6 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       const { from } = editor.state.selection;
       const { $from } = editor.state.selection;
 
-      // Only trigger in paragraph nodes
       if ($from.parent.type.name === "paragraph") {
         const nodeStart = $from.start();
         const textBefore = editor.state.doc.textBetween(nodeStart, from, "\n", "\0");
@@ -118,7 +110,6 @@ export default function PageEditor({ pageId }: { pageId: string }) {
 
         if (slashIdx >= 0) {
           const query = textBefore.slice(slashIdx + 1);
-          // No spaces in query allowed (would mean user typed past the command)
           if (!query.includes(" ") && !query.includes("\n")) {
             const slashPos = nodeStart + slashIdx;
             const coords = editor.view.coordsAtPos(slashPos);
@@ -137,7 +128,6 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         }
       }
 
-      // Close slash menu if conditions not met
       setSlashMenu((s) => ({ ...s, open: false }));
 
       saveTimeout.current = setTimeout(() => {
@@ -150,7 +140,6 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         class: "tiptap-editor-content outline-none min-h-[400px] px-1",
       },
       handleKeyDown: (view, event) => {
-        // Close slash menu on Backspace if it would remove the slash
         if (event.key === "Backspace" && slashMenu.open) {
           const { from } = view.state.selection;
           if (from <= slashMenu.range.from + 1) {
@@ -162,57 +151,74 @@ export default function PageEditor({ pageId }: { pageId: string }) {
     },
   });
 
-  // Attached to the wide content container (includes left padding where the "+" button lives).
-  // Only UPDATE the handle when over a real block; never hide mid-move so the button stays
-  // reachable. The handle is hidden only when the mouse leaves the container entirely.
-  const handleEditorMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!editor) return;
-      const view = editor.view;
-      const posResult = view.posAtCoords({ left: e.clientX, top: e.clientY });
-      if (!posResult) return; // mouse in padding / gap — keep existing handle visible
+  // Recompute per-block "+" button positions. Runs in a rAF to batch rapid calls
+  // (e.g. during fast typing) and avoid flickering React re-renders.
+  const updateBlockButtons = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      if (!editor || !scrollContainerRef.current) return;
+      const containerEl = scrollContainerRef.current;
+      const containerRect = containerEl.getBoundingClientRect();
+      const scrollTop = containerEl.scrollTop;
 
-      const $pos = editor.state.doc.resolve(posResult.pos);
-      if ($pos.depth < 1) return;
-
-      const blockPos = $pos.before(1);
-      const blockNode = editor.state.doc.nodeAt(blockPos);
-      if (!blockNode) return;
-
-      const domNode = view.nodeDOM(blockPos);
-      if (!domNode || !(domNode instanceof HTMLElement)) return;
-
-      const rect = domNode.getBoundingClientRect();
-      if (hideHandleTimeout.current) clearTimeout(hideHandleTimeout.current);
-      setBlockHandle({
-        top: rect.top + rect.height / 2 - 10,
-        left: rect.left - 30,
-        blockPos,
-        blockEndPos: blockPos + blockNode.nodeSize,
+      const btns: BlockButton[] = [];
+      editor.state.doc.forEach((node, offset) => {
+        try {
+          const domNode = editor.view.nodeDOM(offset);
+          if (!(domNode instanceof HTMLElement)) return;
+          const rect = domNode.getBoundingClientRect();
+          btns.push({
+            top: rect.top - containerRect.top + scrollTop + rect.height / 2 - 10,
+            left: rect.left - containerRect.left - 28,
+            docEnd: offset + node.nodeSize,
+          });
+        } catch { /* skip unmounted nodes */ }
       });
-    },
-    [editor]
-  );
+      setBlockButtons(btns);
+    });
+  }, [editor]);
 
-  const handleBlockPlusClick = useCallback(() => {
-    if (!editor || !blockHandle) return;
-    const insertPos = blockHandle.blockEndPos;
+  // Only sync on content changes (not selectionUpdate — that fires on every click
+  // and causes re-renders that make buttons flicker under the cursor).
+  useEffect(() => {
+    if (!editor) return;
+    editor.on("update", updateBlockButtons);
+    return () => { editor.off("update", updateBlockButtons); };
+  }, [editor, updateBlockButtons]);
+
+  // Initial render + scroll + resize
+  useEffect(() => { updateBlockButtons(); }, [updateBlockButtons]);
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateBlockButtons);
+    return () => el.removeEventListener("scroll", updateBlockButtons);
+  }, [updateBlockButtons]);
+
+  useEffect(() => {
+    window.addEventListener("resize", updateBlockButtons);
+    return () => window.removeEventListener("resize", updateBlockButtons);
+  }, [updateBlockButtons]);
+
+  // Insert a new paragraph at docEnd, focus it, then open the block menu.
+  const handleInsertBlock = useCallback((docEnd: number) => {
+    if (!editor) return;
     editor
       .chain()
       .focus()
-      .insertContentAt(insertPos, { type: "paragraph" })
-      .setTextSelection(insertPos + 1)
+      .insertContentAt(docEnd, { type: "paragraph" })
+      .setTextSelection(docEnd + 1)
       .run();
 
     setTimeout(() => {
       try {
-        const coords = editor.view.coordsAtPos(insertPos + 1);
+        const coords = editor.view.coordsAtPos(docEnd + 1);
         setBlockMenuCoords({ x: coords.left, y: coords.bottom });
         setBlockMenuOpen(true);
-        setBlockHandle(null);
       } catch { /* ignore */ }
     }, 0);
-  }, [editor, blockHandle]);
+  }, [editor]);
 
   // Sync title with page changes (e.g. from sidebar rename)
   useEffect(() => {
@@ -337,16 +343,9 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         </BubbleMenu>
       )}
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto">
-        {/* The mouse handlers are on this wide container (includes the 64px left padding
-            where the "+" button lives), so mouseleave doesn't fire when moving from
-            block content to the button. */}
-        <div
-          className="max-w-3xl mx-auto px-16 py-12"
-          onMouseMove={handleEditorMouseMove}
-          onMouseLeave={startHideHandle}
-        >
+      {/* Scrollable content — position:relative so absolute "+" buttons are anchored here */}
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative">
+        <div className="max-w-3xl mx-auto px-16 py-12">
           {/* Breadcrumb */}
           {breadcrumb.length > 0 && (
             <div className="flex items-center gap-1 mb-6 text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
@@ -415,13 +414,28 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           </div>
 
           {/* Editor */}
-          <div ref={editorAreaRef} className="tiptap-editor">
+          <div className="tiptap-editor">
             <EditorContent editor={editor} />
           </div>
         </div>
+
+        {/* Always-visible "+" buttons — one per block, absolutely positioned.
+            key=docEnd gives stable identity so React doesn't unmount on re-render. */}
+        {!blockMenuOpen && blockButtons.map((btn) => (
+          <button
+            key={btn.docEnd}
+            style={{ position: "absolute", top: btn.top, left: btn.left, zIndex: 30 }}
+            onMouseDown={(e) => e.preventDefault()} // keep editor focus
+            onClick={() => handleInsertBlock(btn.docEnd)}
+            className="w-5 h-5 flex items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            title="블록 추가"
+          >
+            <Plus size={14} />
+          </button>
+        ))}
       </div>
 
-      {/* Slash command menu (portal-like, fixed position) */}
+      {/* Slash command menu */}
       {editor && (
         <SlashCommandMenu
           editor={editor}
@@ -433,23 +447,14 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         />
       )}
 
-      {/* Block handle "+" button — fixed so it can sit in the container's left padding */}
-      {blockHandle && !blockMenuOpen && (
-        <button
-          style={{ position: "fixed", top: blockHandle.top, left: blockHandle.left, zIndex: 50 }}
-          onClick={handleBlockPlusClick}
-          className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          title="블록 추가"
-        >
-          <Plus size={14} />
-        </button>
-      )}
-
-      {/* Block menu (opened by "+" button) */}
+      {/* Block type menu (opened by "+" button) */}
       {editor && blockMenuOpen && (
         <div
           className="fixed z-[100] bg-white dark:bg-[#252525] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-xl w-64 max-h-72 overflow-y-auto py-1"
-          style={{ left: Math.min(blockMenuCoords.x, typeof window !== "undefined" ? window.innerWidth - 280 : blockMenuCoords.x), top: blockMenuCoords.y + 8 }}
+          style={{
+            left: Math.min(blockMenuCoords.x, typeof window !== "undefined" ? window.innerWidth - 280 : blockMenuCoords.x),
+            top: blockMenuCoords.y + 8,
+          }}
           onMouseDown={(e) => e.preventDefault()}
         >
           {["텍스트", "목록", "블록", "미디어"].map((group) => {
@@ -483,10 +488,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
 
       {/* Close block menu on outside click */}
       {blockMenuOpen && (
-        <div
-          className="fixed inset-0 z-[99]"
-          onClick={() => setBlockMenuOpen(false)}
-        />
+        <div className="fixed inset-0 z-[99]" onClick={() => setBlockMenuOpen(false)} />
       )}
     </div>
   );
