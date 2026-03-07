@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuidv4 } from "uuid";
-import type { WorkspaceState, Page, Task, Customer, StatusOption } from "./types";
+import type { WorkspaceState, Page, Task, Customer, StatusOption, ManualNode, ManualPageData } from "./types";
 
 // Fixed IDs for the 5 main menu sections
 export const MENU_IDS = {
@@ -191,6 +191,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       tasks: initialTasks,
       customers: initialCustomers,
       customerStatuses: initialCustomerStatuses,
+      manualPages: {} as Record<string, ManualPageData>,
       sidebarCollapsed: false,
       darkMode: false,
 
@@ -383,6 +384,139 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }));
       },
 
+      // ── Manual tree actions ────────────────────────────────────────────────
+
+      addManualNode: (pageId, parentId, afterId) => {
+        const id = uuidv4();
+        set((state) => {
+          const pd = state.manualPages[pageId] ?? { rootItems: [], items: {} };
+          const newNode: ManualNode = {
+            id, text: "", children: [], parentId, isExpanded: true, isPinned: false,
+          };
+          const newItems = { ...pd.items, [id]: newNode };
+
+          if (parentId === null) {
+            const roots = [...pd.rootItems];
+            const idx = afterId ? roots.indexOf(afterId) : -1;
+            roots.splice(idx + 1, 0, id);
+            return { manualPages: { ...state.manualPages, [pageId]: { rootItems: roots, items: newItems } } };
+          } else {
+            const parent = { ...newItems[parentId], children: [...(newItems[parentId]?.children ?? [])] };
+            const idx = afterId ? parent.children.indexOf(afterId) : -1;
+            parent.children.splice(idx + 1, 0, id);
+            return { manualPages: { ...state.manualPages, [pageId]: { rootItems: pd.rootItems, items: { ...newItems, [parentId]: parent } } } };
+          }
+        });
+        return id;
+      },
+
+      updateManualNode: (pageId, nodeId, updates) => {
+        set((state) => {
+          const pd = state.manualPages[pageId];
+          if (!pd?.items[nodeId]) return state;
+          return {
+            manualPages: {
+              ...state.manualPages,
+              [pageId]: {
+                ...pd,
+                items: { ...pd.items, [nodeId]: { ...pd.items[nodeId], ...updates } },
+              },
+            },
+          };
+        });
+      },
+
+      deleteManualNode: (pageId, nodeId) => {
+        set((state) => {
+          const pd = state.manualPages[pageId];
+          if (!pd) return state;
+          const node = pd.items[nodeId];
+          if (!node) return state;
+
+          // Collect all descendant IDs
+          const toDelete = new Set<string>();
+          const collect = (id: string) => {
+            toDelete.add(id);
+            pd.items[id]?.children.forEach(collect);
+          };
+          collect(nodeId);
+
+          const newItems = Object.fromEntries(
+            Object.entries(pd.items).filter(([k]) => !toDelete.has(k))
+          );
+
+          // Remove from parent or root
+          let newRoots = pd.rootItems.filter((id) => id !== nodeId);
+          if (node.parentId && newItems[node.parentId]) {
+            newItems[node.parentId] = {
+              ...newItems[node.parentId],
+              children: newItems[node.parentId].children.filter((id) => id !== nodeId),
+            };
+          }
+
+          return {
+            manualPages: {
+              ...state.manualPages,
+              [pageId]: { rootItems: newRoots, items: newItems },
+            },
+          };
+        });
+      },
+
+      moveManualNode: (pageId, nodeId, afterNodeId) => {
+        set((state) => {
+          const pd = state.manualPages[pageId];
+          if (!pd || nodeId === afterNodeId) return state;
+
+          const node = pd.items[nodeId];
+          const afterNode = pd.items[afterNodeId];
+          if (!node || !afterNode) return state;
+
+          // Don't allow moving into own descendant
+          const isDesc = (checkId: string): boolean => {
+            if (checkId === nodeId) return true;
+            return pd.items[checkId]?.children.some(isDesc) ?? false;
+          };
+          if (isDesc(afterNodeId)) return state;
+
+          let newItems = { ...pd.items };
+          let newRoots = [...pd.rootItems];
+
+          // 1. Remove from current position
+          if (node.parentId === null) {
+            newRoots = newRoots.filter((id) => id !== nodeId);
+          } else {
+            const op = { ...newItems[node.parentId] };
+            op.children = op.children.filter((id) => id !== nodeId);
+            newItems[node.parentId] = op;
+          }
+
+          // 2. Update parentId to match afterNode's parent
+          const newParentId = afterNode.parentId;
+          newItems[nodeId] = { ...newItems[nodeId], parentId: newParentId };
+
+          // 3. Insert after afterNodeId
+          if (newParentId === null) {
+            const idx = newRoots.indexOf(afterNodeId);
+            newRoots.splice(idx + 1, 0, nodeId);
+          } else {
+            const np = { ...newItems[newParentId] };
+            const children = [...np.children];
+            const idx = children.indexOf(afterNodeId);
+            children.splice(idx + 1, 0, nodeId);
+            np.children = children;
+            newItems[newParentId] = np;
+          }
+
+          return {
+            manualPages: {
+              ...state.manualPages,
+              [pageId]: { rootItems: newRoots, items: newItems },
+            },
+          };
+        });
+      },
+
       toggleSidebar: () => {
         set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed }));
       },
@@ -406,6 +540,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         tasks: initialTasks,
         customers: initialCustomers,
         customerStatuses: initialCustomerStatuses,
+        manualPages: {},
         sidebarCollapsed: false,
         darkMode: false,
       }),

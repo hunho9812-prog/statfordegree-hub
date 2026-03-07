@@ -425,64 +425,191 @@ function StatusEditor({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── New row form ─────────────────────────────────────────────────────────────
+// ─── Add customer inline form (full row) ─────────────────────────────────────
 
-function NewRowForm({
-  onAdd,
+const EMPTY_FORM = {
+  name: "",
+  assignee: ASSIGNEES[0],
+  route: "" as CustomerRoute,
+  settlement_amount: null as number | null,
+  alba: "",
+  total_amount: null as number | null,
+  balance: null as number | null,
+  review_proposed: false,
+  balance_received: false,
+  kmong_review: false,
+  kakao_review: false,
+  submit_date: "",
+  status: "",
+  memo: "",
+};
+
+function AddCustomerRow({
+  statuses,
+  onSave,
+  onCancel,
 }: {
-  onAdd: (c: Omit<Customer, "id" | "created_at" | "updated_at">) => void;
+  statuses: StatusOption[];
+  onSave: (c: Omit<Customer, "id" | "created_at" | "updated_at">) => void;
+  onCancel: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [assignee, setAssignee] = useState(ASSIGNEES[0]);
+  const [form, setForm] = useState({ ...EMPTY_FORM });
+  const nameRef = useRef<HTMLInputElement>(null);
 
-  const submit = () => {
-    if (!name.trim()) return;
-    onAdd({
-      name: name.trim(),
-      assignee,
-      route: "",
-      settlement_amount: null,
-      alba: "",
-      total_amount: null,
-      balance: null,
-      review_proposed: false,
-      balance_received: false,
-      kmong_review: false,
-      kakao_review: false,
-      submit_date: "",
-      status: "",
-      memo: "",
-    });
-    setName("");
+  useEffect(() => {
+    nameRef.current?.focus();
+  }, []);
+
+  const set = <K extends keyof typeof EMPTY_FORM>(key: K, value: (typeof EMPTY_FORM)[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  const save = () => {
+    if (!form.name.trim()) return;
+    onSave({ ...form, name: form.name.trim() });
   };
 
+  const numInput = (key: "settlement_amount" | "total_amount" | "balance") => (
+    <input
+      type="number"
+      value={form[key] ?? ""}
+      onChange={(e) =>
+        set(key, e.target.value === "" ? null : Number(e.target.value))
+      }
+      className="w-full bg-transparent outline-none text-sm text-right"
+      placeholder="0"
+    />
+  );
+
   return (
-    <tr className="border-t border-[#e9e9e7] dark:border-[#2f2f2f]">
-      <td className="px-3 py-2">
+    <tr className="border-t-2 border-blue-400 bg-blue-50/50 dark:bg-blue-950/10">
+      {/* 이름 */}
+      <td className="px-3 py-2 min-w-[120px]">
         <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
-          placeholder="+ 새 고객 이름 입력"
-          className="w-full bg-transparent text-sm outline-none text-[#37352f] dark:text-[#e6e6e4] placeholder-gray-300 dark:placeholder-gray-600"
+          ref={nameRef}
+          value={form.name}
+          onChange={(e) => set("name", e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") onCancel();
+          }}
+          placeholder="이름 입력"
+          className="w-full bg-transparent outline-none text-sm text-[#37352f] dark:text-[#e6e6e4] placeholder-blue-300"
         />
       </td>
+      {/* 담당자 */}
       <td className="px-3 py-2">
         <select
-          value={assignee}
-          onChange={(e) => setAssignee(e.target.value)}
+          value={form.assignee}
+          onChange={(e) => set("assignee", e.target.value)}
           className="bg-transparent text-sm outline-none dark:text-[#e6e6e4]"
         >
           {ASSIGNEES.map((a) => <option key={a} value={a}>{a}</option>)}
         </select>
       </td>
-      <td colSpan={12} className="px-3 py-2">
-        <button
-          onClick={submit}
-          disabled={!name.trim()}
-          className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 disabled:opacity-40"
+      {/* Tags */}
+      <td className="px-3 py-2">
+        <select
+          value={form.route}
+          onChange={(e) => set("route", e.target.value as CustomerRoute)}
+          className="bg-transparent text-sm outline-none dark:text-[#e6e6e4]"
         >
-          <Plus size={12} /> 추가
+          {ROUTES.map((r) => <option key={r} value={r}>{r || "—"}</option>)}
+        </select>
+      </td>
+      {/* 알바 */}
+      <td className="px-3 py-2">
+        <input
+          value={form.alba}
+          onChange={(e) => set("alba", e.target.value)}
+          placeholder="알바"
+          className="w-full bg-transparent outline-none text-sm"
+        />
+      </td>
+      {/* 정산금액 */}
+      <td className="px-3 py-2">{numInput("settlement_amount")}</td>
+      {/* 전체금액 */}
+      <td className="px-3 py-2">{numInput("total_amount")}</td>
+      {/* 잔금 */}
+      <td className="px-3 py-2">{numInput("balance")}</td>
+      {/* 후기제안 */}
+      <td className="px-3 py-2 text-center">
+        <input type="checkbox" checked={form.review_proposed}
+          onChange={(e) => set("review_proposed", e.target.checked)}
+          className="w-4 h-4 accent-blue-500 cursor-pointer" />
+      </td>
+      {/* 잔금받음? */}
+      <td className="px-3 py-2 text-center">
+        <input type="checkbox" checked={form.balance_received}
+          onChange={(e) => set("balance_received", e.target.checked)}
+          className="w-4 h-4 accent-blue-500 cursor-pointer" />
+      </td>
+      {/* 크몽후기 */}
+      <td className="px-3 py-2 text-center">
+        <input type="checkbox" checked={form.kmong_review}
+          onChange={(e) => set("kmong_review", e.target.checked)}
+          className="w-4 h-4 accent-blue-500 cursor-pointer" />
+      </td>
+      {/* 카톡후기 */}
+      <td className="px-3 py-2 text-center">
+        <input type="checkbox" checked={form.kakao_review}
+          onChange={(e) => set("kakao_review", e.target.checked)}
+          className="w-4 h-4 accent-blue-500 cursor-pointer" />
+      </td>
+      {/* 제출날짜 */}
+      <td className="px-3 py-2">
+        <input
+          value={form.submit_date}
+          onChange={(e) => set("submit_date", e.target.value)}
+          placeholder="날짜"
+          className="w-full bg-transparent outline-none text-sm"
+        />
+      </td>
+      {/* Status */}
+      <td className="px-3 py-2 min-w-[120px]">
+        <StatusCell value={form.status} statuses={statuses} onChange={(v) => set("status", v)} />
+      </td>
+      {/* 메모 */}
+      <td className="px-3 py-2">
+        <input
+          value={form.memo}
+          onChange={(e) => set("memo", e.target.value)}
+          placeholder="메모"
+          className="w-full bg-transparent outline-none text-sm"
+        />
+      </td>
+      {/* Save/Cancel */}
+      <td className="px-3 py-2">
+        <div className="flex gap-1">
+          <button
+            onClick={save}
+            disabled={!form.name.trim()}
+            className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-40"
+          >
+            저장
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-2 py-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            취소
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ─── Add trigger row ──────────────────────────────────────────────────────────
+
+function AddTriggerRow({ onAdd }: { onAdd: () => void }) {
+  return (
+    <tr className="border-t border-[#e9e9e7] dark:border-[#2f2f2f]">
+      <td colSpan={15} className="px-3 py-2">
+        <button
+          onClick={onAdd}
+          className="flex items-center gap-1.5 text-sm text-[#9b9a97] dark:text-[#6b6b6b] hover:text-[#37352f] dark:hover:text-[#e6e6e4] transition-colors"
+        >
+          <Plus size={14} /> 새 고객 추가
         </button>
       </td>
     </tr>
@@ -568,12 +695,18 @@ export default function CRMPage() {
   const { customers, customerStatuses, createCustomer, updateCustomer, deleteCustomer } =
     useWorkspaceStore();
   const [showStatusEditor, setShowStatusEditor] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const HEADERS = [
     "이름", "담당자", "Tags", "알바", "정산금액",
     "전체금액", "잔금", "후기제안", "잔금받음?", "크몽후기", "카톡후기",
     "제출날짜", "Status", "메모", "",
   ];
+
+  const handleSave = (data: Omit<Customer, "id" | "created_at" | "updated_at">) => {
+    createCustomer(data);
+    setShowAddForm(false);
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#191919]">
@@ -583,12 +716,20 @@ export default function CRMPage() {
           <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">고객 관리</h1>
           <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b]">총 {customers.length}명</p>
         </div>
-        <button
-          onClick={() => setShowStatusEditor(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#9b9a97] dark:text-[#6b6b6b] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] rounded-lg transition-colors"
-        >
-          <Settings size={15} /> Status 편집
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            <Plus size={15} /> 고객 추가
+          </button>
+          <button
+            onClick={() => setShowStatusEditor(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#9b9a97] dark:text-[#6b6b6b] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] rounded-lg transition-colors"
+          >
+            <Settings size={15} /> Status 편집
+          </button>
+        </div>
       </div>
 
       {/* Table */}
@@ -616,7 +757,15 @@ export default function CRMPage() {
                 onDelete={() => deleteCustomer(c.id)}
               />
             ))}
-            <NewRowForm onAdd={(data) => createCustomer(data)} />
+            {showAddForm ? (
+              <AddCustomerRow
+                statuses={customerStatuses}
+                onSave={handleSave}
+                onCancel={() => setShowAddForm(false)}
+              />
+            ) : (
+              <AddTriggerRow onAdd={() => setShowAddForm(true)} />
+            )}
           </tbody>
         </table>
       </div>

@@ -58,12 +58,31 @@ export interface Customer {
   updated_at: string;
 }
 
+// ─── Manual tree ─────────────────────────────────────────────────────────────
+
+export interface ManualNode {
+  id: string;
+  text: string;
+  children: string[];       // ordered list of child node IDs
+  parentId: string | null;
+  isExpanded: boolean;
+  isPinned: boolean;
+}
+
+export interface ManualPageData {
+  rootItems: string[];                  // ordered top-level node IDs
+  items: Record<string, ManualNode>;
+}
+
+// ─── Store ────────────────────────────────────────────────────────────────────
+
 export interface WorkspaceState {
   pages: Record<string, Page>;
   rootPageIds: string[];
   tasks: Task[];
   customers: Customer[];
   customerStatuses: StatusOption[];
+  manualPages: Record<string, ManualPageData>;
   sidebarCollapsed: boolean;
   darkMode: boolean;
   createPage: (parentId?: string | null, insertAfter?: string) => string;
@@ -78,6 +97,10 @@ export interface WorkspaceState {
   deleteCustomer: (id: string) => void;
   upsertCustomerStatus: (status: StatusOption) => void;
   deleteCustomerStatus: (id: string) => void;
+  addManualNode: (pageId: string, parentId: string | null, afterId?: string) => string;
+  updateManualNode: (pageId: string, nodeId: string, updates: Partial<Pick<ManualNode, "text" | "isExpanded" | "isPinned">>) => void;
+  deleteManualNode: (pageId: string, nodeId: string) => void;
+  moveManualNode: (pageId: string, nodeId: string, afterNodeId: string) => void;
   toggleSidebar: () => void;
   toggleDarkMode: () => void;
 }
