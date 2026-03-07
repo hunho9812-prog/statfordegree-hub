@@ -142,13 +142,13 @@ export default function EditorMenuBar({ editor }: EditorMenuBarProps) {
     {
       icon: <ChevronRight size={15} />,
       title: "토글 블록",
-      action: () => (editor.commands as Record<string, () => boolean>).insertToggleBlock?.(),
+      action: () => (editor.commands as unknown as Record<string, () => boolean>).insertToggleBlock?.(),
       isActive: editor.isActive("toggleBlock"),
     },
     {
       icon: <Lightbulb size={15} />,
       title: "콜아웃",
-      action: () => (editor.commands as Record<string, () => boolean>).insertCalloutBlock?.(),
+      action: () => (editor.commands as unknown as Record<string, () => boolean>).insertCalloutBlock?.(),
       isActive: editor.isActive("calloutBlock"),
     },
     {

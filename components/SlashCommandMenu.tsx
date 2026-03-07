@@ -102,7 +102,7 @@ export const SLASH_COMMANDS: SlashCommandItem[] = [
     group: "블록",
     command: (editor, range) => {
       editor.chain().focus().deleteRange(range).run();
-      (editor.commands as Record<string, ((...args: unknown[]) => boolean)>).insertToggleBlock?.();
+      (editor.commands as unknown as Record<string, () => boolean>).insertToggleBlock?.();
     },
   },
   {
@@ -131,7 +131,7 @@ export const SLASH_COMMANDS: SlashCommandItem[] = [
     group: "블록",
     command: (editor, range) => {
       editor.chain().focus().deleteRange(range).run();
-      (editor.commands as Record<string, ((...args: unknown[]) => boolean)>).insertCalloutBlock?.();
+      (editor.commands as unknown as Record<string, () => boolean>).insertCalloutBlock?.();
     },
   },
   {
