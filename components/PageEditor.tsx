@@ -14,10 +14,10 @@ import Color from "@tiptap/extension-color";
 import { useWorkspaceStore } from "@/lib/store";
 import { formatRelativeTime } from "@/lib/utils";
 import EditorMenuBar from "./EditorMenuBar";
-import SlashCommandMenu from "./SlashCommandMenu";
+import SlashCommandMenu, { SLASH_COMMANDS } from "./SlashCommandMenu";
 import { ToggleBlock } from "./extensions/ToggleBlock";
 import { CalloutBlock } from "./extensions/CalloutBlock";
-import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code } from "lucide-react";
+import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const EMOJIS = [
@@ -48,12 +48,31 @@ export default function PageEditor({ pageId }: { pageId: string }) {
     range: { from: 0, to: 0 },
   });
 
+  const [blockHandle, setBlockHandle] = useState<{
+    top: number;
+    left: number;
+    blockPos: number;
+    blockEndPos: number;
+  } | null>(null);
+  const [blockMenuOpen, setBlockMenuOpen] = useState(false);
+  const [blockMenuCoords, setBlockMenuCoords] = useState({ x: 0, y: 0 });
+
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const hideHandleTimeout = useRef<NodeJS.Timeout | null>(null);
+  const editorAreaRef = useRef<HTMLDivElement>(null);
 
   const closeSlashMenu = useCallback(() => {
     setSlashMenu((s) => ({ ...s, open: false }));
+  }, []);
+
+  const startHideHandle = useCallback(() => {
+    hideHandleTimeout.current = setTimeout(() => setBlockHandle(null), 120);
+  }, []);
+
+  const cancelHideHandle = useCallback(() => {
+    if (hideHandleTimeout.current) clearTimeout(hideHandleTimeout.current);
   }, []);
 
   const editor = useEditor({
@@ -142,6 +161,55 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       },
     },
   });
+
+  const handleEditorMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!editor) return;
+      const view = editor.view;
+      const posResult = view.posAtCoords({ left: e.clientX, top: e.clientY });
+      if (!posResult) { startHideHandle(); return; }
+
+      const $pos = editor.state.doc.resolve(posResult.pos);
+      if ($pos.depth < 1) { startHideHandle(); return; }
+
+      const blockPos = $pos.before(1);
+      const blockNode = editor.state.doc.nodeAt(blockPos);
+      if (!blockNode) { startHideHandle(); return; }
+
+      const domNode = view.nodeDOM(blockPos);
+      if (!domNode || !(domNode instanceof HTMLElement)) { startHideHandle(); return; }
+
+      const rect = domNode.getBoundingClientRect();
+      if (hideHandleTimeout.current) clearTimeout(hideHandleTimeout.current);
+      setBlockHandle({
+        top: rect.top + rect.height / 2 - 10,
+        left: rect.left - 30,
+        blockPos,
+        blockEndPos: blockPos + blockNode.nodeSize,
+      });
+    },
+    [editor, startHideHandle]
+  );
+
+  const handleBlockPlusClick = useCallback(() => {
+    if (!editor || !blockHandle) return;
+    const insertPos = blockHandle.blockEndPos;
+    editor
+      .chain()
+      .focus()
+      .insertContentAt(insertPos, { type: "paragraph" })
+      .setTextSelection(insertPos + 1)
+      .run();
+
+    setTimeout(() => {
+      try {
+        const coords = editor.view.coordsAtPos(insertPos + 1);
+        setBlockMenuCoords({ x: coords.left, y: coords.bottom });
+        setBlockMenuOpen(true);
+        setBlockHandle(null);
+      } catch { /* ignore */ }
+    }, 0);
+  }, [editor, blockHandle]);
 
   // Sync title with page changes (e.g. from sidebar rename)
   useEffect(() => {
@@ -337,7 +405,12 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           </div>
 
           {/* Editor */}
-          <div className="tiptap-editor">
+          <div
+            ref={editorAreaRef}
+            className="tiptap-editor"
+            onMouseMove={handleEditorMouseMove}
+            onMouseLeave={startHideHandle}
+          >
             <EditorContent editor={editor} />
           </div>
         </div>
@@ -352,6 +425,64 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           query={slashMenu.query}
           range={slashMenu.range}
           onClose={closeSlashMenu}
+        />
+      )}
+
+      {/* Block handle "+" button */}
+      {blockHandle && !blockMenuOpen && (
+        <button
+          style={{ position: "fixed", top: blockHandle.top, left: blockHandle.left, zIndex: 50 }}
+          onMouseEnter={cancelHideHandle}
+          onMouseLeave={startHideHandle}
+          onClick={handleBlockPlusClick}
+          className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          title="블록 추가"
+        >
+          <Plus size={14} />
+        </button>
+      )}
+
+      {/* Block menu (opened by "+" button) */}
+      {editor && blockMenuOpen && (
+        <div
+          className="fixed z-[100] bg-white dark:bg-[#252525] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-xl w-64 max-h-72 overflow-y-auto py-1"
+          style={{ left: Math.min(blockMenuCoords.x, typeof window !== "undefined" ? window.innerWidth - 280 : blockMenuCoords.x), top: blockMenuCoords.y + 8 }}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {["텍스트", "목록", "블록", "미디어"].map((group) => {
+            const items = SLASH_COMMANDS.filter((cmd) => cmd.group === group);
+            if (!items.length) return null;
+            return (
+              <div key={group}>
+                <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{group}</p>
+                {items.map((cmd) => (
+                  <button
+                    key={cmd.id}
+                    onClick={() => {
+                      const pos = editor.state.selection.from;
+                      cmd.command(editor, { from: pos, to: pos });
+                      setBlockMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-left text-[#37352f] dark:text-[#e6e6e4] hover:bg-gray-50 dark:hover:bg-[#2f2f2f] transition-colors"
+                  >
+                    <span className="flex-shrink-0 text-gray-400">{cmd.icon}</span>
+                    <div>
+                      <p className="text-sm font-medium leading-4">{cmd.title}</p>
+                      <p className="text-xs text-gray-400 leading-4">{cmd.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Close block menu on outside click */}
+      {blockMenuOpen && (
+        <div
+          className="fixed inset-0 z-[99]"
+          onClick={() => setBlockMenuOpen(false)}
         />
       )}
     </div>
