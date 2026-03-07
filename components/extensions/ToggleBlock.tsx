@@ -1,6 +1,6 @@
 "use client";
 
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node, mergeAttributes, type CommandProps } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, type NodeViewProps } from "@tiptap/react";
 import { useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
@@ -101,7 +101,7 @@ export const ToggleBlock = Node.create({
     return {
       insertToggleBlock:
         () =>
-        ({ commands }) => {
+        ({ commands }: CommandProps) => {
           return commands.insertContent({
             type: this.name,
             attrs: { isOpen: true, title: "" },

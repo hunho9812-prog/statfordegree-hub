@@ -1,6 +1,6 @@
 "use client";
 
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node, mergeAttributes, type CommandProps } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, type NodeViewProps } from "@tiptap/react";
 import { useState } from "react";
 
@@ -107,7 +107,7 @@ export const CalloutBlock = Node.create({
     return {
       insertCalloutBlock:
         (attrs?: { emoji?: string; color?: string }) =>
-        ({ commands }) => {
+        ({ commands }: CommandProps) => {
           return commands.insertContent({
             type: this.name,
             attrs: { emoji: "💡", color: "yellow", ...attrs },
