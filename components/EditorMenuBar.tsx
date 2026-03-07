@@ -155,13 +155,13 @@ export default function EditorMenuBar({ editor }: EditorMenuBarProps) {
   ];
 
   return (
-    <div className="flex items-center gap-0.5 flex-wrap px-3 py-1.5 border-b border-[#e9e9e7] bg-white sticky top-0 z-10">
+    <div className="flex items-center gap-0.5 flex-wrap px-3 py-1.5 border-b border-[#e9e9e7] dark:border-[#2f2f2f] bg-white dark:bg-[#191919] sticky top-0 z-10">
       {buttons.map((btn, idx) => {
         if (btn === "divider") {
           return (
             <div
               key={`divider-${idx}`}
-              className="w-px h-5 bg-[#e9e9e7] mx-1"
+              className="w-px h-5 bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-1"
             />
           );
         }
@@ -172,10 +172,10 @@ export default function EditorMenuBar({ editor }: EditorMenuBarProps) {
             disabled={btn.disabled}
             title={btn.title}
             className={cn(
-              "w-7 h-7 flex items-center justify-center rounded text-[#37352f]",
-              "hover:bg-[rgba(55,53,47,0.08)] transition-colors",
+              "w-7 h-7 flex items-center justify-center rounded text-[#37352f] dark:text-[#e6e6e4]",
+              "hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] transition-colors",
               "disabled:opacity-30 disabled:cursor-not-allowed",
-              btn.isActive && "bg-[rgba(55,53,47,0.12)] text-blue-600"
+              btn.isActive && "bg-[rgba(55,53,47,0.12)] dark:bg-[rgba(255,255,255,0.1)] text-blue-600 dark:text-blue-400"
             )}
           >
             {btn.icon}

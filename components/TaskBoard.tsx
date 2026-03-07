@@ -85,10 +85,10 @@ export default function TaskBoard() {
   };
 
   return (
-    <div className="flex-1 overflow-hidden flex flex-col">
-      <div className="px-8 py-6 border-b border-[#e9e9e7]">
-        <h1 className="text-2xl font-bold text-[#37352f]">업무 보드</h1>
-        <p className="text-sm text-[#9b9a97] mt-1">
+    <div className="flex-1 overflow-hidden flex flex-col bg-white dark:bg-[#191919]">
+      <div className="px-8 py-6 border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
+        <h1 className="text-2xl font-bold text-[#37352f] dark:text-[#e6e6e4]">업무 보드</h1>
+        <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b] mt-1">
           팀 업무를 칸반 보드로 관리하세요
         </p>
       </div>
@@ -152,7 +152,7 @@ export default function TaskBoard() {
 
                   {/* Add task form */}
                   {addingTo === col.id && (
-                    <div className="bg-white border border-[#e9e9e7] rounded-xl p-3 shadow-sm">
+                    <div className="bg-white dark:bg-[#252525] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl p-3 shadow-sm">
                       <input
                         autoFocus
                         type="text"
@@ -165,7 +165,7 @@ export default function TaskBoard() {
                           if (e.key === "Enter") handleSubmit(col.id);
                           if (e.key === "Escape") setAddingTo(null);
                         }}
-                        className="w-full text-sm text-[#37352f] outline-none placeholder-[#c4c3bf] mb-2"
+                        className="w-full text-sm text-[#37352f] dark:text-[#e6e6e4] bg-transparent outline-none placeholder-[#c4c3bf] dark:placeholder-[#4f4f4f] mb-2"
                       />
                       <input
                         type="text"
@@ -174,7 +174,7 @@ export default function TaskBoard() {
                         onChange={(e) =>
                           setForm({ ...form, description: e.target.value })
                         }
-                        className="w-full text-xs text-[#9b9a97] outline-none placeholder-[#c4c3bf] mb-3"
+                        className="w-full text-xs text-[#9b9a97] bg-transparent outline-none placeholder-[#c4c3bf] dark:placeholder-[#4f4f4f] mb-3"
                       />
                       <div className="flex gap-2 mb-3">
                         <select
@@ -185,7 +185,7 @@ export default function TaskBoard() {
                               priority: e.target.value as TaskPriority,
                             })
                           }
-                          className="flex-1 text-xs border border-[#e9e9e7] rounded-md px-2 py-1 outline-none bg-white"
+                          className="flex-1 text-xs border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-md px-2 py-1 outline-none bg-white dark:bg-[#2f2f2f] dark:text-[#e6e6e4]"
                         >
                           <option value="low">낮음</option>
                           <option value="medium">보통</option>
@@ -198,7 +198,7 @@ export default function TaskBoard() {
                           onChange={(e) =>
                             setForm({ ...form, assignee: e.target.value })
                           }
-                          className="flex-1 text-xs border border-[#e9e9e7] rounded-md px-2 py-1 outline-none"
+                          className="flex-1 text-xs border border-[#e9e9e7] dark:border-[#3f3f3f] dark:bg-[#2f2f2f] dark:text-[#e6e6e4] rounded-md px-2 py-1 outline-none"
                         />
                       </div>
                       <div className="flex gap-2 mb-3">
@@ -208,7 +208,7 @@ export default function TaskBoard() {
                           onChange={(e) =>
                             setForm({ ...form, dueDate: e.target.value })
                           }
-                          className="flex-1 text-xs border border-[#e9e9e7] rounded-md px-2 py-1 outline-none bg-white"
+                          className="flex-1 text-xs border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-md px-2 py-1 outline-none bg-white dark:bg-[#2f2f2f] dark:text-[#e6e6e4]"
                         />
                         <input
                           type="text"
@@ -217,7 +217,7 @@ export default function TaskBoard() {
                           onChange={(e) =>
                             setForm({ ...form, tags: e.target.value })
                           }
-                          className="flex-1 text-xs border border-[#e9e9e7] rounded-md px-2 py-1 outline-none"
+                          className="flex-1 text-xs border border-[#e9e9e7] dark:border-[#3f3f3f] dark:bg-[#2f2f2f] dark:text-[#e6e6e4] rounded-md px-2 py-1 outline-none"
                         />
                       </div>
                       <div className="flex gap-2">
@@ -230,7 +230,7 @@ export default function TaskBoard() {
                         </button>
                         <button
                           onClick={() => setAddingTo(null)}
-                          className="px-3 py-1.5 border border-[#e9e9e7] text-xs rounded-md hover:bg-[rgba(55,53,47,0.08)] transition-colors"
+                          className="px-3 py-1.5 border border-[#e9e9e7] dark:border-[#3f3f3f] dark:text-[#e6e6e4] text-xs rounded-md hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] transition-colors"
                         >
                           취소
                         </button>
@@ -244,7 +244,7 @@ export default function TaskBoard() {
                         setAddingTo(col.id);
                         setForm(defaultForm);
                       }}
-                      className="w-full py-3 border-2 border-dashed border-[#e9e9e7] rounded-xl text-xs text-[#9b9a97] hover:border-[#c4c3bf] hover:text-[#37352f] transition-colors"
+                      className="w-full py-3 border-2 border-dashed border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl text-xs text-[#9b9a97] hover:border-[#c4c3bf] hover:text-[#37352f] dark:hover:text-[#e6e6e4] transition-colors"
                     >
                       + 업무 추가
                     </button>
@@ -295,22 +295,22 @@ function TaskCard({
   const otherStatuses = COLUMNS.filter((c) => c.id !== currentStatus);
 
   return (
-    <div className="bg-white border border-[#e9e9e7] rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow group">
+    <div className="bg-white dark:bg-[#252525] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl p-3 shadow-sm hover:shadow-md dark:shadow-none dark:hover:border-[#555] transition-all group">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-[#37352f] leading-snug flex-1">
+        <p className="text-sm font-medium text-[#37352f] dark:text-[#e6e6e4] leading-snug flex-1">
           {task.title}
         </p>
         <div className="relative flex-shrink-0">
           <button
             onClick={onMenuToggle}
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-[rgba(55,53,47,0.08)] text-[#9b9a97] opacity-0 group-hover:opacity-100 transition-opacity"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] text-[#9b9a97] opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <MoreHorizontal size={14} />
           </button>
           {isMenuOpen && (
-            <div className="absolute right-0 top-7 z-50 bg-white border border-[#e9e9e7] rounded-lg shadow-lg py-1 w-44">
+            <div className="absolute right-0 top-7 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg shadow-lg py-1 w-44">
               <button
-                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[rgba(55,53,47,0.08)]"
+                className="w-full px-3 py-1.5 text-xs text-left text-[#37352f] dark:text-[#e6e6e4] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)]"
                 onClick={onEdit}
               >
                 수정
@@ -318,15 +318,15 @@ function TaskCard({
               {otherStatuses.map((s) => (
                 <button
                   key={s.id}
-                  className="w-full px-3 py-1.5 text-xs text-left hover:bg-[rgba(55,53,47,0.08)]"
+                  className="w-full px-3 py-1.5 text-xs text-left text-[#37352f] dark:text-[#e6e6e4] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)]"
                   onClick={() => onMove(task.id, s.id)}
                 >
                   {STATUS_LABELS[s.id]}(으)로 이동
                 </button>
               ))}
-              <div className="my-1 h-px bg-[#e9e9e7]" />
+              <div className="my-1 h-px bg-[#e9e9e7] dark:bg-[#3f3f3f]" />
               <button
-                className="w-full px-3 py-1.5 text-xs text-left text-red-500 hover:bg-red-50 flex items-center gap-2"
+                className="w-full px-3 py-1.5 text-xs text-left text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
                 onClick={() => onDelete(task.id)}
               >
                 <Trash2 size={12} />
@@ -418,13 +418,13 @@ function EditTaskModal({ task, onClose, onSave }: EditTaskModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e9e9e7]">
-          <h2 className="text-base font-semibold text-[#37352f]">업무 수정</h2>
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-[#252525] rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
+          <h2 className="text-base font-semibold text-[#37352f] dark:text-[#e6e6e4]">업무 수정</h2>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[rgba(55,53,47,0.08)] text-[#9b9a97]"
+            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] text-[#9b9a97]"
           >
             <X size={16} />
           </button>
@@ -432,43 +432,33 @@ function EditTaskModal({ task, onClose, onSave }: EditTaskModalProps) {
 
         <div className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-[#9b9a97] mb-1">
-              제목 *
-            </label>
+            <label className="block text-xs font-medium text-[#9b9a97] mb-1">제목 *</label>
             <input
               autoFocus
               type="text"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full text-sm border border-[#e9e9e7] rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-200"
+              className="input-style"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#9b9a97] mb-1">
-              설명
-            </label>
+            <label className="block text-xs font-medium text-[#9b9a97] mb-1">설명</label>
             <textarea
               value={form.description}
-              onChange={(e) =>
-                setForm({ ...form, description: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={3}
-              className="w-full text-sm border border-[#e9e9e7] rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-200 resize-none"
+              className="input-style resize-none"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[#9b9a97] mb-1">
-                상태
-              </label>
+              <label className="block text-xs font-medium text-[#9b9a97] mb-1">상태</label>
               <select
                 value={form.status}
-                onChange={(e) =>
-                  setForm({ ...form, status: e.target.value as TaskStatus })
-                }
-                className="w-full text-sm border border-[#e9e9e7] rounded-lg px-3 py-2 outline-none bg-white"
+                onChange={(e) => setForm({ ...form, status: e.target.value as TaskStatus })}
+                className="input-style"
               >
                 <option value="todo">할 일</option>
                 <option value="in-progress">진행 중</option>
@@ -477,15 +467,11 @@ function EditTaskModal({ task, onClose, onSave }: EditTaskModalProps) {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#9b9a97] mb-1">
-                우선순위
-              </label>
+              <label className="block text-xs font-medium text-[#9b9a97] mb-1">우선순위</label>
               <select
                 value={form.priority}
-                onChange={(e) =>
-                  setForm({ ...form, priority: e.target.value as TaskPriority })
-                }
-                className="w-full text-sm border border-[#e9e9e7] rounded-lg px-3 py-2 outline-none bg-white"
+                onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}
+                className="input-style"
               >
                 <option value="low">낮음</option>
                 <option value="medium">보통</option>
@@ -496,44 +482,34 @@ function EditTaskModal({ task, onClose, onSave }: EditTaskModalProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[#9b9a97] mb-1">
-                담당자
-              </label>
+              <label className="block text-xs font-medium text-[#9b9a97] mb-1">담당자</label>
               <input
                 type="text"
                 value={form.assignee}
-                onChange={(e) =>
-                  setForm({ ...form, assignee: e.target.value })
-                }
-                className="w-full text-sm border border-[#e9e9e7] rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-200"
+                onChange={(e) => setForm({ ...form, assignee: e.target.value })}
+                className="input-style"
                 placeholder="이름 입력"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#9b9a97] mb-1">
-                마감일
-              </label>
+              <label className="block text-xs font-medium text-[#9b9a97] mb-1">마감일</label>
               <input
                 type="date"
                 value={form.dueDate}
-                onChange={(e) =>
-                  setForm({ ...form, dueDate: e.target.value })
-                }
-                className="w-full text-sm border border-[#e9e9e7] rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                className="input-style"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#9b9a97] mb-1">
-              태그 (쉼표로 구분)
-            </label>
+            <label className="block text-xs font-medium text-[#9b9a97] mb-1">태그 (쉼표로 구분)</label>
             <input
               type="text"
               value={form.tags}
               onChange={(e) => setForm({ ...form, tags: e.target.value })}
-              className="w-full text-sm border border-[#e9e9e7] rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-200"
+              className="input-style"
               placeholder="태그1, 태그2, ..."
             />
           </div>
@@ -549,7 +525,7 @@ function EditTaskModal({ task, onClose, onSave }: EditTaskModalProps) {
           </button>
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-[#e9e9e7] text-sm rounded-lg hover:bg-[rgba(55,53,47,0.08)] transition-colors"
+            className="px-4 py-2 border border-[#e9e9e7] dark:border-[#3f3f3f] dark:text-[#e6e6e4] text-sm rounded-lg hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] transition-colors"
           >
             취소
           </button>

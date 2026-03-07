@@ -192,6 +192,44 @@ body {
   cursor: pointer;
 }
 
+/* ─── TipTap Editor — Dark mode ────────────────────────────────── */
+.dark .tiptap-editor .ProseMirror {
+  color: #e6e6e4;
+}
+
+.dark .tiptap-editor .ProseMirror h1,
+.dark .tiptap-editor .ProseMirror h2,
+.dark .tiptap-editor .ProseMirror h3 {
+  color: #e6e6e4;
+}
+
+.dark .tiptap-editor .ProseMirror blockquote {
+  border-left-color: #3f3f3f;
+  color: #6b6b6b;
+}
+
+.dark .tiptap-editor .ProseMirror code {
+  background: #2f2f2f;
+  color: #ff8080;
+}
+
+.dark .tiptap-editor .ProseMirror hr {
+  border-top-color: #3f3f3f;
+}
+
+.dark .tiptap-editor .ProseMirror mark {
+  background-color: #5a4f00;
+  color: #e6e6e4;
+}
+
+.dark .tiptap-editor .ProseMirror.is-editor-empty:first-child::before {
+  color: #4f4f4f;
+}
+
+.dark .tiptap-editor .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div > p {
+  color: #6b6b6b;
+}
+
 /* Focus outline for inputs */
 input:focus,
 textarea:focus,
@@ -214,6 +252,14 @@ select:focus {
   border-radius: 3px;
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: #3f3f3f;
+}
+
 ::-webkit-scrollbar-thumb:hover {
   background: #b3b3b0;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }

@@ -70,8 +70,9 @@ export default function SidebarPageItem({
       <div
         className={cn(
           "group flex items-center gap-1 py-[3px] px-2 rounded-md cursor-pointer select-none",
-          "text-sm text-[#37352f] hover:bg-[rgba(55,53,47,0.08)]",
-          isActive && "bg-[rgba(55,53,47,0.08)]"
+          "text-sm text-[#37352f] dark:text-[#e6e6e4]",
+          "hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)]",
+          isActive && "bg-[rgba(55,53,47,0.08)] dark:bg-[rgba(255,255,255,0.06)]"
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
         onClick={() => router.push(`/p/${page.id}`)}
@@ -82,7 +83,7 @@ export default function SidebarPageItem({
         <button
           className={cn(
             "w-5 h-5 flex items-center justify-center rounded flex-shrink-0",
-            "hover:bg-[rgba(55,53,47,0.16)] text-[#9b9a97]",
+            "hover:bg-[rgba(55,53,47,0.16)] dark:hover:bg-[rgba(255,255,255,0.1)] text-[#9b9a97]",
             !hasChildren && "invisible"
           )}
           onClick={handleToggleExpand}
@@ -128,9 +129,9 @@ export default function SidebarPageItem({
                 <MoreHorizontal size={14} />
               </button>
               {showMenu && (
-                <div className="absolute right-0 top-6 z-50 bg-white border border-[#e9e9e7] rounded-lg shadow-lg py-1 w-40">
+                <div className="absolute right-0 top-6 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg shadow-lg py-1 w-40">
                   <button
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                     onClick={handleDelete}
                   >
                     <Trash2 size={14} />

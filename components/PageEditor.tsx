@@ -124,7 +124,7 @@ export default function PageEditor({ pageId }: PageEditorProps) {
 
   if (!page) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center bg-white dark:bg-[#191919]">
         <div className="text-center">
           <p className="text-[#9b9a97] text-lg">페이지를 찾을 수 없습니다</p>
           <button
@@ -149,7 +149,7 @@ export default function PageEditor({ pageId }: PageEditorProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#191919]">
       {/* Toolbar */}
       {editor && <EditorMenuBar editor={editor} />}
 
@@ -158,13 +158,13 @@ export default function PageEditor({ pageId }: PageEditorProps) {
         <div className="max-w-3xl mx-auto px-16 py-12">
           {/* Breadcrumb */}
           {breadcrumb.length > 0 && (
-            <div className="flex items-center gap-1 mb-6 text-sm text-[#9b9a97]">
+            <div className="flex items-center gap-1 mb-6 text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
               {breadcrumb.map((item, idx) => (
                 <span key={item.id} className="flex items-center gap-1">
                   {idx > 0 && <ChevronRight size={12} />}
                   <button
                     onClick={() => router.push(`/p/${item.id}`)}
-                    className="hover:text-[#37352f] transition-colors"
+                    className="hover:text-[#37352f] dark:hover:text-[#e6e6e4] transition-colors"
                   >
                     {item.emoji} {item.title}
                   </button>
@@ -178,21 +178,21 @@ export default function PageEditor({ pageId }: PageEditorProps) {
           <div className="relative mb-4" ref={emojiPickerRef}>
             <button
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="text-5xl hover:bg-[rgba(55,53,47,0.08)] rounded-lg p-1 transition-colors leading-none"
+              className="text-5xl hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] rounded-lg p-1 transition-colors leading-none"
               title="이모지 변경"
             >
               {page.emoji || "📄"}
             </button>
 
             {showEmojiPicker && (
-              <div className="absolute left-0 top-16 z-50 bg-white border border-[#e9e9e7] rounded-xl shadow-lg p-3 w-64">
+              <div className="absolute left-0 top-16 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-lg p-3 w-64">
                 <p className="text-xs text-[#9b9a97] mb-2 font-medium">이모지 선택</p>
                 <div className="grid grid-cols-10 gap-1">
                   {EMOJIS.map((emoji) => (
                     <button
                       key={emoji}
                       onClick={() => handleEmojiSelect(emoji)}
-                      className="w-7 h-7 flex items-center justify-center rounded hover:bg-[rgba(55,53,47,0.08)] text-lg"
+                      className="w-7 h-7 flex items-center justify-center rounded hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] text-lg"
                     >
                       {emoji}
                     </button>
@@ -210,22 +210,18 @@ export default function PageEditor({ pageId }: PageEditorProps) {
             onKeyDown={handleTitleKeyDown}
             placeholder="제목 없음"
             rows={1}
-            className={`
-              w-full text-4xl font-bold text-[#37352f] resize-none overflow-hidden
-              bg-transparent border-none outline-none placeholder-[#c4c3bf]
-              leading-tight mb-8 block
-            `}
+            className="w-full text-4xl font-bold text-[#37352f] dark:text-[#e6e6e4] resize-none overflow-hidden bg-transparent border-none outline-none placeholder-[#c4c3bf] dark:placeholder-[#4f4f4f] leading-tight mb-8 block"
           />
 
           {/* Meta info */}
-          <div className="flex items-center gap-4 mb-8 text-xs text-[#9b9a97]">
+          <div className="flex items-center gap-4 mb-8 text-xs text-[#9b9a97] dark:text-[#6b6b6b]">
             <span className="flex items-center gap-1">
               <Clock size={12} />
               {formatRelativeTime(page.updatedAt)} 업데이트
             </span>
             <span
               className={`flex items-center gap-1 ${
-                saveStatus === "saving" ? "text-yellow-500" : "text-[#c4c3bf]"
+                saveStatus === "saving" ? "text-yellow-500" : "text-[#c4c3bf] dark:text-[#4f4f4f]"
               }`}
             >
               {saveStatus === "saving" ? "저장 중..." : saveStatus === "saved" ? "저장됨" : "미저장"}
