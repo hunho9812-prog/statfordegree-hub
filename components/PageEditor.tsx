@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -17,7 +17,7 @@ import EditorMenuBar from "./EditorMenuBar";
 import SlashCommandMenu, { SLASH_COMMANDS } from "./SlashCommandMenu";
 import { ToggleBlock } from "./extensions/ToggleBlock";
 import { CalloutBlock } from "./extensions/CalloutBlock";
-import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus } from "lucide-react";
+import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical } from "lucide-react";
 import { useRouter } from "next/navigation";
 import MonthPageManager from "./MonthPageManager";
 
@@ -35,9 +35,18 @@ interface SlashMenuState {
 }
 
 interface BlockButton {
-  top: number;
-  left: number;
+  top: number;        // vertical center for the control group
+  blockTop: number;   // real block top (scroll-space) — used for drop indicator
+  blockBottom: number;// real block bottom
+  left: number;       // left edge of 3-button control group
+  docStart: number;   // ProseMirror offset of block start
+  docEnd: number;     // ProseMirror offset of block end
+}
+
+interface DragState {
+  docStart: number;
   docEnd: number;
+  srcIdx: number;
 }
 
 export default function PageEditor({ pageId }: { pageId: string }) {
@@ -58,12 +67,14 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   const [blockButtons, setBlockButtons] = useState<BlockButton[]>([]);
   const [blockMenuOpen, setBlockMenuOpen] = useState(false);
   const [blockMenuCoords, setBlockMenuCoords] = useState({ x: 0, y: 0 });
+  const [dropBtnIdx, setDropBtnIdx] = useState<number | null>(null);
 
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
+  const dragStateRef = useRef<DragState | null>(null);
 
   const closeSlashMenu = useCallback(() => {
     setSlashMenu((s) => ({ ...s, open: false }));
@@ -168,9 +179,15 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           const domNode = editor.view.nodeDOM(offset);
           if (!(domNode instanceof HTMLElement)) return;
           const rect = domNode.getBoundingClientRect();
+          const relTop = rect.top - containerRect.top + scrollTop;
+          // 3 buttons × 18 px + 2 gaps × 2 px = 58 px; keep ≥ 4 px from container edge
+          const groupLeft = Math.max(4, rect.left - containerRect.left - 62);
           btns.push({
-            top: rect.top - containerRect.top + scrollTop + rect.height / 2 - 10,
-            left: rect.left - containerRect.left - 28,
+            top: relTop + rect.height / 2 - 9,
+            blockTop: relTop,
+            blockBottom: relTop + rect.height,
+            left: groupLeft,
+            docStart: offset,
             docEnd: offset + node.nodeSize,
           });
         } catch { /* skip unmounted nodes */ }
@@ -220,6 +237,89 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       } catch { /* ignore */ }
     }, 0);
   }, [editor]);
+
+  // Delete a single block by its ProseMirror range.
+  const handleDeleteBlock = useCallback((docStart: number, docEnd: number) => {
+    if (!editor) return;
+    // Never delete the very last block to keep the editor non-empty.
+    if (editor.state.doc.childCount <= 1) return;
+    editor.chain().focus().deleteRange({ from: docStart, to: docEnd }).run();
+  }, [editor]);
+
+  // ── Drag-to-reorder ──────────────────────────────────────────────────────────
+  const handleDragStart = useCallback((
+    e: React.DragEvent,
+    docStart: number,
+    docEnd: number,
+    srcIdx: number,
+  ) => {
+    dragStateRef.current = { docStart, docEnd, srcIdx };
+    e.dataTransfer.effectAllowed = "move";
+    // Invisible drag ghost so the default blue box doesn't flicker
+    const ghost = document.createElement("div");
+    ghost.style.cssText = "position:fixed;top:-9999px";
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 0, 0);
+    requestAnimationFrame(() => document.body.removeChild(ghost));
+  }, []);
+
+  const handleContainerDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (!dragStateRef.current) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const containerEl = scrollContainerRef.current;
+    if (!containerEl) return;
+    const mouseY = e.clientY - containerEl.getBoundingClientRect().top + containerEl.scrollTop;
+    // Find the block whose centre is nearest the cursor
+    let closest = 0;
+    let minDist = Infinity;
+    blockButtons.forEach((btn, idx) => {
+      const dist = Math.abs(btn.top + 9 - mouseY);
+      if (dist < minDist) { minDist = dist; closest = idx; }
+    });
+    setDropBtnIdx(closest);
+  }, [blockButtons]);
+
+  const handleContainerDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!editor || !dragStateRef.current || dropBtnIdx === null) {
+      dragStateRef.current = null;
+      setDropBtnIdx(null);
+      return;
+    }
+    const { docStart, docEnd, srcIdx } = dragStateRef.current;
+    const targetBtn = blockButtons[dropBtnIdx];
+    dragStateRef.current = null;
+    setDropBtnIdx(null);
+
+    if (srcIdx === dropBtnIdx || !targetBtn) return;
+
+    editor.chain().focus().command(({ tr, state, dispatch }) => {
+      const content = state.doc.slice(docStart, docEnd).content;
+      tr.delete(docStart, docEnd);
+      // Map target position through the deletion
+      const insertPos = srcIdx < dropBtnIdx
+        ? tr.mapping.map(targetBtn.docEnd)   // moving down → after target
+        : tr.mapping.map(targetBtn.docStart); // moving up  → before target
+      tr.insert(insertPos, content);
+      if (dispatch) dispatch(tr);
+      return true;
+    }).run();
+  }, [editor, blockButtons, dropBtnIdx]);
+
+  const handleDragEnd = useCallback(() => {
+    dragStateRef.current = null;
+    setDropBtnIdx(null);
+  }, []);
+
+  // Drop-indicator position (blue line shown while dragging)
+  const dropIndicator = useMemo(() => {
+    if (dropBtnIdx === null || !dragStateRef.current) return null;
+    const btn = blockButtons[dropBtnIdx];
+    if (!btn) return null;
+    const isMovingDown = dragStateRef.current.srcIdx < dropBtnIdx;
+    return { top: isMovingDown ? btn.blockBottom : btn.blockTop, left: btn.left + 60 };
+  }, [dropBtnIdx, blockButtons]);
 
   // Sync title with page changes (e.g. from sidebar rename)
   useEffect(() => {
@@ -344,8 +444,19 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         </BubbleMenu>
       )}
 
-      {/* Scrollable content — position:relative so absolute "+" buttons are anchored here */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative">
+      {/* Scrollable content — position:relative so absolute block controls are anchored here */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto relative"
+        onDragOver={handleContainerDragOver}
+        onDrop={handleContainerDrop}
+        onDragLeave={(e) => {
+          // Only clear when leaving the scroll container entirely
+          if (!scrollContainerRef.current?.contains(e.relatedTarget as Node)) {
+            setDropBtnIdx(null);
+          }
+        }}
+      >
         <div className="max-w-3xl mx-auto px-16 py-12">
           {/* Breadcrumb */}
           {breadcrumb.length > 0 && (
@@ -423,20 +534,61 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           </div>
         </div>
 
-        {/* Always-visible "+" buttons — one per block, absolutely positioned.
-            key=docEnd gives stable identity so React doesn't unmount on re-render. */}
-        {!blockMenuOpen && blockButtons.map((btn) => (
-          <button
-            key={btn.docEnd}
+        {/* Per-block control group: ⋮⋮ drag · ➕ add · 🗑️ delete
+            key=docStart for stable identity across re-renders. */}
+        {!blockMenuOpen && blockButtons.map((btn, idx) => (
+          <div
+            key={btn.docStart}
             style={{ position: "absolute", top: btn.top, left: btn.left, zIndex: 30 }}
-            onMouseDown={(e) => e.preventDefault()} // keep editor focus
-            onClick={() => handleInsertBlock(btn.docEnd)}
-            className="w-5 h-5 flex items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            title="블록 추가"
+            className="flex items-center gap-0.5"
           >
-            <Plus size={14} />
-          </button>
+            {/* ⋮⋮ Drag handle */}
+            <button
+              draggable
+              onDragStart={(e) => handleDragStart(e, btn.docStart, btn.docEnd, idx)}
+              onDragEnd={handleDragEnd}
+              className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-500 dark:hover:text-gray-300 cursor-grab active:cursor-grabbing transition-colors"
+              title="드래그하여 이동"
+            >
+              <GripVertical size={11} />
+            </button>
+
+            {/* ➕ Add block */}
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handleInsertBlock(btn.docEnd)}
+              className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              title="블록 추가"
+            >
+              <Plus size={12} />
+            </button>
+
+            {/* 🗑️ Delete block */}
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handleDeleteBlock(btn.docStart, btn.docEnd)}
+              className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+              title="블록 삭제"
+            >
+              <Trash2 size={11} />
+            </button>
+          </div>
         ))}
+
+        {/* Blue drop-target indicator line shown while dragging */}
+        {dropIndicator && (
+          <div
+            style={{
+              position: "absolute",
+              top: dropIndicator.top - 1,
+              left: dropIndicator.left,
+              right: 16,
+              zIndex: 40,
+              pointerEvents: "none",
+            }}
+            className="h-0.5 bg-blue-500 rounded-full"
+          />
+        )}
       </div>
 
       {/* Slash command menu */}
