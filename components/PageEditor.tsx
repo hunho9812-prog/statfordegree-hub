@@ -162,22 +162,25 @@ export default function PageEditor({ pageId }: { pageId: string }) {
     },
   });
 
+  // Attached to the wide content container (includes left padding where the "+" button lives).
+  // Only UPDATE the handle when over a real block; never hide mid-move so the button stays
+  // reachable. The handle is hidden only when the mouse leaves the container entirely.
   const handleEditorMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!editor) return;
       const view = editor.view;
       const posResult = view.posAtCoords({ left: e.clientX, top: e.clientY });
-      if (!posResult) { startHideHandle(); return; }
+      if (!posResult) return; // mouse in padding / gap — keep existing handle visible
 
       const $pos = editor.state.doc.resolve(posResult.pos);
-      if ($pos.depth < 1) { startHideHandle(); return; }
+      if ($pos.depth < 1) return;
 
       const blockPos = $pos.before(1);
       const blockNode = editor.state.doc.nodeAt(blockPos);
-      if (!blockNode) { startHideHandle(); return; }
+      if (!blockNode) return;
 
       const domNode = view.nodeDOM(blockPos);
-      if (!domNode || !(domNode instanceof HTMLElement)) { startHideHandle(); return; }
+      if (!domNode || !(domNode instanceof HTMLElement)) return;
 
       const rect = domNode.getBoundingClientRect();
       if (hideHandleTimeout.current) clearTimeout(hideHandleTimeout.current);
@@ -188,7 +191,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         blockEndPos: blockPos + blockNode.nodeSize,
       });
     },
-    [editor, startHideHandle]
+    [editor]
   );
 
   const handleBlockPlusClick = useCallback(() => {
@@ -336,7 +339,14 @@ export default function PageEditor({ pageId }: { pageId: string }) {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-16 py-12">
+        {/* The mouse handlers are on this wide container (includes the 64px left padding
+            where the "+" button lives), so mouseleave doesn't fire when moving from
+            block content to the button. */}
+        <div
+          className="max-w-3xl mx-auto px-16 py-12"
+          onMouseMove={handleEditorMouseMove}
+          onMouseLeave={startHideHandle}
+        >
           {/* Breadcrumb */}
           {breadcrumb.length > 0 && (
             <div className="flex items-center gap-1 mb-6 text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
@@ -405,12 +415,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           </div>
 
           {/* Editor */}
-          <div
-            ref={editorAreaRef}
-            className="tiptap-editor"
-            onMouseMove={handleEditorMouseMove}
-            onMouseLeave={startHideHandle}
-          >
+          <div ref={editorAreaRef} className="tiptap-editor">
             <EditorContent editor={editor} />
           </div>
         </div>
@@ -428,12 +433,10 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         />
       )}
 
-      {/* Block handle "+" button */}
+      {/* Block handle "+" button — fixed so it can sit in the container's left padding */}
       {blockHandle && !blockMenuOpen && (
         <button
           style={{ position: "fixed", top: blockHandle.top, left: blockHandle.left, zIndex: 50 }}
-          onMouseEnter={cancelHideHandle}
-          onMouseLeave={startHideHandle}
           onClick={handleBlockPlusClick}
           className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           title="블록 추가"
