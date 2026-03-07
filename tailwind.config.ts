@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -37,14 +38,6 @@ const config: Config = {
           blue: "#0b6e99",
           purple: "#6940a5",
           pink: "#ad1a72",
-        },
-      },
-      typography: {
-        DEFAULT: {
-          css: {
-            color: "#37352f",
-            maxWidth: "none",
-          },
         },
       },
     },

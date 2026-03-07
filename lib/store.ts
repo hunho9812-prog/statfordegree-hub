@@ -1,341 +1,61 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuidv4 } from "uuid";
-import type { WorkspaceState, Page, Task } from "./types";
+import type { WorkspaceState, Page, Task, Customer } from "./types";
 
-const welcomePageId = "welcome-page";
-const manualPageId = "manual-page";
-const projectPageId = "project-page";
-const taskGuideId = "task-guide-page";
+// Fixed IDs for the 5 main menu sections
+export const MENU_IDS = {
+  MANUAL: "menu-manual",
+  MANUAL_ANALYSIS: "menu-manual-analysis",
+  MANUAL_CHECKLIST: "menu-manual-checklist",
+  MANUAL_OTHER: "menu-manual-other",
+  TAX: "menu-tax",
+  ADMATCH: "menu-admatch",
+  STATGENIE: "menu-statgenie",
+} as const;
 
 const now = new Date().toISOString();
 
+function makeEmptyDoc(text: string) {
+  return JSON.stringify({
+    type: "doc",
+    content: [
+      {
+        type: "heading",
+        attrs: { level: 1 },
+        content: [{ type: "text", text }],
+      },
+      { type: "paragraph", content: [] },
+    ],
+  });
+}
+
 const initialPages: Record<string, Page> = {
-  [welcomePageId]: {
-    id: welcomePageId,
-    title: "Statfordegree Hub 시작하기",
-    emoji: "👋",
-    content: JSON.stringify({
-      type: "doc",
-      content: [
-        {
-          type: "heading",
-          attrs: { level: 1 },
-          content: [{ type: "text", text: "Statfordegree Hub에 오신 것을 환영합니다!" }],
-        },
-        {
-          type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: "이 공간은 우리 팀의 지식관리 시스템입니다. 업무 메뉴얼, 프로젝트 문서, 팀 정보를 한 곳에 정리하세요.",
-            },
-          ],
-        },
-        {
-          type: "heading",
-          attrs: { level: 2 },
-          content: [{ type: "text", text: "⚡ 주요 기능" }],
-        },
-        {
-          type: "bulletList",
-          content: [
-            {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    { type: "text", marks: [{ type: "bold" }], text: "페이지 관리" },
-                    { type: "text", text: " — 좌측 사이드바에서 새 페이지를 만들고 계층적으로 정리하세요" },
-                  ],
-                },
-              ],
-            },
-            {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    { type: "text", marks: [{ type: "bold" }], text: "리치 텍스트 에디터" },
-                    { type: "text", text: " — 제목, 목록, 체크박스, 코드 블록 등 다양한 포맷 지원" },
-                  ],
-                },
-              ],
-            },
-            {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    { type: "text", marks: [{ type: "bold" }], text: "업무 관리" },
-                    { type: "text", text: " — 칸반 보드로 팀 업무를 시각적으로 관리하세요" },
-                  ],
-                },
-              ],
-            },
-            {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    { type: "text", marks: [{ type: "bold" }], text: "자동 저장" },
-                    { type: "text", text: " — 모든 변경사항이 자동으로 저장됩니다" },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        {
-          type: "heading",
-          attrs: { level: 2 },
-          content: [{ type: "text", text: "📝 에디터 사용법" }],
-        },
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "에디터에서 텍스트를 선택하면 서식 도구 모음이 나타납니다. 아래 단축키도 사용할 수 있습니다:" },
-          ],
-        },
-        {
-          type: "bulletList",
-          content: [
-            {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    { type: "text", marks: [{ type: "code" }], text: "Ctrl+B" },
-                    { type: "text", text: " — 굵게" },
-                  ],
-                },
-              ],
-            },
-            {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    { type: "text", marks: [{ type: "code" }], text: "Ctrl+I" },
-                    { type: "text", text: " — 기울임" },
-                  ],
-                },
-              ],
-            },
-            {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    { type: "text", marks: [{ type: "code" }], text: "Ctrl+U" },
-                    { type: "text", text: " — 밑줄" },
-                  ],
-                },
-              ],
-            },
-            {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    { type: "text", marks: [{ type: "code" }], text: "Ctrl+Shift+H" },
-                    { type: "text", text: " — 형광펜" },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        {
-          type: "heading",
-          attrs: { level: 2 },
-          content: [{ type: "text", text: "✅ 할 일" }],
-        },
-        {
-          type: "taskList",
-          content: [
-            {
-              type: "taskItem",
-              attrs: { checked: true },
-              content: [
-                {
-                  type: "paragraph",
-                  content: [{ type: "text", text: "Statfordegree Hub 계정 생성" }],
-                },
-              ],
-            },
-            {
-              type: "taskItem",
-              attrs: { checked: false },
-              content: [
-                {
-                  type: "paragraph",
-                  content: [{ type: "text", text: "팀원들과 공유하기" }],
-                },
-              ],
-            },
-            {
-              type: "taskItem",
-              attrs: { checked: false },
-              content: [
-                {
-                  type: "paragraph",
-                  content: [{ type: "text", text: "첫 번째 팀 메뉴얼 작성하기" }],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    }),
+  [MENU_IDS.MANUAL]: {
+    id: MENU_IDS.MANUAL,
+    title: "메뉴얼",
+    emoji: "📋",
+    content: makeEmptyDoc("메뉴얼"),
     parentId: null,
-    children: [],
-    createdAt: now,
-    updatedAt: now,
-    isExpanded: false,
-  },
-  [manualPageId]: {
-    id: manualPageId,
-    title: "팀 메뉴얼",
-    emoji: "📚",
-    content: JSON.stringify({
-      type: "doc",
-      content: [
-        {
-          type: "heading",
-          attrs: { level: 1 },
-          content: [{ type: "text", text: "팀 메뉴얼" }],
-        },
-        {
-          type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: "팀의 업무 프로세스, 규칙, 가이드라인을 정리하는 공간입니다.",
-            },
-          ],
-        },
-        {
-          type: "heading",
-          attrs: { level: 2 },
-          content: [{ type: "text", text: "📋 목차" }],
-        },
-        {
-          type: "orderedList",
-          content: [
-            {
-              type: "listItem",
-              content: [
-                { type: "paragraph", content: [{ type: "text", text: "온보딩 가이드" }] },
-              ],
-            },
-            {
-              type: "listItem",
-              content: [
-                { type: "paragraph", content: [{ type: "text", text: "업무 프로세스" }] },
-              ],
-            },
-            {
-              type: "listItem",
-              content: [
-                { type: "paragraph", content: [{ type: "text", text: "커뮤니케이션 규칙" }] },
-              ],
-            },
-            {
-              type: "listItem",
-              content: [
-                { type: "paragraph", content: [{ type: "text", text: "도구 사용 가이드" }] },
-              ],
-            },
-          ],
-        },
-        {
-          type: "heading",
-          attrs: { level: 2 },
-          content: [{ type: "text", text: "🚀 온보딩 가이드" }],
-        },
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "새 팀원을 위한 온보딩 내용을 여기에 작성하세요..." },
-          ],
-        },
-        { type: "paragraph", content: [] },
-      ],
-    }),
-    parentId: null,
-    children: [],
-    createdAt: now,
-    updatedAt: now,
-    isExpanded: false,
-  },
-  [projectPageId]: {
-    id: projectPageId,
-    title: "프로젝트",
-    emoji: "🗂️",
-    content: JSON.stringify({
-      type: "doc",
-      content: [
-        {
-          type: "heading",
-          attrs: { level: 1 },
-          content: [{ type: "text", text: "프로젝트" }],
-        },
-        {
-          type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: "진행 중인 프로젝트와 계획을 정리하는 공간입니다.",
-            },
-          ],
-        },
-        {
-          type: "heading",
-          attrs: { level: 2 },
-          content: [{ type: "text", text: "🟢 진행 중" }],
-        },
-        {
-          type: "paragraph",
-          content: [{ type: "text", text: "현재 진행 중인 프로젝트를 여기에 정리하세요..." }],
-        },
-        {
-          type: "heading",
-          attrs: { level: 2 },
-          content: [{ type: "text", text: "🔜 예정" }],
-        },
-        {
-          type: "paragraph",
-          content: [{ type: "text", text: "예정된 프로젝트를 여기에 정리하세요..." }],
-        },
-        {
-          type: "heading",
-          attrs: { level: 2 },
-          content: [{ type: "text", text: "✅ 완료" }],
-        },
-        {
-          type: "paragraph",
-          content: [{ type: "text", text: "완료된 프로젝트를 여기에 기록하세요..." }],
-        },
-      ],
-    }),
-    parentId: null,
-    children: [taskGuideId],
+    children: [MENU_IDS.MANUAL_ANALYSIS, MENU_IDS.MANUAL_CHECKLIST, MENU_IDS.MANUAL_OTHER],
     createdAt: now,
     updatedAt: now,
     isExpanded: true,
   },
-  [taskGuideId]: {
-    id: taskGuideId,
-    title: "업무 관리 가이드",
+  [MENU_IDS.MANUAL_ANALYSIS]: {
+    id: MENU_IDS.MANUAL_ANALYSIS,
+    title: "분석시 메뉴얼",
+    emoji: "📊",
+    content: makeEmptyDoc("분석시 메뉴얼"),
+    parentId: MENU_IDS.MANUAL,
+    children: [],
+    createdAt: now,
+    updatedAt: now,
+    isExpanded: false,
+  },
+  [MENU_IDS.MANUAL_CHECKLIST]: {
+    id: MENU_IDS.MANUAL_CHECKLIST,
+    title: "크레도/응대 체크리스트",
     emoji: "✅",
     content: JSON.stringify({
       type: "doc",
@@ -343,66 +63,75 @@ const initialPages: Record<string, Page> = {
         {
           type: "heading",
           attrs: { level: 1 },
-          content: [{ type: "text", text: "업무 관리 가이드" }],
+          content: [{ type: "text", text: "크레도/응대 체크리스트" }],
         },
         {
-          type: "paragraph",
+          type: "taskList",
           content: [
             {
-              type: "text",
-              text: "좌측 사이드바의 '업무 보드' 메뉴에서 칸반 보드를 이용해 팀 업무를 관리할 수 있습니다.",
-            },
-          ],
-        },
-        {
-          type: "heading",
-          attrs: { level: 2 },
-          content: [{ type: "text", text: "칸반 보드 사용법" }],
-        },
-        {
-          type: "bulletList",
-          content: [
-            {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    { type: "text", marks: [{ type: "bold" }], text: "할 일 (Todo)" },
-                    { type: "text", text: " — 아직 시작하지 않은 업무" },
-                  ],
-                },
-              ],
+              type: "taskItem",
+              attrs: { checked: false },
+              content: [{ type: "paragraph", content: [{ type: "text", text: "고객 첫 응대 완료" }] }],
             },
             {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    { type: "text", marks: [{ type: "bold" }], text: "진행 중 (In Progress)" },
-                    { type: "text", text: " — 현재 작업 중인 업무" },
-                  ],
-                },
-              ],
+              type: "taskItem",
+              attrs: { checked: false },
+              content: [{ type: "paragraph", content: [{ type: "text", text: "요구사항 파악" }] }],
             },
             {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    { type: "text", marks: [{ type: "bold" }], text: "완료 (Done)" },
-                    { type: "text", text: " — 완료된 업무" },
-                  ],
-                },
-              ],
+              type: "taskItem",
+              attrs: { checked: false },
+              content: [{ type: "paragraph", content: [{ type: "text", text: "분석 일정 확인" }] }],
             },
           ],
         },
       ],
     }),
-    parentId: projectPageId,
+    parentId: MENU_IDS.MANUAL,
+    children: [],
+    createdAt: now,
+    updatedAt: now,
+    isExpanded: false,
+  },
+  [MENU_IDS.MANUAL_OTHER]: {
+    id: MENU_IDS.MANUAL_OTHER,
+    title: "기타 문서",
+    emoji: "📁",
+    content: makeEmptyDoc("기타 문서"),
+    parentId: MENU_IDS.MANUAL,
+    children: [],
+    createdAt: now,
+    updatedAt: now,
+    isExpanded: false,
+  },
+  [MENU_IDS.TAX]: {
+    id: MENU_IDS.TAX,
+    title: "세금 메뉴얼",
+    emoji: "💰",
+    content: makeEmptyDoc("세금 메뉴얼"),
+    parentId: null,
+    children: [],
+    createdAt: now,
+    updatedAt: now,
+    isExpanded: false,
+  },
+  [MENU_IDS.ADMATCH]: {
+    id: MENU_IDS.ADMATCH,
+    title: "AdMatch",
+    emoji: "📢",
+    content: makeEmptyDoc("AdMatch"),
+    parentId: null,
+    children: [],
+    createdAt: now,
+    updatedAt: now,
+    isExpanded: false,
+  },
+  [MENU_IDS.STATGENIE]: {
+    id: MENU_IDS.STATGENIE,
+    title: "스탯지니",
+    emoji: "🤖",
+    content: makeEmptyDoc("스탯지니"),
+    parentId: null,
     children: [],
     createdAt: now,
     updatedAt: now,
@@ -435,27 +164,19 @@ const initialTasks: Task[] = [
     createdAt: now,
     updatedAt: now,
   },
-  {
-    id: uuidv4(),
-    title: "Statfordegree Hub 셋업 완료",
-    description: "팀원 모두가 사용할 수 있도록 환경 구성",
-    status: "done",
-    priority: "high",
-    assignee: "팀장",
-    dueDate: null,
-    tags: ["셋업"],
-    createdAt: now,
-    updatedAt: now,
-  },
 ];
+
+const initialCustomers: Customer[] = [];
 
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       pages: initialPages,
-      rootPageIds: [welcomePageId, manualPageId, projectPageId],
+      rootPageIds: [MENU_IDS.MANUAL, MENU_IDS.TAX, MENU_IDS.ADMATCH, MENU_IDS.STATGENIE],
       tasks: initialTasks,
+      customers: initialCustomers,
       sidebarCollapsed: false,
+      darkMode: false,
 
       createPage: (parentId = null, insertAfter) => {
         const id = uuidv4();
@@ -539,7 +260,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
           let newPages = deleteRecursive(id, state.pages);
 
-          // Remove from parent or root
           if (page.parentId) {
             const parent = newPages[page.parentId];
             if (parent) {
@@ -598,13 +318,59 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }));
       },
 
+      createCustomer: (customerData) => {
+        const id = uuidv4();
+        const customer: Customer = {
+          id,
+          ...customerData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        set((state) => ({ customers: [...state.customers, customer] }));
+        return id;
+      },
+
+      updateCustomer: (id, updates) => {
+        set((state) => ({
+          customers: state.customers.map((c) =>
+            c.id === id
+              ? { ...c, ...updates, updated_at: new Date().toISOString() }
+              : c
+          ),
+        }));
+      },
+
+      deleteCustomer: (id) => {
+        set((state) => ({
+          customers: state.customers.filter((c) => c.id !== id),
+        }));
+      },
+
       toggleSidebar: () => {
         set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed }));
+      },
+
+      toggleDarkMode: () => {
+        set((state) => {
+          const next = !state.darkMode;
+          if (typeof document !== "undefined") {
+            document.documentElement.classList.toggle("dark", next);
+          }
+          return { darkMode: next };
+        });
       },
     }),
     {
       name: "statfordegree-hub-storage",
-      version: 1,
+      version: 2,
+      migrate: () => ({
+        pages: initialPages,
+        rootPageIds: [MENU_IDS.MANUAL, MENU_IDS.TAX, MENU_IDS.ADMATCH, MENU_IDS.STATGENIE],
+        tasks: initialTasks,
+        customers: initialCustomers,
+        sidebarCollapsed: false,
+        darkMode: false,
+      }),
     }
   )
 );
