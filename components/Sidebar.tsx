@@ -89,7 +89,7 @@ export default function Sidebar() {
             <Users size={16} />
           </button>
         </Link>
-        <Link href="/manual">
+        <Link href="/p/menu-manual">
           <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="메뉴얼">
             <BookOpen size={16} />
           </button>
@@ -206,8 +206,8 @@ export default function Sidebar() {
           </div>
         </Link>
 
-        <Link href="/manual">
-          <div className={navItem(pathname === "/manual")}>
+        <Link href="/p/menu-manual">
+          <div className={navItem(pathname === "/manual" || pathname === "/p/menu-manual")}>
             <BookOpen size={15} className="text-[#9b9a97]" />
             <span>메뉴얼</span>
           </div>

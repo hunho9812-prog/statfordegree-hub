@@ -53,7 +53,7 @@ interface DragState {
 
 export default function PageEditor({ pageId }: { pageId: string }) {
   const router = useRouter();
-  const { pages, updatePage } = useWorkspaceStore();
+  const { pages, updatePage, createPage } = useWorkspaceStore();
   const page = pages[pageId];
 
   const [title, setTitle] = useState(page?.title || "");
@@ -547,6 +547,53 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           <div className={isMonthPage ? "hidden" : "tiptap-editor"}>
             <EditorContent editor={editor} />
           </div>
+
+          {/* Child pages section */}
+          {page.children.length > 0 && !isMonthPage && (
+            <div className="mt-10 border-t border-[#e9e9e7] dark:border-[#3f3f3f] pt-6">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] uppercase tracking-wide">
+                  하위 페이지
+                </span>
+                <button
+                  onClick={() => {
+                    const newId = createPage(pageId);
+                    router.push(`/p/${newId}`);
+                  }}
+                  className="flex items-center gap-1 text-xs text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[rgba(55,53,47,0.06)] dark:hover:bg-[rgba(255,255,255,0.04)] px-2 py-1 rounded transition-colors"
+                >
+                  <Plus size={12} />
+                  새 페이지
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {page.children.map((childId) => {
+                  const child = pages[childId];
+                  if (!child) return null;
+                  return (
+                    <button
+                      key={childId}
+                      onClick={() => router.push(`/p/${childId}`)}
+                      className="flex items-center gap-3 px-3 py-3 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] hover:bg-[rgba(55,53,47,0.04)] dark:hover:bg-[rgba(255,255,255,0.04)] text-left transition-colors group"
+                    >
+                      <span className="text-2xl flex-shrink-0 leading-none">{child.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[#37352f] dark:text-[#e6e6e4] truncate group-hover:text-black dark:group-hover:text-white transition-colors">
+                          {child.title || "제목 없음"}
+                        </p>
+                        {child.children.length > 0 && (
+                          <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] mt-0.5">
+                            하위 페이지 {child.children.length}개
+                          </p>
+                        )}
+                      </div>
+                      <ChevronRight size={15} className="text-[#c4c3bf] dark:text-[#4f4f4f] group-hover:text-[#9b9a97] transition-colors flex-shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Month page: full-width embedded CRM outside max-w-3xl */}
