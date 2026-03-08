@@ -12,6 +12,7 @@ import {
   FileText,
   CheckSquare,
   Users,
+  BookOpen,
   Sun,
   Moon,
 } from "lucide-react";
@@ -86,6 +87,11 @@ export default function Sidebar() {
         <Link href="/crm">
           <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="고객관리">
             <Users size={16} />
+          </button>
+        </Link>
+        <Link href="/manual">
+          <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="메뉴얼">
+            <BookOpen size={16} />
           </button>
         </Link>
         <button
@@ -197,6 +203,13 @@ export default function Sidebar() {
           <div className={navItem(pathname === "/crm")}>
             <Users size={15} className="text-[#9b9a97]" />
             <span>고객관리</span>
+          </div>
+        </Link>
+
+        <Link href="/manual">
+          <div className={navItem(pathname === "/manual")}>
+            <BookOpen size={15} className="text-[#9b9a97]" />
+            <span>메뉴얼</span>
           </div>
         </Link>
       </div>
