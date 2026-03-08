@@ -535,22 +535,9 @@ export default function PageEditor({ pageId }: { pageId: string }) {
             </span>
           </div>
 
-          {/* Year page: bar chart + month manager */}
-          {isYearPage && (
-            <>
-              <YearRevenueDashboard pageId={pageId} />
-              <MonthPageManager pageId={pageId} />
-            </>
-          )}
-
-          {/* Editor — hidden on month pages */}
-          <div className={isMonthPage ? "hidden" : "tiptap-editor"}>
-            <EditorContent editor={editor} />
-          </div>
-
-          {/* Child pages section */}
+          {/* Child pages section — shown right after meta */}
           {page.children.length > 0 && !isMonthPage && (
-            <div className="mt-10 border-t border-[#e9e9e7] dark:border-[#3f3f3f] pt-6">
+            <div className="mb-8">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] uppercase tracking-wide">
                   하위 페이지
@@ -594,6 +581,19 @@ export default function PageEditor({ pageId }: { pageId: string }) {
               </div>
             </div>
           )}
+
+          {/* Year page: bar chart + month manager */}
+          {isYearPage && (
+            <>
+              <YearRevenueDashboard pageId={pageId} />
+              <MonthPageManager pageId={pageId} />
+            </>
+          )}
+
+          {/* Editor — hidden on month pages */}
+          <div className={isMonthPage ? "hidden" : "tiptap-editor"}>
+            <EditorContent editor={editor} />
+          </div>
         </div>
 
         {/* Month page: full-width embedded CRM outside max-w-3xl */}
