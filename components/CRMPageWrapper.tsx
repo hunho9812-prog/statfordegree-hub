@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 
-const CRMPage = dynamic(() => import("./CRMPage"), {
+const CRMHub = dynamic(() => import("./CRMHub"), {
   ssr: false,
   loading: () => (
     <div className="flex-1 flex items-center justify-center bg-white dark:bg-[#191919]">
@@ -15,5 +15,5 @@ const CRMPage = dynamic(() => import("./CRMPage"), {
 });
 
 export default function CRMPageWrapper() {
-  return <CRMPage />;
+  return <CRMHub />;
 }
