@@ -6,9 +6,9 @@ import { useWorkspaceStore } from "@/lib/store";
 
 const MONTH_LABELS = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
 
-// Extract month number from title "고객관리양식(YY년 N월)"
+// Extract month number from title "N월" (child of a year page)
 function monthFromTitle(title: string): number {
-  const m = title.match(/\(\d{2}년\s*(\d{1,2})월\)$/);
+  const m = title.match(/^(\d{1,2})월$/);
   return m ? parseInt(m[1]) : 0;
 }
 
@@ -20,23 +20,16 @@ export default function YearRevenueDashboard({ pageId }: { pageId: string }) {
   if (!yearMatch) return null;
 
   const year = parseInt(yearMatch[1]);
-  const shortYear = year % 100; // 2025 → 25
 
   // Build monthly revenue data (indexes 0–11 = 1월–12월)
   const monthlyData = useMemo(() => {
-    // Map month page IDs to month numbers
+    // Map month page IDs to month numbers (child pages titled "N월")
     const monthPageMap: Record<string, number> = {}; // pageId → month (1–12)
     page.children.forEach((childId) => {
       const child = pages[childId];
       if (!child) return;
-      // Match "고객관리양식(YY년 N월)"
-      const mTitle = child.title.match(
-        new RegExp(`^고객관리양식\\(${shortYear}년\\s*(\\d{1,2})월\\)$`)
-      );
-      if (mTitle) {
-        const m = parseInt(mTitle[1]);
-        if (m >= 1 && m <= 12) monthPageMap[childId] = m;
-      }
+      const m = monthFromTitle(child.title);
+      if (m >= 1 && m <= 12) monthPageMap[childId] = m;
     });
 
     const revenue = new Array<number>(12).fill(0);
@@ -47,7 +40,7 @@ export default function YearRevenueDashboard({ pageId }: { pageId: string }) {
     });
 
     return revenue;
-  }, [page.children, pages, customers, shortYear]);
+  }, [page.children, pages, customers]);
 
   const maxRevenue = Math.max(...monthlyData, 1);
   const totalRevenue = monthlyData.reduce((s, v) => s + v, 0);

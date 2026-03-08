@@ -383,8 +383,11 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   }
 
   // Page type detection
-  const isMonthPage = /^고객관리양식\(\d{2}년\s*\d{1,2}월\)$/.test(page.title);
   const isYearPage = /^(\d{4})년/.test(page.title);
+  const isMonthPage =
+    /^\d{1,2}월$/.test(page.title) &&
+    page.parentId !== null &&
+    /^(\d{4})년/.test(pages[page.parentId]?.title ?? "");
 
   // Build breadcrumb
   const breadcrumb: { id: string; title: string; emoji: string }[] = [];
