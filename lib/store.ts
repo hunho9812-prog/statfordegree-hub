@@ -2,6 +2,16 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuidv4 } from "uuid";
 import type { WorkspaceState, Page, Task, Customer, StatusOption, ManualNode, ManualPageData } from "./types";
+import {
+  dbPages,
+  dbTasks,
+  dbCustomers,
+  dbCustomerStatuses,
+  dbManualNodes,
+  dbManualPageRoots,
+  dbWorkspaceConfig,
+} from "./db";
+import { isSupabaseConfigured } from "./supabase";
 
 // Fixed IDs for the manual page hierarchy
 export const MENU_IDS = {
@@ -482,7 +492,7 @@ const freshState = {
 
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...freshState,
 
       createPage: (parentId = null, insertAfter) => {
@@ -530,6 +540,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           }
         });
 
+        // Supabase sync
+        const s = get();
+        dbPages.upsert(s.pages[id]);
+        if (parentId) {
+          dbPages.update(parentId, { children: s.pages[parentId].children });
+        } else {
+          dbWorkspaceConfig.set("rootPageIds", s.rootPageIds);
+        }
+
         return id;
       },
 
@@ -544,9 +563,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             },
           },
         }));
+        dbPages.update(id, { ...updates, updatedAt: new Date().toISOString() });
       },
 
       deletePage: (id) => {
+        // Collect all IDs to delete before modifying state
+        const collectIds = (pageId: string, pages: Record<string, Page>): string[] => {
+          const p = pages[pageId];
+          if (!p) return [];
+          return [pageId, ...p.children.flatMap((c) => collectIds(c, pages))];
+        };
+        const currentPages = get().pages;
+        const currentPage = currentPages[id];
+        const idsToDelete = collectIds(id, currentPages);
+
         set((state) => {
           const page = state.pages[id];
           if (!page) return state;
@@ -583,6 +613,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const newRootIds = state.rootPageIds.filter((rid) => rid !== id);
           return { pages: newPages, rootPageIds: newRootIds };
         });
+
+        // Supabase sync — delete all recursively collected IDs
+        idsToDelete.forEach((pid) => dbPages.delete(pid));
+        if (currentPage?.parentId) {
+          const s = get();
+          const parent = s.pages[currentPage.parentId];
+          if (parent) dbPages.update(currentPage.parentId, { children: parent.children });
+        } else {
+          dbWorkspaceConfig.set("rootPageIds", get().rootPageIds);
+        }
       },
 
       togglePageExpand: (id) => {
@@ -595,6 +635,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             },
           },
         }));
+        const s = get();
+        dbPages.update(id, { isExpanded: s.pages[id].isExpanded });
       },
 
       createTask: (taskData) => {
@@ -606,6 +648,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           updatedAt: new Date().toISOString(),
         };
         set((state) => ({ tasks: [...state.tasks, task] }));
+        dbTasks.upsert(task);
         return id;
       },
 
@@ -617,12 +660,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               : t
           ),
         }));
+        const updated = get().tasks.find((t) => t.id === id);
+        if (updated) dbTasks.upsert(updated);
       },
 
       deleteTask: (id) => {
         set((state) => ({
           tasks: state.tasks.filter((t) => t.id !== id),
         }));
+        dbTasks.delete(id);
       },
 
       createCustomer: (customerData) => {
@@ -635,6 +681,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           updated_at: new Date().toISOString(),
         };
         set((state) => ({ customers: [...state.customers, customer] }));
+        dbCustomers.upsert(customer);
         return id;
       },
 
@@ -646,12 +693,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               : c
           ),
         }));
+        const updated = get().customers.find((c) => c.id === id);
+        if (updated) dbCustomers.upsert(updated);
       },
 
       deleteCustomer: (id) => {
         set((state) => ({
           customers: state.customers.filter((c) => c.id !== id),
         }));
+        dbCustomers.delete(id);
       },
 
       upsertCustomerStatus: (status) => {
@@ -666,12 +716,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           }
           return { customerStatuses: [...state.customerStatuses, status] };
         });
+        dbCustomerStatuses.upsert(status);
       },
 
       deleteCustomerStatus: (id) => {
         set((state) => ({
           customerStatuses: state.customerStatuses.filter((s) => s.id !== id),
         }));
+        dbCustomerStatuses.delete(id);
       },
 
       // ── Manual tree actions ────────────────────────────────────────────────
@@ -697,6 +749,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             return { manualPages: { ...state.manualPages, [pageId]: { rootItems: pd.rootItems, items: { ...newItems, [parentId]: parent } } } };
           }
         });
+        // Supabase sync
+        const pd = get().manualPages[pageId];
+        if (pd) {
+          dbManualNodes.upsert(pd.items[id], pageId);
+          if (parentId) dbManualNodes.upsert(pd.items[parentId], pageId);
+          else dbManualPageRoots.upsert(pageId, pd.rootItems);
+        }
         return id;
       },
 
@@ -714,9 +773,23 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             },
           };
         });
+        const node = get().manualPages[pageId]?.items[nodeId];
+        if (node) dbManualNodes.upsert(node, pageId);
       },
 
       deleteManualNode: (pageId, nodeId) => {
+        // Collect IDs to delete before state change
+        const pd = get().manualPages[pageId];
+        const idsToDelete: string[] = [];
+        if (pd) {
+          const collect = (id: string) => {
+            idsToDelete.push(id);
+            pd.items[id]?.children.forEach(collect);
+          };
+          collect(nodeId);
+        }
+        const deletedNode = pd?.items[nodeId];
+
         set((state) => {
           const pd = state.manualPages[pageId];
           if (!pd) return state;
@@ -749,6 +822,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             },
           };
         });
+        // Supabase sync
+        dbManualNodes.deleteMany(idsToDelete);
+        if (deletedNode?.parentId) {
+          const parentNode = get().manualPages[pageId]?.items[deletedNode.parentId];
+          if (parentNode) dbManualNodes.upsert(parentNode, pageId);
+        } else {
+          const newRoots = get().manualPages[pageId]?.rootItems ?? [];
+          dbManualPageRoots.upsert(pageId, newRoots);
+        }
       },
 
       moveManualNode: (pageId, nodeId, afterNodeId) => {
@@ -799,6 +881,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             },
           };
         });
+        // Supabase sync
+        const updatedPd = get().manualPages[pageId];
+        if (updatedPd) {
+          dbManualNodes.upsert(updatedPd.items[nodeId], pageId);
+          dbManualPageRoots.upsert(pageId, updatedPd.rootItems);
+        }
       },
 
       toggleSidebar: () => {
@@ -814,10 +902,69 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           return { darkMode: next };
         });
       },
+
+      loadFromSupabase: async () => {
+        if (!isSupabaseConfigured) return;
+
+        const [pages, tasks, customers, statuses, manualNodesData, manualRoots, rootPageIdsConfig] =
+          await Promise.all([
+            dbPages.fetchAll(),
+            dbTasks.fetchAll(),
+            dbCustomers.fetchAll(),
+            dbCustomerStatuses.fetchAll(),
+            dbManualNodes.fetchAll(),
+            dbManualPageRoots.fetchAll(),
+            dbWorkspaceConfig.get("rootPageIds"),
+          ]);
+
+        // Build manualPages from flat node list
+        const manualPages: Record<string, ManualPageData> = {};
+        for (const { pageId, node } of manualNodesData) {
+          if (!manualPages[pageId]) manualPages[pageId] = { rootItems: [], items: {} };
+          manualPages[pageId].items[node.id] = node;
+        }
+        for (const [pid, rootItems] of Object.entries(manualRoots)) {
+          if (!manualPages[pid]) manualPages[pid] = { rootItems: [], items: {} };
+          manualPages[pid].rootItems = rootItems;
+        }
+
+        const isFirstRun = Object.keys(pages).length === 0;
+        if (isFirstRun) {
+          // Seed initial data on first run
+          await Promise.all([
+            dbPages.upsertMany(Object.values(freshState.pages)),
+            dbCustomerStatuses.upsertMany(freshState.customerStatuses),
+            dbWorkspaceConfig.set("rootPageIds", freshState.rootPageIds),
+          ]);
+          set({
+            pages: freshState.pages,
+            rootPageIds: freshState.rootPageIds,
+            tasks: [],
+            customers: [],
+            customerStatuses: freshState.customerStatuses,
+            manualPages: {},
+          });
+          return;
+        }
+
+        set({
+          pages,
+          rootPageIds: (rootPageIdsConfig as string[] | null) ?? freshState.rootPageIds,
+          tasks,
+          customers,
+          customerStatuses: statuses.length > 0 ? statuses : freshState.customerStatuses,
+          manualPages,
+        });
+      },
     }),
     {
       name: "statfordegree-hub-storage",
       version: 5,
+      // Only persist UI preferences — data comes from Supabase
+      partialize: (state) => ({
+        darkMode: state.darkMode,
+        sidebarCollapsed: state.sidebarCollapsed,
+      }),
       migrate: (persistedState: unknown, version: number) => {
         if (version === 4) {
           // v4 → v5: reset pages to new Notion-style hierarchy, preserve customers/tasks

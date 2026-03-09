@@ -104,4 +104,5 @@ export interface WorkspaceState {
   moveManualNode: (pageId: string, nodeId: string, afterNodeId: string) => void;
   toggleSidebar: () => void;
   toggleDarkMode: () => void;
+  loadFromSupabase: () => Promise<void>;
 }
