@@ -930,21 +930,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         const isFirstRun = Object.keys(pages).length === 0;
         if (isFirstRun) {
-          // Seed initial data on first run
+          // Seed: push current localStorage state (pages + existing data) into Supabase
+          const current = get();
           await Promise.all([
-            dbPages.upsertMany(Object.values(freshState.pages)),
-            dbCustomerStatuses.upsertMany(freshState.customerStatuses),
-            dbWorkspaceConfig.set("rootPageIds", freshState.rootPageIds),
+            dbPages.upsertMany(Object.values(current.pages)),
+            dbCustomerStatuses.upsertMany(current.customerStatuses),
+            dbWorkspaceConfig.set("rootPageIds", current.rootPageIds),
+            ...current.tasks.map((t) => dbTasks.upsert(t)),
+            ...current.customers.map((c) => dbCustomers.upsert(c)),
           ]);
-          set({
-            pages: freshState.pages,
-            rootPageIds: freshState.rootPageIds,
-            tasks: [],
-            customers: [],
-            customerStatuses: freshState.customerStatuses,
-            manualPages: {},
-          });
-          return;
+          return; // keep localStorage state as-is
         }
 
         set({
@@ -960,11 +955,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     {
       name: "statfordegree-hub-storage",
       version: 5,
-      // Only persist UI preferences — data comes from Supabase
-      partialize: (state) => ({
-        darkMode: state.darkMode,
-        sidebarCollapsed: state.sidebarCollapsed,
-      }),
       migrate: (persistedState: unknown, version: number) => {
         if (version === 4) {
           // v4 → v5: reset pages to new Notion-style hierarchy, preserve customers/tasks
