@@ -928,26 +928,46 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           manualPages[pid].rootItems = rootItems;
         }
 
-        const isFirstRun = Object.keys(pages).length === 0;
-        if (isFirstRun) {
-          // Seed: push current localStorage state (pages + existing data) into Supabase
-          const current = get();
+        const current = get();
+
+        // Find data that exists locally but not in Supabase → upload it (migration)
+        const supaPageIds = new Set(Object.keys(pages));
+        const localOnlyPages = Object.values(current.pages).filter((p) => !supaPageIds.has(p.id));
+
+        const supaTaskIds = new Set(tasks.map((t) => t.id));
+        const localOnlyTasks = current.tasks.filter((t) => !supaTaskIds.has(t.id));
+
+        const supaCustomerIds = new Set(customers.map((c) => c.id));
+        const localOnlyCustomers = current.customers.filter((c) => !supaCustomerIds.has(c.id));
+
+        const uploadOps: Promise<void>[] = [];
+        if (localOnlyPages.length > 0) uploadOps.push(dbPages.upsertMany(localOnlyPages));
+        if (localOnlyTasks.length > 0) uploadOps.push(...localOnlyTasks.map((t) => dbTasks.upsert(t)));
+        if (localOnlyCustomers.length > 0) uploadOps.push(...localOnlyCustomers.map((c) => dbCustomers.upsert(c)));
+        if (uploadOps.length > 0) await Promise.all(uploadOps);
+
+        // Seed workspace config if missing
+        if (Object.keys(pages).length === 0) {
           await Promise.all([
-            dbPages.upsertMany(Object.values(current.pages)),
             dbCustomerStatuses.upsertMany(current.customerStatuses),
             dbWorkspaceConfig.set("rootPageIds", current.rootPageIds),
-            ...current.tasks.map((t) => dbTasks.upsert(t)),
-            ...current.customers.map((c) => dbCustomers.upsert(c)),
           ]);
-          return; // keep localStorage state as-is
         }
 
+        // Merge: Supabase is source of truth, supplement with local-only items
+        const mergedPages = {
+          ...pages,
+          ...Object.fromEntries(localOnlyPages.map((p) => [p.id, p])),
+        };
+        const mergedTasks = [...tasks, ...localOnlyTasks];
+        const mergedCustomers = [...customers, ...localOnlyCustomers];
+
         set({
-          pages,
-          rootPageIds: (rootPageIdsConfig as string[] | null) ?? freshState.rootPageIds,
-          tasks,
-          customers,
-          customerStatuses: statuses.length > 0 ? statuses : freshState.customerStatuses,
+          pages: Object.keys(mergedPages).length > 0 ? mergedPages : current.pages,
+          rootPageIds: (rootPageIdsConfig as string[] | null) ?? current.rootPageIds,
+          tasks: mergedTasks,
+          customers: mergedCustomers,
+          customerStatuses: statuses.length > 0 ? statuses : current.customerStatuses,
           manualPages,
         });
       },
