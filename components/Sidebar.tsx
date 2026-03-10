@@ -16,8 +16,8 @@ import {
   Sun,
   Moon,
   LogOut,
-  Shield,
   Crown,
+  UserCog,
 } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -99,6 +99,13 @@ export default function Sidebar() {
             <BookOpen size={16} />
           </button>
         </Link>
+        {profile?.role === "admin" && (
+          <Link href="/admin">
+            <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="팀원관리">
+              <UserCog size={16} />
+            </button>
+          </Link>
+        )}
         <button
           onClick={handleNewPage}
           className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)}
@@ -107,13 +114,6 @@ export default function Sidebar() {
           <Plus size={16} />
         </button>
         <div className="flex-1" />
-        {profile?.role === "admin" && (
-          <Link href="/admin">
-            <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="팀 관리">
-              <Shield size={16} />
-            </button>
-          </Link>
-        )}
         <button
           onClick={toggleDarkMode}
           className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)}
@@ -231,6 +231,15 @@ export default function Sidebar() {
             <span>메뉴얼</span>
           </div>
         </Link>
+
+        {profile?.role === "admin" && (
+          <Link href="/admin">
+            <div className={navItem(pathname === "/admin")}>
+              <UserCog size={15} className="text-[#9b9a97]" />
+              <span>팀원관리</span>
+            </div>
+          </Link>
+        )}
       </div>
 
       {/* Divider */}
@@ -305,16 +314,6 @@ export default function Sidebar() {
               </p>
             </div>
           </div>
-        )}
-
-        {/* Admin panel link */}
-        {profile?.role === "admin" && (
-          <Link href="/admin">
-            <div className={cn("flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-[#9b9a97] transition-colors", hover)}>
-              <Shield size={15} />
-              <span>팀 관리</span>
-            </div>
-          </Link>
         )}
 
         {/* Dark mode */}

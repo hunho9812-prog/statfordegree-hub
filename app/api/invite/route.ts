@@ -34,14 +34,18 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. 초대 메일 발송 (service role 사용)
-  const { email } = await req.json();
+  const { email, name, role } = await req.json();
   if (!email) {
     return NextResponse.json({ error: "이메일을 입력해주세요." }, { status: 400 });
   }
 
+  const inviteRole = role === "admin" ? "admin" : "member";
+
   try {
     const adminClient = createAdminClient();
-    const { error } = await adminClient.auth.admin.inviteUserByEmail(email);
+    const { error } = await adminClient.auth.admin.inviteUserByEmail(email, {
+      data: { name: name ?? "", role: inviteRole },
+    });
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

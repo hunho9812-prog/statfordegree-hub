@@ -10,9 +10,13 @@
 create table if not exists users (
   id         uuid primary key references auth.users(id) on delete cascade,
   email      text not null,
+  name       text not null default '',
   role       text not null default 'member' check (role in ('admin', 'member')),
   created_at timestamptz default now()
 );
+
+-- name 컬럼 추가 (기존 테이블에 없을 경우)
+alter table users add column if not exists name text not null default '';
 
 -- users 테이블 RLS
 alter table users enable row level security;
@@ -34,11 +38,16 @@ create policy "users_self_insert" on users
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.users (id, email, role)
+  insert into public.users (id, email, name, role)
   values (
     new.id,
     new.email,
-    case when new.email = 'rlagusgh1214@naver.com' then 'admin' else 'member' end
+    coalesce(new.raw_user_meta_data->>'name', ''),
+    case
+      when new.email = 'rlagusgh1214@naver.com' then 'admin'
+      when new.raw_user_meta_data->>'role' = 'admin' then 'admin'
+      else 'member'
+    end
   )
   on conflict (id) do nothing; -- 이미 등록된 경우 무시
   return new;
