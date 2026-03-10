@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { Eye, EyeOff } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
@@ -11,17 +12,16 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // 이미 로그인된 경우 홈으로
     if (isSupabaseConfigured && supabase) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) router.replace("/");
       });
     }
-    // 에러 파라미터 처리
     const errorParam = searchParams.get("error");
     if (errorParam === "unauthorized") {
       setError("초대받지 않은 계정입니다. 관리자에게 초대를 요청하세요.");
@@ -47,7 +47,6 @@ function LoginForm() {
         }
         return;
       }
-      // 로그인 성공 → 홈으로 (AuthProvider의 onAuthStateChange가 profile 로드)
       router.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인 중 오류가 발생했습니다.");
@@ -59,6 +58,7 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f7f6f3] dark:bg-[#191919] px-4">
       <div className="w-full max-w-sm">
+
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-2xl shadow-lg mb-4">
@@ -110,17 +110,27 @@ function LoginForm() {
               <label className="block text-sm font-medium text-[#37352f] dark:text-[#e6e6e4] mb-1.5">
                 Password
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className="input-style"
-                autoComplete="current-password"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="input-style pr-10"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4]"
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
             </div>
 
+            {/* 로그인 버튼 */}
             <button
               type="submit"
               disabled={submitting || !isSupabaseConfigured}
@@ -140,8 +150,25 @@ function LoginForm() {
             </button>
           </form>
 
-          <p className="mt-6 text-xs text-center text-[#9b9a97] dark:text-[#6b6b6b]">
-            계정이 없으신가요? 관리자에게 초대를 요청하세요.
+          {/* 구분선 */}
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-[#e9e9e7] dark:bg-[#2f2f2f]" />
+            <span className="text-xs text-[#c4c3bf] dark:text-[#4f4f4f]">또는</span>
+            <div className="flex-1 h-px bg-[#e9e9e7] dark:bg-[#2f2f2f]" />
+          </div>
+
+          {/* 회원가입하기 버튼 */}
+          <button
+            type="button"
+            onClick={() => router.push("/auth/signup")}
+            disabled={!isSupabaseConfigured}
+            className="w-full py-2.5 px-4 bg-white dark:bg-[#252525] text-[#37352f] dark:text-[#e6e6e4] rounded-lg text-sm font-semibold border border-[#e9e9e7] dark:border-[#3f3f3f] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            회원가입하기
+          </button>
+
+          <p className="mt-4 text-xs text-center text-[#9b9a97] dark:text-[#6b6b6b]">
+            초대 링크를 통해 받은 분만 가입 가능합니다.
           </p>
         </div>
       </div>
