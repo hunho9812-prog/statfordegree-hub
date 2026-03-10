@@ -99,13 +99,11 @@ export default function Sidebar() {
             <BookOpen size={16} />
           </button>
         </Link>
-        {profile?.role === "admin" && (
-          <Link href="/admin">
-            <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="팀원관리">
-              <UserCog size={16} />
-            </button>
-          </Link>
-        )}
+        <Link href="/admin">
+          <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="팀원관리">
+            <UserCog size={16} />
+          </button>
+        </Link>
         <button
           onClick={handleNewPage}
           className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)}
@@ -232,14 +230,12 @@ export default function Sidebar() {
           </div>
         </Link>
 
-        {profile?.role === "admin" && (
-          <Link href="/admin">
-            <div className={navItem(pathname === "/admin")}>
-              <UserCog size={15} className="text-[#9b9a97]" />
-              <span>팀원관리</span>
-            </div>
-          </Link>
-        )}
+        <Link href="/admin">
+          <div className={navItem(pathname === "/admin")}>
+            <UserCog size={15} className="text-[#9b9a97]" />
+            <span>팀원관리</span>
+          </div>
+        </Link>
       </div>
 
       {/* Divider */}

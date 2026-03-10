@@ -45,10 +45,12 @@ export default function AdminPage() {
     }
   }, []);
 
+  const isAdmin = profile?.role === "admin";
+
   useEffect(() => {
     if (!loading) {
-      if (!profile || profile.role !== "admin") {
-        router.replace("/");
+      if (!profile) {
+        router.replace("/login");
         return;
       }
       fetchMembers();
@@ -110,7 +112,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile) return null;
 
   return (
     <div className="flex-1 overflow-y-auto bg-white dark:bg-[#191919]">
@@ -124,13 +126,15 @@ export default function AdminPage() {
               팀원 초대 및 접근 권한 관리
             </p>
           </div>
-          <button
-            onClick={() => { setShowInviteModal(true); setInviteMsg(null); }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#37352f] dark:bg-[#e6e6e4] text-white dark:text-[#191919] rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-          >
-            <UserPlus size={15} />
-            팀원 초대
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setShowInviteModal(true); setInviteMsg(null); }}
+              className="flex items-center gap-2 px-4 py-2 bg-[#37352f] dark:bg-[#e6e6e4] text-white dark:text-[#191919] rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              <UserPlus size={15} />
+              팀원 초대
+            </button>
+          )}
         </div>
 
         {/* 팀원 목록 테이블 */}
@@ -200,11 +204,7 @@ export default function AdminPage() {
 
                   {/* 역할 */}
                   <div>
-                    {m.id === profile.id ? (
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
-                        {m.role === "admin" ? "관리자" : "팀원"}
-                      </span>
-                    ) : (
+                    {isAdmin && m.id !== profile.id ? (
                       <select
                         value={m.role}
                         onChange={(e) => handleRoleChange(m.id, e.target.value as "admin" | "member")}
@@ -213,6 +213,10 @@ export default function AdminPage() {
                         <option value="member">팀원</option>
                         <option value="admin">관리자</option>
                       </select>
+                    ) : (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4]">
+                        {m.role === "admin" ? "관리자" : "팀원"}
+                      </span>
                     )}
                   </div>
 
@@ -230,7 +234,7 @@ export default function AdminPage() {
 
                   {/* 관리 */}
                   <div>
-                    {m.id !== profile.id && (
+                    {isAdmin && m.id !== profile.id && (
                       <button
                         onClick={() => setDeleteTarget(m)}
                         className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-red-500 border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
