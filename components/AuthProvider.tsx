@@ -34,14 +34,14 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  // loading = auth 세션 확인 중 (true → false가 최대한 빠르게)
+  // profile 로드는 별도 비동기 → loading에 포함 안 함
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  // 이중 loadProfile 호출 방지용 ref
   const loadingProfileFor = useRef<string | null>(null);
 
   const loadProfile = useCallback(async (u: User) => {
     if (!supabase) return;
-    // 동일 유저에 대해 이미 로딩 중이면 스킵
     if (loadingProfileFor.current === u.id) return;
     loadingProfileFor.current = u.id;
 
@@ -76,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .single();
         setProfile(newProfile as UserProfile | null);
       } else {
+        // 초대받지 않은 계정 → 로그아웃
         setProfile(null);
         await supabase.auth.signOut();
         router.replace("/login?error=unauthorized");
@@ -91,18 +92,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // onAuthStateChange 하나만 사용 (INITIAL_SESSION 이벤트가 getSession() 역할을 함)
-    // getSession() + onAuthStateChange를 둘 다 쓰면 loadProfile이 두 번 호출됨
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         const u = session?.user ?? null;
         setUser(u);
+
         if (u) {
-          await loadProfile(u);
+          // profile 로드는 백그라운드에서 (await 없음)
+          // → loading을 DB 쿼리가 끝날 때까지 기다리지 않음
+          loadProfile(u);
         } else {
           setProfile(null);
           loadingProfileFor.current = null;
         }
+
+        // auth 세션 확인이 끝나면 즉시 loading 해제
+        // profile은 비동기로 채워짐
         setLoading(false);
       }
     );

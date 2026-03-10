@@ -25,6 +25,8 @@ function LoginForm() {
     const errorParam = searchParams.get("error");
     if (errorParam === "unauthorized") {
       setError("초대받지 않은 계정입니다. 관리자에게 초대를 요청하세요.");
+    } else if (errorParam === "invite_expired") {
+      setError("초대 링크가 만료되었습니다. 관리자에게 재초대를 요청하세요.");
     }
   }, [router, searchParams]);
 

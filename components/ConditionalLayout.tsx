@@ -5,6 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import { useAuth } from "./AuthProvider";
 
+// 로그인 없이 접근 허용되는 경로
+const PUBLIC_PATHS = ["/login", "/auth"];
+
 export default function ConditionalLayout({
   children,
 }: {
@@ -14,14 +17,16 @@ export default function ConditionalLayout({
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  // 로그인 안된 경우 /login으로 redirect
+  const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+
   useEffect(() => {
-    if (!loading && !user && pathname !== "/login") {
+    if (!loading && !user && !isPublicPath) {
       router.replace("/login");
     }
-  }, [user, loading, pathname, router]);
+  }, [user, loading, isPublicPath, router]);
 
-  if (pathname === "/login") {
+  // /login, /auth/callback 등 공개 경로 → 그대로 렌더
+  if (isPublicPath) {
     return <>{children}</>;
   }
 
@@ -34,7 +39,7 @@ export default function ConditionalLayout({
     );
   }
 
-  // 로그인 안된 상태 (redirect 진행 중) → 빈 화면
+  // 미로그인 (redirect 진행 중)
   if (!user) {
     return null;
   }

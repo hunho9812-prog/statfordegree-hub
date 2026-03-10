@@ -3,46 +3,33 @@
 /**
  * /auth/callback
  *
- * Supabase 초대 메일 클릭 시 이 페이지로 이동합니다.
- * URL 해시(#access_token=...&type=invite)를 createBrowserClient가
- * 자동으로 감지해 세션을 수립하고, onAuthStateChange 이벤트가 발행됩니다.
- * 세션 수립이 확인되면 홈으로 redirect 합니다.
+ * 초대 메일 링크 클릭 시 Supabase가 이 페이지로 redirect합니다.
+ * URL에 포함된 hash 토큰(#access_token=...&type=invite)을
+ * AuthProvider의 onAuthStateChange가 자동으로 처리합니다.
+ *
+ * 이 페이지는 useAuth()로 처리 결과만 기다립니다.
+ * (중복 onAuthStateChange 리스너를 만들지 않음)
  */
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function AuthCallbackPage() {
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!supabase) {
-      router.replace("/login");
-      return;
+    if (loading) return; // 아직 처리 중
+
+    if (user) {
+      // 세션 수립 성공 → 홈으로
+      router.replace("/");
+    } else {
+      // 세션 수립 실패 (만료된 토큰 등) → 로그인으로
+      router.replace("/login?error=invite_expired");
     }
-
-    // 이미 세션이 있으면 바로 홈으로
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.replace("/");
-      }
-    });
-
-    // createBrowserClient가 URL hash 토큰을 자동 처리함
-    // SIGNED_IN 이벤트가 발행되면 홈으로 이동
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session) {
-        router.replace("/");
-      } else if (event === "SIGNED_OUT") {
-        router.replace("/login");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [router]);
+  }, [user, loading, router]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-[#f7f6f3] dark:bg-[#191919]">
