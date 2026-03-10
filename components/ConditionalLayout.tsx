@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import { useAuth } from "./AuthProvider";
 
-// 로그인 없이 접근 허용되는 경로
+// 로그인 없이 접근 허용되는 경로 (/auth/callback, /auth/signup 포함)
 const PUBLIC_PATHS = ["/login", "/auth"];
 
 export default function ConditionalLayout({

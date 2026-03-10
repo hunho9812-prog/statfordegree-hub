@@ -434,32 +434,8 @@ const initialPages: Record<string, Page> = Object.fromEntries([
   makePage(MENU_IDS.STATGENIE, "스탯지니", "🤖", null, [], makeEmptyDoc("스탯지니")),
 ]);
 
-const initialTasks: Task[] = [
-  {
-    id: uuidv4(),
-    title: "팀 메뉴얼 초안 작성",
-    description: "온보딩 가이드와 주요 프로세스 문서화",
-    status: "in-progress",
-    priority: "high",
-    assignee: "팀원1",
-    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    tags: ["문서", "온보딩"],
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: uuidv4(),
-    title: "업무 프로세스 정리",
-    description: "주요 업무 흐름을 단계별로 정리",
-    status: "todo",
-    priority: "medium",
-    assignee: "팀원2",
-    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-    tags: ["프로세스"],
-    createdAt: now,
-    updatedAt: now,
-  },
-];
+// 업무보드는 빈 상태로 시작 (직접 추가해서 사용)
+const initialTasks: Task[] = [];
 
 const initialCustomers: Customer[] = [];
 
@@ -974,14 +950,25 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
       name: "statfordegree-hub-storage",
-      version: 5,
+      version: 6,
       migrate: (persistedState: unknown, version: number) => {
+        const s = persistedState as Record<string, unknown>;
+
+        if (version === 5) {
+          // v5 → v6: 기본 업무 항목(팀 메뉴얼 초안 작성, 업무 프로세스 정리) 제거
+          const DEFAULT_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
+          return {
+            ...s,
+            tasks: ((s.tasks as Task[]) ?? []).filter(
+              (t) => !DEFAULT_TITLES.includes(t.title)
+            ),
+          };
+        }
         if (version === 4) {
           // v4 → v5: reset pages to new Notion-style hierarchy, preserve customers/tasks
-          const s = persistedState as Record<string, unknown>;
           return {
             ...freshState,
-            tasks: (s.tasks as Task[]) ?? freshState.tasks,
+            tasks: [],
             customers: ((s.customers as Customer[]) ?? []).map((c) => ({
               ...customerDefaults,
               ...c,
@@ -992,7 +979,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             darkMode: (s.darkMode as boolean) ?? false,
           };
         }
-        // Older versions: reset to fresh state
+        // 구버전: 전체 초기화
         return freshState;
       },
     }

@@ -23,10 +23,10 @@ export default function AuthCallbackPage() {
     if (loading) return; // 아직 처리 중
 
     if (user) {
-      // 세션 수립 성공 → 홈으로
-      router.replace("/");
+      // 초대 링크로 접속 → 비밀번호 설정 페이지로 이동
+      router.replace("/auth/signup");
     } else {
-      // 세션 수립 실패 (만료된 토큰 등) → 로그인으로
+      // 토큰 처리 실패 (만료 등) → 로그인 페이지
       router.replace("/login?error=invite_expired");
     }
   }, [user, loading, router]);
@@ -34,7 +34,7 @@ export default function AuthCallbackPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-[#f7f6f3] dark:bg-[#191919]">
       <div className="w-8 h-8 border-2 border-[#37352f] dark:border-[#e6e6e4] border-t-transparent rounded-full animate-spin" />
-      <p className="text-sm text-[#9b9a97]">로그인 처리 중...</p>
+      <p className="text-sm text-[#9b9a97]">초대 확인 중...</p>
     </div>
   );
 }
