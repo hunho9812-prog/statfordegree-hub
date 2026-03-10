@@ -68,12 +68,10 @@ const BADGE_COLORS: Record<string, string> = {
 
 export default function HomePage() {
   const router = useRouter();
-  const { createPage, customers, tasks } = useWorkspaceStore();
+  const { createPage, tasks } = useWorkspaceStore();
 
   const todoCount = tasks.filter((t) => t.status === "todo").length;
   const inProgressCount = tasks.filter((t) => t.status === "in-progress").length;
-  const totalCustomers = customers.length;
-  const pendingBalance = customers.filter((c) => !c.balance_received).length;
 
   function handleNewPage() {
     const id = createPage(null);
@@ -102,8 +100,6 @@ export default function HomePage() {
         <div className="flex gap-3 mt-8 mb-10 flex-wrap">
           <StatChip label="진행중 업무" value={inProgressCount} color="blue" />
           <StatChip label="할 일" value={todoCount} color="orange" />
-          <StatChip label="전체 고객" value={totalCustomers} color="green" />
-          <StatChip label="잔금 미수령" value={pendingBalance} color="red" />
         </div>
 
         {/* Menu section */}
