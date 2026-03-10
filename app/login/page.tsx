@@ -11,20 +11,16 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-
-    // 이미 로그인 된 경우 홈으로
+    // 이미 로그인된 경우 홈으로
     if (isSupabaseConfigured && supabase) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) router.replace("/");
       });
     }
-
     // 에러 파라미터 처리
     const errorParam = searchParams.get("error");
     if (errorParam === "unauthorized") {
@@ -35,7 +31,7 @@ function LoginForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setLoading(true);
+    setSubmitting(true);
 
     try {
       const { error: authError } = await signIn(email, password);
@@ -49,15 +45,14 @@ function LoginForm() {
         }
         return;
       }
-      router.push("/");
+      // 로그인 성공 → 홈으로 (AuthProvider의 onAuthStateChange가 profile 로드)
+      router.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인 중 오류가 발생했습니다.");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
-
-  if (!mounted) return null;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f7f6f3] dark:bg-[#191919] px-4">
@@ -126,10 +121,10 @@ function LoginForm() {
 
             <button
               type="submit"
-              disabled={loading || !isSupabaseConfigured}
+              disabled={submitting || !isSupabaseConfigured}
               className="w-full py-2.5 px-4 bg-[#37352f] dark:bg-[#e6e6e4] text-white dark:text-[#191919] rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed mt-2"
             >
-              {loading ? (
+              {submitting ? (
                 <span className="flex items-center justify-center gap-2">
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -154,7 +149,11 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f6f3] dark:bg-[#191919]">
+        <div className="w-6 h-6 border-2 border-[#37352f] dark:border-[#37352f] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
       <LoginForm />
     </Suspense>
   );
