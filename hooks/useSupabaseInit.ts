@@ -31,30 +31,42 @@ export function useSupabaseInit() {
     // 최초 로드
     loadFromSupabase();
 
-    // 300ms 디바운스 재로드 함수:
-    // 현재 기기의 변경과 다른 기기의 변경 모두 동일하게 처리하되,
-    // 연속 이벤트가 몰릴 때 fetch를 하나로 묶음
+    // 300ms 디바운스 재로드: 연속 이벤트를 하나의 fetch로 묶음
     const scheduleReload = () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => loadFromSupabase(), DEBOUNCE_MS);
     };
 
-    // 모든 테이블의 INSERT / UPDATE / DELETE 이벤트 구독
-    // ※ Supabase 대시보드에서 해당 테이블의 Realtime이 활성화되어 있어야 합니다.
-    let channel = supabase.channel("workspace-realtime");
-    for (const table of REALTIME_TABLES) {
-      channel = channel.on(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        "postgres_changes" as any,
-        { event: "*", schema: "public", table },
-        scheduleReload
-      );
-    }
-    channel.subscribe();
+    // @supabase/ssr의 createBrowserClient는 쿠키 기반 세션을 사용하므로
+    // Realtime WebSocket에 인증 토큰을 명시적으로 전달해야 합니다.
+    // 이를 하지 않으면 구독은 맺어지지만 이벤트를 수신하지 못합니다.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token) {
+        supabase!.realtime.setAuth(session.access_token);
+      }
+    });
+
+    // 테이블별 독립 채널 생성
+    // 단일 채널에 여러 테이블을 묶으면 하나의 구독 실패가 전체에 영향을 줄 수 있으므로
+    // 테이블마다 별도 채널을 사용합니다.
+    const channels = REALTIME_TABLES.map((table) =>
+      supabase!
+        .channel(`realtime:public:${table}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table },
+          scheduleReload
+        )
+        .subscribe((status, err) => {
+          if (err) {
+            console.error(`[Realtime] ${table} 구독 오류:`, err);
+          }
+        })
+    );
 
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      supabase?.removeChannel(channel);
+      channels.forEach((ch) => supabase?.removeChannel(ch));
     };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 }
