@@ -26,6 +26,7 @@ export default function AdminPage() {
 
   // 승인/거절 처리 중 상태
   const [approveLoading, setApproveLoading] = useState<string | null>(null);
+  const [approveError, setApproveError] = useState<string | null>(null);
 
   const fetchMembers = useCallback(async () => {
     setMembersLoading(true);
@@ -46,15 +47,21 @@ export default function AdminPage() {
 
   async function handleApprove(memberId: string, action: "approve" | "reject") {
     setApproveLoading(memberId + action);
+    setApproveError(null);
     try {
       const res = await fetch("/api/admin/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: memberId, action }),
       });
+      const data = await res.json();
       if (res.ok) {
-        fetchMembers();
+        await fetchMembers();
+      } else {
+        setApproveError(data.error ?? "처리 중 오류가 발생했습니다.");
       }
+    } catch {
+      setApproveError("네트워크 오류가 발생했습니다.");
     } finally {
       setApproveLoading(null);
     }
@@ -104,6 +111,25 @@ export default function AdminPage() {
             새로고침
           </button>
         </div>
+
+        {/* 오류 배너 */}
+        {approveError && (
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50">
+            <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-700 dark:text-red-300">승인 처리 실패</p>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{approveError}</p>
+              {approveError.includes("column") && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                  💡 Supabase Dashboard → SQL Editor에서 <code className="bg-red-100 dark:bg-red-900/50 px-1 rounded">supabase/schema.sql</code> 하단의 마이그레이션 SQL을 실행해주세요.
+                </p>
+              )}
+            </div>
+            <button onClick={() => setApproveError(null)} className="text-red-400 hover:text-red-600">
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* ── 승인 대기 섹션 ── */}
         {isAdmin && (

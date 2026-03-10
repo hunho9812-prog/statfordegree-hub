@@ -43,13 +43,23 @@ export async function POST(req: NextRequest) {
   const status = action === "approve" ? "approved" : "rejected";
   const admin = createAdminClient();
 
-  const { error } = await admin
+  const { data: updated, error } = await admin
     .from("users")
     .update({ status })
-    .eq("id", userId);
+    .eq("id", userId)
+    .select();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // status 컬럼이 없는 경우 (DB 마이그레이션 미실행)
+    const msg = error.message.toLowerCase().includes("column")
+      ? `DB 마이그레이션이 필요합니다: ${error.message}`
+      : error.message;
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+
+  // 업데이트된 행이 없으면 ID가 잘못된 것
+  if (!updated || updated.length === 0) {
+    return NextResponse.json({ error: "해당 사용자를 찾을 수 없습니다." }, { status: 404 });
   }
 
   return NextResponse.json({ success: true, status });
