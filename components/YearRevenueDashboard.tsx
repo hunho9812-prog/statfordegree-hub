@@ -42,7 +42,8 @@ export default function YearRevenueDashboard({ pageId }: { pageId: string }) {
     return revenue;
   }, [page.children, pages, customers]);
 
-  const maxRevenue = Math.max(...monthlyData, 1);
+  const MAX_REVENUE = 30_000_000; // y축 최대값 3000만원
+  const BAR_MAX_H = 110; // 막대 최대 높이(px)
   const totalRevenue = monthlyData.reduce((s, v) => s + v, 0);
   const bestMonthIdx = monthlyData.indexOf(Math.max(...monthlyData));
 
@@ -76,32 +77,47 @@ export default function YearRevenueDashboard({ pageId }: { pageId: string }) {
             아직 매출 데이터가 없습니다. 월 페이지에 고객을 추가하면 자동으로 집계됩니다.
           </p>
         ) : (
-          <div className="flex items-end gap-1.5 h-36">
+          /* 전체 컬럼 높이 = 막대영역(BAR_MAX_H) + 금액라벨(14px) + 월라벨(18px) */
+          <div
+            className="flex gap-1"
+            style={{ height: BAR_MAX_H + 32, alignItems: "stretch" }}
+          >
             {monthlyData.map((rev, idx) => {
-              const pct = (rev / maxRevenue) * 100;
+              const barH = Math.round((rev / MAX_REVENUE) * BAR_MAX_H);
               const isBest = idx === bestMonthIdx && rev > 0;
+              const label = rev > 0 ? String(Math.round(rev / 10000)) : "";
               return (
-                <div key={idx} className="flex flex-col items-center flex-1 gap-1 group">
-                  {/* Value label — only show when bar is tall enough */}
-                  <span className="text-[9px] font-medium text-[#9b9a97] dark:text-[#6b6b6b] leading-none">
-                    {rev > 0 ? `${Math.round(rev / 10000)}만` : ""}
+                <div key={idx} className="flex flex-col items-center flex-1">
+                  {/* 막대 위 공백: flex-1로 남은 공간 모두 차지해 막대를 아래로 밀기 */}
+                  <div style={{ flex: 1 }} />
+                  {/* 금액 라벨 (막대 바로 위) */}
+                  <span
+                    className="leading-none mb-0.5"
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 600,
+                      color: isBest ? "#3b82f6" : "#9b9a97",
+                      minHeight: 12,
+                    }}
+                  >
+                    {label}
                   </span>
-                  {/* Bar */}
-                  <div className="w-full flex items-end flex-1">
-                    <div
-                      className="w-full rounded-t transition-all duration-500"
-                      style={{
-                        height: rev > 0 ? `${Math.max(pct, 4)}%` : "2px",
-                        backgroundColor: isBest
-                          ? "#3b82f6"
-                          : rev > 0
-                          ? "#93c5fd"
-                          : "#e5e7eb",
-                      }}
-                    />
-                  </div>
-                  {/* Month label */}
-                  <span className={`text-[9px] whitespace-nowrap ${isBest ? "font-bold text-blue-500" : "text-[#9b9a97] dark:text-[#6b6b6b]"}`}>
+                  {/* 막대 */}
+                  <div
+                    className="w-full rounded-t transition-all duration-500"
+                    style={{
+                      height: barH > 0 ? barH : 2,
+                      backgroundColor: isBest
+                        ? "#3b82f6"
+                        : rev > 0
+                        ? "#93c5fd"
+                        : "#e5e7eb",
+                    }}
+                  />
+                  {/* 월 라벨 */}
+                  <span
+                    className={`text-[9px] mt-1 whitespace-nowrap ${isBest ? "font-bold text-blue-500" : "text-[#9b9a97] dark:text-[#6b6b6b]"}`}
+                  >
                     {MONTH_LABELS[idx]}
                   </span>
                 </div>
