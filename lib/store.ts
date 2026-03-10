@@ -906,12 +906,18 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         const current = get();
 
+        // 기본 샘플 업무 제목 목록 (업로드·병합에서 완전히 제외)
+        const DEFAULT_TASK_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
+
         // Find data that exists locally but not in Supabase → upload it (migration)
+        // 단, 기본 샘플 업무는 로컬에만 있더라도 절대 업로드하지 않음
         const supaPageIds = new Set(Object.keys(pages));
         const localOnlyPages = Object.values(current.pages).filter((p) => !supaPageIds.has(p.id));
 
         const supaTaskIds = new Set(tasks.map((t) => t.id));
-        const localOnlyTasks = current.tasks.filter((t) => !supaTaskIds.has(t.id));
+        const localOnlyTasks = current.tasks.filter(
+          (t) => !supaTaskIds.has(t.id) && !DEFAULT_TASK_TITLES.includes(t.title)
+        );
 
         const supaCustomerIds = new Set(customers.map((c) => c.id));
         const localOnlyCustomers = current.customers.filter((c) => !supaCustomerIds.has(c.id));
@@ -936,14 +942,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           ...Object.fromEntries(localOnlyPages.map((p) => [p.id, p])),
         };
 
-        // Supabase에 남아있는 기본 샘플 업무 항목 정리
-        const DEFAULT_TASK_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
+        // Supabase에 남아있는 기본 샘플 업무 항목 모두 삭제 (중복 포함)
         const defaultTasksInSupa = tasks.filter((t) => DEFAULT_TASK_TITLES.includes(t.title));
         if (defaultTasksInSupa.length > 0) {
           defaultTasksInSupa.forEach((t) => dbTasks.delete(t.id));
         }
         const cleanedTasks = tasks.filter((t) => !DEFAULT_TASK_TITLES.includes(t.title));
 
+        // localOnlyTasks는 이미 기본 샘플 제목을 제외했으므로 안전하게 병합
         const mergedTasks = [...cleanedTasks, ...localOnlyTasks];
         const mergedCustomers = [...customers, ...localOnlyCustomers];
 
@@ -959,13 +965,22 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
       name: "statfordegree-hub-storage",
-      version: 6,
+      version: 7,
       migrate: (persistedState: unknown, version: number) => {
         const s = persistedState as Record<string, unknown>;
+        const DEFAULT_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
 
+        if (version === 6) {
+          // v6 → v7: 기본 업무 항목 완전 제거 (중복 누적된 경우도 모두 삭제)
+          return {
+            ...s,
+            tasks: ((s.tasks as Task[]) ?? []).filter(
+              (t) => !DEFAULT_TITLES.includes(t.title)
+            ),
+          };
+        }
         if (version === 5) {
-          // v5 → v6: 기본 업무 항목(팀 메뉴얼 초안 작성, 업무 프로세스 정리) 제거
-          const DEFAULT_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
+          // v5 → v7
           return {
             ...s,
             tasks: ((s.tasks as Task[]) ?? []).filter(
@@ -974,7 +989,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           };
         }
         if (version === 4) {
-          // v4 → v5: reset pages to new Notion-style hierarchy, preserve customers/tasks
+          // v4 → v7
           return {
             ...freshState,
             tasks: [],
