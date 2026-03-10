@@ -53,10 +53,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (!error && data) {
-        const profile = data as UserProfile;
+        const existingProfile = data as UserProfile;
+
+        // 관리자 이메일이면 항상 admin + approved 보장
+        if (u.email === ADMIN_EMAIL) {
+          if (existingProfile.role !== "admin" || existingProfile.status !== "approved") {
+            await supabase
+              .from("users")
+              .update({ role: "admin", status: "approved" })
+              .eq("id", u.id);
+            setProfile({ ...existingProfile, role: "admin", status: "approved" });
+          } else {
+            setProfile(existingProfile);
+          }
+          return;
+        }
 
         // 승인 대기 중인 계정 → 로그아웃
-        if (profile.status === "pending") {
+        if (existingProfile.status === "pending") {
           setProfile(null);
           await supabase.auth.signOut();
           router.replace("/login?error=pending");
@@ -64,14 +78,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // 거절된 계정 → 로그아웃
-        if (profile.status === "rejected") {
+        if (existingProfile.status === "rejected") {
           setProfile(null);
           await supabase.auth.signOut();
           router.replace("/login?error=rejected");
           return;
         }
 
-        setProfile(profile);
+        setProfile(existingProfile);
         return;
       }
 

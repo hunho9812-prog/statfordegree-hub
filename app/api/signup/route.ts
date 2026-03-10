@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { ADMIN_EMAIL } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -70,15 +71,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // 트리거가 public.users를 자동 생성하지만, 명시적으로 status=pending 보장
+    // 트리거가 public.users를 자동 생성하지만, 명시적으로 상태 보장
     if (data.user) {
+      const isAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
       await admin.from("users").upsert(
         {
           id: data.user.id,
           email: email.toLowerCase(),
           name: name.trim(),
-          role: "member",
-          status: "pending",
+          role: isAdmin ? "admin" : "member",
+          status: isAdmin ? "approved" : "pending",
         },
         { onConflict: "id" }
       );
