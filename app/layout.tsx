@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
 import DarkModeSync from "@/components/DarkModeSync";
 import SupabaseInit from "@/components/SupabaseInit";
+import { AuthProvider } from "@/components/AuthProvider";
+import ConditionalLayout from "@/components/ConditionalLayout";
 
 export const metadata: Metadata = {
   title: "Statfordegree Hub",
@@ -35,13 +36,10 @@ export default function RootLayout({
       </head>
       <body className="bg-white dark:bg-[#191919] text-[#37352f] dark:text-[#e6e6e4] antialiased">
         <DarkModeSync />
-        <SupabaseInit />
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 overflow-hidden flex flex-col">
-            {children}
-          </main>
-        </div>
+        <AuthProvider>
+          <SupabaseInit />
+          <ConditionalLayout>{children}</ConditionalLayout>
+        </AuthProvider>
       </body>
     </html>
   );

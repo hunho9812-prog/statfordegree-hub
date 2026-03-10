@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -18,6 +18,8 @@ const configured = Boolean(
 
 export const isSupabaseConfigured = configured;
 
+// createBrowserClient handles cookie-based session storage automatically
+// → auth tokens are included in all requests after login
 export const supabase = configured
-  ? createClient(supabaseUrl!, supabaseAnonKey!)
+  ? createBrowserClient(supabaseUrl!, supabaseAnonKey!)
   : null;

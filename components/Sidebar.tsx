@@ -15,10 +15,14 @@ import {
   BookOpen,
   Sun,
   Moon,
+  LogOut,
+  Shield,
+  Crown,
 } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import SidebarPageItem from "./SidebarPageItem";
+import { useAuth } from "./AuthProvider";
 
 export default function Sidebar() {
   const router = useRouter();
@@ -29,6 +33,7 @@ export default function Sidebar() {
   const [showSearch, setShowSearch] = useState(false);
 
   const { pages, rootPageIds, createPage, darkMode, toggleDarkMode } = useWorkspaceStore();
+  const { profile, signOut } = useAuth();
 
   useEffect(() => {
     setMounted(true);
@@ -102,12 +107,26 @@ export default function Sidebar() {
           <Plus size={16} />
         </button>
         <div className="flex-1" />
+        {profile?.role === "admin" && (
+          <Link href="/admin">
+            <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="팀 관리">
+              <Shield size={16} />
+            </button>
+          </Link>
+        )}
         <button
           onClick={toggleDarkMode}
           className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)}
           title={darkMode ? "라이트 모드" : "다크 모드"}
         >
           {darkMode ? <Sun size={15} /> : <Moon size={15} />}
+        </button>
+        <button
+          onClick={signOut}
+          className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)}
+          title="로그아웃"
+        >
+          <LogOut size={15} />
         </button>
       </div>
     );
@@ -263,8 +282,42 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* Bottom: dark mode toggle */}
-      <div className="px-2 pb-3 border-t border-[#e9e9e7] dark:border-[#2f2f2f] pt-2">
+      {/* Bottom: user info + actions */}
+      <div className="px-2 pb-3 border-t border-[#e9e9e7] dark:border-[#2f2f2f] pt-2 space-y-0.5">
+        {/* User info */}
+        {profile && (
+          <div className="flex items-center gap-2 px-2 py-1.5">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center flex-shrink-0">
+              {profile.role === "admin" ? (
+                <Crown size={11} className="text-white" />
+              ) : (
+                <span className="text-white text-[10px] font-bold">
+                  {profile.email[0].toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-[#37352f] dark:text-[#e6e6e4] truncate leading-tight">
+                {profile.email}
+              </p>
+              <p className="text-[10px] text-[#9b9a97] leading-tight">
+                {profile.role === "admin" ? "관리자" : "멤버"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Admin panel link */}
+        {profile?.role === "admin" && (
+          <Link href="/admin">
+            <div className={cn("flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-[#9b9a97] transition-colors", hover)}>
+              <Shield size={15} />
+              <span>팀 관리</span>
+            </div>
+          </Link>
+        )}
+
+        {/* Dark mode */}
         <button
           onClick={toggleDarkMode}
           className={cn(
@@ -274,6 +327,18 @@ export default function Sidebar() {
         >
           {darkMode ? <Sun size={15} /> : <Moon size={15} />}
           <span>{darkMode ? "라이트 모드" : "다크 모드"}</span>
+        </button>
+
+        {/* Logout */}
+        <button
+          onClick={signOut}
+          className={cn(
+            "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-[#9b9a97] transition-colors",
+            hover
+          )}
+        >
+          <LogOut size={15} />
+          <span>로그아웃</span>
         </button>
       </div>
     </div>
