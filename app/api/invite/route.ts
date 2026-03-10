@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { createAdminClient } from "@/lib/supabase-admin";
+import { createAdminClient, getSupabaseUrl, getServerAnonKey } from "@/lib/supabase-admin";
+
+// 초대 후 사용자가 이동할 Vercel 배포 URL
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://hunho9812-prog-statfordegree-hub-pj.vercel.app";
 
 export async function POST(req: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.json({ error: "Supabase 미설정" }, { status: 500 });
+  let supabaseUrl: string;
+  let supabaseAnonKey: string;
+  try {
+    supabaseUrl = getSupabaseUrl();
+    supabaseAnonKey = getServerAnonKey();
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Supabase 미설정" },
+      { status: 500 }
+    );
   }
 
   // 1. 요청자가 admin인지 확인
@@ -18,7 +28,9 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "인증되지 않은 요청" }, { status: 401 });
   }
@@ -33,7 +45,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "관리자 권한 필요" }, { status: 403 });
   }
 
-  // 2. 초대 메일 발송 (service role 사용)
+  // 2. 요청 파라미터 파싱
   const { email, name, role } = await req.json();
   if (!email) {
     return NextResponse.json({ error: "이메일을 입력해주세요." }, { status: 400 });
@@ -44,16 +56,20 @@ export async function POST(req: NextRequest) {
   try {
     const adminClient = createAdminClient();
 
-    // Supabase auth에 초대 메일 발송
-    const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-      data: { name: name ?? "", role: inviteRole },
-    });
+    // 3. 초대 메일 발송
+    //    redirectTo → 반드시 Vercel 배포 URL로 설정해야 localhost 에러 방지
+    //    Supabase Dashboard > Authentication > URL Configuration 에도 동일 URL 등록 필요
+    const { data: inviteData, error: inviteError } =
+      await adminClient.auth.admin.inviteUserByEmail(email, {
+        data: { name: name ?? "", role: inviteRole },
+        redirectTo: `${SITE_URL}/auth/callback`,
+      });
 
     if (inviteError) {
       return NextResponse.json({ error: inviteError.message }, { status: 400 });
     }
 
-    // public.users 에도 미리 등록 (초대 수락 전이라도 loadProfile에서 찾을 수 있도록)
+    // 4. public.users 에도 미리 등록 (초대 수락 전에도 profile 조회 가능하도록)
     if (inviteData?.user) {
       await adminClient.from("users").upsert({
         id: inviteData.user.id,

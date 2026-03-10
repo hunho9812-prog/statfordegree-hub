@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { createAdminClient } from "@/lib/supabase-admin";
+import { createAdminClient, getSupabaseUrl, getServerAnonKey } from "@/lib/supabase-admin";
 
 async function getCallerProfile(req: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createServerClient(getSupabaseUrl(), getServerAnonKey(), {
     cookies: {
       getAll: () => req.cookies.getAll(),
       setAll: () => {},
     },
   });
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return null;
 
   const { data: profile } = await supabase
@@ -41,9 +40,11 @@ export async function PATCH(
     return NextResponse.json({ error: "잘못된 role 값" }, { status: 400 });
   }
 
-  // 자기 자신 권한 변경 방지
   if (id === caller.id) {
-    return NextResponse.json({ error: "자신의 권한은 변경할 수 없습니다." }, { status: 400 });
+    return NextResponse.json(
+      { error: "자신의 권한은 변경할 수 없습니다." },
+      { status: 400 }
+    );
   }
 
   const admin = createAdminClient();
@@ -67,7 +68,10 @@ export async function DELETE(
   const { id } = await params;
 
   if (id === caller.id) {
-    return NextResponse.json({ error: "자기 자신은 삭제할 수 없습니다." }, { status: 400 });
+    return NextResponse.json(
+      { error: "자기 자신은 삭제할 수 없습니다." },
+      { status: 400 }
+    );
   }
 
   try {
