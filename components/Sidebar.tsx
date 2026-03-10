@@ -33,7 +33,7 @@ export default function Sidebar() {
   const [showSearch, setShowSearch] = useState(false);
 
   const { pages, rootPageIds, createPage, darkMode, toggleDarkMode } = useWorkspaceStore();
-  const { profile, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
 
   useEffect(() => {
     setMounted(true);
@@ -290,23 +290,28 @@ export default function Sidebar() {
       {/* Bottom: user info + actions */}
       <div className="px-2 pb-3 border-t border-[#e9e9e7] dark:border-[#2f2f2f] pt-2 space-y-0.5">
         {/* User info */}
-        {profile && (
+        {user && (
           <div className="flex items-center gap-2 px-2 py-1.5">
             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center flex-shrink-0">
-              {profile.role === "admin" ? (
+              {profile?.role === "admin" ? (
                 <Crown size={11} className="text-white" />
               ) : (
                 <span className="text-white text-[10px] font-bold">
-                  {profile.email[0].toUpperCase()}
+                  {(user.email ?? "?")[0].toUpperCase()}
                 </span>
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-[#37352f] dark:text-[#e6e6e4] truncate leading-tight">
-                {profile.email}
+              {profile?.name && (
+                <p className="text-xs font-medium text-[#37352f] dark:text-[#e6e6e4] truncate leading-tight">
+                  {profile.name}
+                </p>
+              )}
+              <p className="text-xs text-[#9b9a97] truncate leading-tight">
+                {user.email}
               </p>
               <p className="text-[10px] text-[#9b9a97] leading-tight">
-                {profile.role === "admin" ? "관리자" : "멤버"}
+                {profile?.role === "admin" ? "관리자" : "멤버"}
               </p>
             </div>
           </div>

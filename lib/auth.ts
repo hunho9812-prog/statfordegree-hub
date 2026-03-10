@@ -5,6 +5,7 @@ export const ADMIN_EMAIL = "rlagusgh1214@naver.com";
 export interface UserProfile {
   id: string;
   email: string;
+  name: string;
   role: "admin" | "member";
   created_at: string;
 }

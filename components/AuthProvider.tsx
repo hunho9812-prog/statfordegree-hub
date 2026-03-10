@@ -107,8 +107,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadProfile]);
 
   async function handleSignOut() {
-    if (!supabase) return;
-    await supabase.auth.signOut();
+    setProfile(null);
+    setUser(null);
+    if (supabase) await supabase.auth.signOut();
     router.push("/login");
   }
 
