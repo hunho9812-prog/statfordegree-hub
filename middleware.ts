@@ -35,10 +35,11 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginPage = pathname === "/login";
+  const isAuthRoute = pathname.startsWith("/auth/"); // /auth/callback, /auth/signup 등
   const isApiRoute = pathname.startsWith("/api/");
 
-  // 미로그인 + 로그인 페이지 아님 → /login 으로 리다이렉트
-  if (!user && !isLoginPage && !isApiRoute) {
+  // 미로그인 + 공개 경로 아님 → /login 으로 리다이렉트
+  if (!user && !isLoginPage && !isAuthRoute && !isApiRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
