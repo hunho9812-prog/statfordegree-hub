@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { UserPlus, Trash2, RefreshCw, Crown, User, X, AlertTriangle } from "lucide-react";
 
@@ -15,8 +14,9 @@ interface Member {
 }
 
 export default function AdminPage() {
-  const router = useRouter();
-  const { profile, loading } = useAuth();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+
   const [members, setMembers] = useState<Member[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
@@ -45,17 +45,9 @@ export default function AdminPage() {
     }
   }, []);
 
-  const isAdmin = profile?.role === "admin";
-
   useEffect(() => {
-    if (!loading) {
-      if (!profile) {
-        router.replace("/login");
-        return;
-      }
-      fetchMembers();
-    }
-  }, [loading, profile, router, fetchMembers]);
+    fetchMembers();
+  }, [fetchMembers]);
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -104,16 +96,6 @@ export default function AdminPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="animate-spin w-6 h-6 border-2 border-[#37352f] dark:border-[#e6e6e4] border-t-transparent rounded-full" />
-      </div>
-    );
-  }
-
-  if (!profile) return null;
-
   return (
     <div className="flex-1 overflow-y-auto bg-white dark:bg-[#191919]">
       <div className="max-w-4xl mx-auto px-8 pt-12 pb-12">
@@ -144,9 +126,9 @@ export default function AdminPage() {
             <div className="flex items-center justify-between w-full">
               <span className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">
                 현재 팀원 목록
-                <span className="ml-2 text-xs font-normal text-[#9b9a97]">
-                  ({members.length}명)
-                </span>
+                {!membersLoading && (
+                  <span className="ml-2 text-xs font-normal text-[#9b9a97]">({members.length}명)</span>
+                )}
               </span>
               <button
                 onClick={fetchMembers}
@@ -169,8 +151,20 @@ export default function AdminPage() {
 
           {/* Rows */}
           {membersLoading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin w-5 h-5 border-2 border-[#9b9a97] border-t-transparent rounded-full mx-auto" />
+            /* 스켈레톤 로딩 */
+            <div className="divide-y divide-[#e9e9e7] dark:divide-[#2f2f2f]">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="grid grid-cols-[2fr_3fr_1.5fr_1.2fr_1fr] gap-4 items-center px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                    <div className="h-3 w-20 rounded bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                  </div>
+                  <div className="h-3 w-36 rounded bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                  <div className="h-5 w-14 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                  <div className="h-5 w-14 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                  <div />
+                </div>
+              ))}
             </div>
           ) : members.length === 0 ? (
             <div className="text-center py-12 text-sm text-[#9b9a97]">
@@ -193,7 +187,7 @@ export default function AdminPage() {
                       )}
                     </div>
                     <span className="text-sm text-[#37352f] dark:text-[#e6e6e4] truncate">
-                      {m.name || <span className="text-[#9b9a97] italic">미설정</span>}
+                      {m.name || <span className="text-[#9b9a97] italic text-xs">미설정</span>}
                     </span>
                   </div>
 
@@ -204,7 +198,7 @@ export default function AdminPage() {
 
                   {/* 역할 */}
                   <div>
-                    {isAdmin && m.id !== profile.id ? (
+                    {isAdmin && profile && m.id !== profile.id ? (
                       <select
                         value={m.role}
                         onChange={(e) => handleRoleChange(m.id, e.target.value as "admin" | "member")}
@@ -234,7 +228,7 @@ export default function AdminPage() {
 
                   {/* 관리 */}
                   <div>
-                    {isAdmin && m.id !== profile.id && (
+                    {isAdmin && profile && m.id !== profile.id && (
                       <button
                         onClick={() => setDeleteTarget(m)}
                         className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-red-500 border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
@@ -361,13 +355,11 @@ export default function AdminPage() {
               </div>
               <div>
                 <h3 className="text-base font-semibold text-[#37352f] dark:text-[#e6e6e4]">팀원 제거</h3>
-                <p className="text-sm text-[#9b9a97] mt-1">
-                  정말 이 팀원을 제거하시겠습니까?
-                </p>
+                <p className="text-sm text-[#9b9a97] mt-1">정말 이 팀원을 제거하시겠습니까?</p>
               </div>
             </div>
 
-            <div className="bg-[#f7f6f3] dark:bg-[#1f1f1f] rounded-lg px-4 py-3 mb-5">
+            <div className="bg-[#f7f6f3] dark:bg-[#1f1f1f] rounded-lg px-4 py-3 mb-4">
               <p className="text-sm font-medium text-[#37352f] dark:text-[#e6e6e4]">
                 {deleteTarget.name || "이름 미설정"}
               </p>
