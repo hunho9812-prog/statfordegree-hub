@@ -72,6 +72,12 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   const [dropBtnIdx, setDropBtnIdx] = useState<number | null>(null);
 
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
+  const titleSaveTimer = useRef<NodeJS.Timeout | null>(null);
+  // 내가 마지막으로 저장한 content를 추적 (Realtime 에코 방지용)
+  const lastLocalSaveRef = useRef<string | null>(page?.content ?? null);
+  // 사용자가 현재 타이핑 중인지 (외부 변경으로 덮어쓰기 방지용)
+  const isSavingRef = useRef(false);
+  const isEditingTitleRef = useRef(false);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -111,6 +117,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       : { type: "doc", content: [{ type: "paragraph" }] },
     onUpdate: ({ editor }) => {
       setSaveStatus("saving");
+      isSavingRef.current = true;
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
 
       // Slash command detection
@@ -134,8 +141,11 @@ export default function PageEditor({ pageId }: { pageId: string }) {
               range: { from: slashPos, to: from },
             });
             saveTimeout.current = setTimeout(() => {
-              updatePage(pageId, { content: JSON.stringify(editor.getJSON()) });
+              const content = JSON.stringify(editor.getJSON());
+              lastLocalSaveRef.current = content;
+              updatePage(pageId, { content });
               setSaveStatus("saved");
+              isSavingRef.current = false;
             }, 800);
             return;
           }
@@ -145,8 +155,11 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       setSlashMenu((s) => ({ ...s, open: false }));
 
       saveTimeout.current = setTimeout(() => {
-        updatePage(pageId, { content: JSON.stringify(editor.getJSON()) });
+        const content = JSON.stringify(editor.getJSON());
+        lastLocalSaveRef.current = content;
+        updatePage(pageId, { content });
         setSaveStatus("saved");
+        isSavingRef.current = false;
       }, 800);
     },
     editorProps: {
@@ -324,10 +337,23 @@ export default function PageEditor({ pageId }: { pageId: string }) {
     return { top: isMovingDown ? btn.blockBottom : btn.blockTop, left: btn.left + 60 };
   }, [dropBtnIdx, blockButtons]);
 
-  // Sync title with page changes (e.g. from sidebar rename)
+  // Sync title with page changes from other users (realtime)
   useEffect(() => {
-    if (page) setTitle(page.title);
+    if (page && !isEditingTitleRef.current) setTitle(page.title);
   }, [page?.title]);
+
+  // Sync content with changes from other users (realtime)
+  // - 내가 저장한 내용이 반영된 경우(에코)는 건너뜀
+  // - 사용자가 타이핑 중이면 건너뜀 (입력 방해 방지)
+  useEffect(() => {
+    if (!editor || !page?.content) return;
+    if (page.content === lastLocalSaveRef.current) return;
+    if (isSavingRef.current) return;
+    try {
+      editor.commands.setContent(JSON.parse(page.content), false);
+    } catch { /* invalid JSON, skip */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page?.content]);
 
   // Close emoji picker on outside click
   useEffect(() => {
@@ -353,10 +379,12 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       const val = e.target.value;
       setTitle(val);
       setSaveStatus("saving");
-      if (saveTimeout.current) clearTimeout(saveTimeout.current);
-      saveTimeout.current = setTimeout(() => {
+      isEditingTitleRef.current = true;
+      if (titleSaveTimer.current) clearTimeout(titleSaveTimer.current);
+      titleSaveTimer.current = setTimeout(() => {
         updatePage(pageId, { title: val });
         setSaveStatus("saved");
+        isEditingTitleRef.current = false;
       }, 500);
     },
     [pageId, updatePage]
