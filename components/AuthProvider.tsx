@@ -36,41 +36,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const loadProfile = useCallback(
-    async (u: User) => {
-      if (!supabase) return;
+  const loadProfile = useCallback(async (u: User) => {
+    if (!supabase) return;
 
-      const { data, error } = await supabase
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", u.id)
+      .single();
+
+    if (!error && data) {
+      setProfile(data as UserProfile);
+      return;
+    }
+
+    // public.users 레코드 없음 → 자동 생성 시도
+    // admin 이메일이거나, 초대 메타데이터(role)가 있는 경우만 허용
+    const role: "admin" | "member" | null =
+      u.email === ADMIN_EMAIL
+        ? "admin"
+        : (u.user_metadata?.role as "admin" | "member" | undefined) ?? null;
+
+    if (role) {
+      const { data: newProfile } = await supabase
         .from("users")
-        .select("*")
-        .eq("id", u.id)
+        .upsert({
+          id: u.id,
+          email: u.email!,
+          name: (u.user_metadata?.name as string) ?? "",
+          role,
+        })
+        .select()
         .single();
-
-      if (error || !data) {
-        // 관리자 이메일이면 자동으로 users 테이블에 등록
-        if (u.email === ADMIN_EMAIL) {
-          const { data: newProfile } = await supabase
-            .from("users")
-            .insert({
-              id: u.id,
-              email: u.email,
-              name: (u.user_metadata?.name as string) ?? "",
-              role: "admin",
-            })
-            .select()
-            .single();
-          setProfile(newProfile as UserProfile);
-        } else {
-          // 초대받지 않은 사용자 → 로그아웃
-          await supabase.auth.signOut();
-          router.push("/login?error=unauthorized");
-        }
-      } else {
-        setProfile(data as UserProfile);
-      }
-    },
-    [router]
-  );
+      setProfile(newProfile as UserProfile | null);
+    } else {
+      // 초대받지 않은 계정 → 로그아웃
+      setProfile(null);
+      await supabase.auth.signOut();
+      router.replace("/login?error=unauthorized");
+    }
+  }, [router]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
@@ -110,13 +115,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
     setUser(null);
     if (supabase) await supabase.auth.signOut();
-    router.push("/login");
+    router.replace("/login");
   }
 
   return (
-    <AuthContext.Provider
-      value={{ user, profile, loading, signOut: handleSignOut }}
-    >
+    <AuthContext.Provider value={{ user, profile, loading, signOut: handleSignOut }}>
       {children}
     </AuthContext.Provider>
   );
