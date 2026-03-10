@@ -191,3 +191,54 @@ create policy "team_members_only" on manual_page_roots
 
 create policy "team_members_only" on workspace_config
   for all using (auth.uid() in (select id from users)) with check (auth.uid() in (select id from users));
+
+-- ============================================================
+-- 4단계: Realtime 활성화 (기기 간 실시간 동기화)
+-- ============================================================
+
+-- 변경 감지를 위한 REPLICA IDENTITY 설정
+alter table pages               replica identity full;
+alter table tasks               replica identity full;
+alter table customers           replica identity full;
+alter table customer_statuses   replica identity full;
+alter table manual_nodes        replica identity full;
+alter table manual_page_roots   replica identity full;
+alter table workspace_config    replica identity full;
+
+-- supabase_realtime publication에 테이블 추가
+-- (이미 추가된 경우 오류가 나도 무시해도 됩니다)
+do $$
+begin
+  alter publication supabase_realtime add table pages;
+  exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table tasks;
+  exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table customers;
+  exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table customer_statuses;
+  exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table manual_nodes;
+  exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table manual_page_roots;
+  exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table workspace_config;
+  exception when duplicate_object then null;
+end $$;
