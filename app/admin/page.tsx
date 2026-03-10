@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { UserPlus, Trash2, RefreshCw, Crown, User, X, AlertTriangle, Copy, Check, Link } from "lucide-react";
+import { Trash2, RefreshCw, Crown, User, AlertTriangle, Check, X, Clock, UserCheck, UserX } from "lucide-react";
 
 interface Member {
   id: string;
   name: string;
   email: string;
   role: "admin" | "member";
-  status: "active" | "pending";
+  status: "pending" | "approved" | "rejected";
   created_at: string;
 }
 
@@ -20,20 +20,12 @@ export default function AdminPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
-  // 초대 모달
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteTab, setInviteTab] = useState<"email" | "link">("link");
-  const [inviteName, setInviteName] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
-  const [inviteLoading, setInviteLoading] = useState(false);
-  const [inviteMsg, setInviteMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
-
   // 삭제 확인 모달
   const [deleteTarget, setDeleteTarget] = useState<Member | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // 승인/거절 처리 중 상태
+  const [approveLoading, setApproveLoading] = useState<string | null>(null);
 
   const fetchMembers = useCallback(async () => {
     setMembersLoading(true);
@@ -52,66 +44,20 @@ export default function AdminPage() {
     fetchMembers();
   }, [fetchMembers]);
 
-  async function handleInvite(e: React.FormEvent) {
-    e.preventDefault();
-    setInviteLoading(true);
-    setInviteMsg(null);
-    setGeneratedLink(null);
-
-    const isLink = inviteTab === "link";
-
+  async function handleApprove(memberId: string, action: "approve" | "reject") {
+    setApproveLoading(memberId + action);
     try {
-      const res = await fetch("/api/invite", {
+      const res = await fetch("/api/admin/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail, name: inviteName, role: inviteRole, linkOnly: isLink }),
+        body: JSON.stringify({ userId: memberId, action }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        // 이메일 rate limit 시 자동으로 링크 생성 재시도
-        if (data.rateLimited) {
-          setInviteTab("link");
-          // 자동으로 링크 생성 재시도
-          try {
-            const linkRes = await fetch("/api/invite", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: inviteEmail, name: inviteName, role: inviteRole, linkOnly: true }),
-            });
-            const linkData = await linkRes.json();
-            if (linkRes.ok && linkData.inviteLink) {
-              setGeneratedLink(linkData.inviteLink);
-              setInviteMsg({ type: "success", text: "이메일 한도 초과로 초대 링크를 대신 생성했습니다. 아래 링크를 복사해서 전달하세요." });
-              fetchMembers();
-              return;
-            }
-          } catch { /* 링크 생성도 실패하면 아래 에러 표시 */ }
-        }
-        setInviteMsg({ type: "error", text: data.error ?? "초대 실패" });
-      } else if (isLink && data.inviteLink) {
-        setGeneratedLink(data.inviteLink);
-        setInviteMsg({ type: "success", text: "초대 링크가 생성되었습니다. 아래 링크를 복사해서 전달하세요." });
-        fetchMembers();
-      } else {
-        setInviteMsg({ type: "success", text: `${inviteEmail}로 초대 메일을 발송했습니다.` });
-        setInviteName("");
-        setInviteEmail("");
-        setInviteRole("member");
+      if (res.ok) {
         fetchMembers();
       }
-    } catch {
-      setInviteMsg({ type: "error", text: "요청 중 오류가 발생했습니다." });
     } finally {
-      setInviteLoading(false);
+      setApproveLoading(null);
     }
-  }
-
-  function handleCopyLink() {
-    if (!generatedLink) return;
-    navigator.clipboard.writeText(generatedLink).then(() => {
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
-    });
   }
 
   async function handleRoleChange(memberId: string, newRole: "admin" | "member") {
@@ -134,321 +80,279 @@ export default function AdminPage() {
     }
   }
 
+  const pendingMembers = members.filter((m) => m.status === "pending");
+  const approvedMembers = members.filter((m) => m.status === "approved");
+  const rejectedMembers = members.filter((m) => m.status === "rejected");
+
   return (
     <div className="flex-1 overflow-y-auto bg-white dark:bg-[#191919]">
-      <div className="max-w-4xl mx-auto px-8 pt-12 pb-12">
+      <div className="max-w-4xl mx-auto px-8 pt-12 pb-12 space-y-8">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[#37352f] dark:text-[#e6e6e4]">팀원관리</h1>
             <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b] mt-0.5">
-              팀원 초대 및 접근 권한 관리
+              가입 승인 및 팀원 접근 권한 관리
             </p>
           </div>
-          {isAdmin && (
-            <button
-              onClick={() => { setShowInviteModal(true); setInviteMsg(null); }}
-              className="flex items-center gap-2 px-4 py-2 bg-[#37352f] dark:bg-[#e6e6e4] text-white dark:text-[#191919] rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-            >
-              <UserPlus size={15} />
-              팀원 초대
-            </button>
-          )}
+          <button
+            onClick={fetchMembers}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors border border-[#e9e9e7] dark:border-[#2f2f2f]"
+          >
+            <RefreshCw size={13} />
+            새로고침
+          </button>
         </div>
 
-        {/* 팀원 목록 테이블 */}
-        <div className="border border-[#e9e9e7] dark:border-[#2f2f2f] rounded-xl overflow-hidden">
-          {/* Table Header */}
-          <div className="flex items-center px-4 py-3 bg-[#f7f6f3] dark:bg-[#252525] border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
-            <div className="flex items-center justify-between w-full">
-              <span className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">
-                현재 팀원 목록
-                {!membersLoading && (
-                  <span className="ml-2 text-xs font-normal text-[#9b9a97]">({members.length}명)</span>
-                )}
-              </span>
-              <button
-                onClick={fetchMembers}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-[#9b9a97] hover:bg-[#e9e9e7] dark:hover:bg-[#3f3f3f] transition-colors"
-              >
-                <RefreshCw size={12} />
-                새로고침
-              </button>
+        {/* ── 승인 대기 섹션 ── */}
+        {isAdmin && (
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Clock size={15} className="text-amber-500" />
+              <h2 className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">
+                승인 대기
+              </h2>
+              {!membersLoading && pendingMembers.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                  {pendingMembers.length}
+                </span>
+              )}
             </div>
-          </div>
 
-          {/* Column headers */}
-          <div className="grid grid-cols-[2fr_3fr_1.5fr_1.2fr_1fr] gap-4 px-4 py-2.5 bg-[#fafaf9] dark:bg-[#1f1f1f] border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
-            <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">이름</span>
-            <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">이메일</span>
-            <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">역할</span>
-            <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">상태</span>
-            <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">관리</span>
-          </div>
-
-          {/* Rows */}
-          {membersLoading ? (
-            /* 스켈레톤 로딩 */
-            <div className="divide-y divide-[#e9e9e7] dark:divide-[#2f2f2f]">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="grid grid-cols-[2fr_3fr_1.5fr_1.2fr_1fr] gap-4 items-center px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
-                    <div className="h-3 w-20 rounded bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
-                  </div>
-                  <div className="h-3 w-36 rounded bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
-                  <div className="h-5 w-14 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
-                  <div className="h-5 w-14 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
-                  <div />
+            <div className="border border-[#e9e9e7] dark:border-[#2f2f2f] rounded-xl overflow-hidden">
+              {membersLoading ? (
+                <div className="divide-y divide-[#e9e9e7] dark:divide-[#2f2f2f]">
+                  {[...Array(2)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 px-4 py-3">
+                      <div className="w-8 h-8 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-3 w-28 rounded bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                        <div className="h-2.5 w-40 rounded bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : members.length === 0 ? (
-            <div className="text-center py-12 text-sm text-[#9b9a97]">
-              팀원이 없습니다. 초대를 보내보세요.
-            </div>
-          ) : (
-            <div className="divide-y divide-[#e9e9e7] dark:divide-[#2f2f2f]">
-              {members.map((m) => (
-                <div
-                  key={m.id}
-                  className="grid grid-cols-[2fr_3fr_1.5fr_1.2fr_1fr] gap-4 items-center px-4 py-3 hover:bg-[#fafaf9] dark:hover:bg-[#1f1f1f] transition-colors"
-                >
-                  {/* 이름 */}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center flex-shrink-0">
-                      {m.role === "admin" ? (
-                        <Crown size={13} className="text-amber-500" />
-                      ) : (
-                        <User size={13} className="text-[#9b9a97]" />
+              ) : pendingMembers.length === 0 ? (
+                <div className="text-center py-10 text-sm text-[#9b9a97]">
+                  승인 대기 중인 가입 신청이 없습니다.
+                </div>
+              ) : (
+                <div className="divide-y divide-[#e9e9e7] dark:divide-[#2f2f2f]">
+                  {pendingMembers.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center gap-4 px-4 py-3 hover:bg-[#fafaf9] dark:hover:bg-[#1f1f1f] transition-colors"
+                    >
+                      {/* 아바타 */}
+                      <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+                        <Clock size={15} className="text-amber-500" />
+                      </div>
+
+                      {/* 정보 */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[#37352f] dark:text-[#e6e6e4] truncate">
+                          {m.name || <span className="text-[#9b9a97] italic text-xs font-normal">이름 미설정</span>}
+                        </p>
+                        <p className="text-xs text-[#9b9a97] truncate">{m.email}</p>
+                      </div>
+
+                      {/* 신청일 */}
+                      <span className="text-xs text-[#9b9a97] hidden sm:block flex-shrink-0">
+                        {new Date(m.created_at).toLocaleDateString("ko-KR")}
+                      </span>
+
+                      {/* 승인/거절 버튼 */}
+                      {isAdmin && (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => handleApprove(m.id, "approve")}
+                            disabled={approveLoading === m.id + "approve"}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white transition-colors disabled:opacity-50"
+                          >
+                            {approveLoading === m.id + "approve" ? (
+                              <RefreshCw size={11} className="animate-spin" />
+                            ) : (
+                              <UserCheck size={12} />
+                            )}
+                            승인
+                          </button>
+                          <button
+                            onClick={() => handleApprove(m.id, "reject")}
+                            disabled={approveLoading === m.id + "reject"}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-200 dark:border-red-800/50 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50"
+                          >
+                            {approveLoading === m.id + "reject" ? (
+                              <RefreshCw size={11} className="animate-spin" />
+                            ) : (
+                              <UserX size={12} />
+                            )}
+                            거절
+                          </button>
+                        </div>
                       )}
                     </div>
-                    <span className="text-sm text-[#37352f] dark:text-[#e6e6e4] truncate">
-                      {m.name || <span className="text-[#9b9a97] italic text-xs">미설정</span>}
-                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* ── 팀원 목록 섹션 ── */}
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <Check size={15} className="text-emerald-500" />
+            <h2 className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">
+              팀원 목록
+            </h2>
+            {!membersLoading && (
+              <span className="text-xs text-[#9b9a97]">({approvedMembers.length}명)</span>
+            )}
+          </div>
+
+          <div className="border border-[#e9e9e7] dark:border-[#2f2f2f] rounded-xl overflow-hidden">
+            {/* Column headers */}
+            <div className="grid grid-cols-[2fr_3fr_1.5fr_1fr] gap-4 px-4 py-2.5 bg-[#fafaf9] dark:bg-[#1f1f1f] border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
+              <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">이름</span>
+              <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">이메일</span>
+              <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">역할</span>
+              <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">관리</span>
+            </div>
+
+            {membersLoading ? (
+              <div className="divide-y divide-[#e9e9e7] dark:divide-[#2f2f2f]">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="grid grid-cols-[2fr_3fr_1.5fr_1fr] gap-4 items-center px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                      <div className="h-3 w-20 rounded bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                    </div>
+                    <div className="h-3 w-36 rounded bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                    <div className="h-5 w-14 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                    <div />
                   </div>
-
-                  {/* 이메일 */}
-                  <span className="text-sm text-[#37352f] dark:text-[#e6e6e4] truncate">
-                    {m.email}
-                  </span>
-
-                  {/* 역할 */}
-                  <div>
-                    {isAdmin && profile && m.id !== profile.id ? (
-                      <select
-                        value={m.role}
-                        onChange={(e) => handleRoleChange(m.id, e.target.value as "admin" | "member")}
-                        className="text-xs px-2 py-1 border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-md bg-white dark:bg-[#1f1f1f] text-[#37352f] dark:text-[#e6e6e4] focus:outline-none cursor-pointer"
-                      >
-                        <option value="member">팀원</option>
-                        <option value="admin">관리자</option>
-                      </select>
-                    ) : (
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4]">
-                        {m.role === "admin" ? "관리자" : "팀원"}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* 상태 */}
-                  <span
-                    className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full w-fit ${
-                      m.status === "active"
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                    }`}
+                ))}
+              </div>
+            ) : approvedMembers.length === 0 ? (
+              <div className="text-center py-12 text-sm text-[#9b9a97]">
+                승인된 팀원이 없습니다.
+              </div>
+            ) : (
+              <div className="divide-y divide-[#e9e9e7] dark:divide-[#2f2f2f]">
+                {approvedMembers.map((m) => (
+                  <div
+                    key={m.id}
+                    className="grid grid-cols-[2fr_3fr_1.5fr_1fr] gap-4 items-center px-4 py-3 hover:bg-[#fafaf9] dark:hover:bg-[#1f1f1f] transition-colors"
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${m.status === "active" ? "bg-emerald-500" : "bg-amber-500"}`} />
-                    {m.status === "active" ? "활성" : "초대대기"}
-                  </span>
+                    {/* 이름 */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center flex-shrink-0">
+                        {m.role === "admin" ? (
+                          <Crown size={13} className="text-amber-500" />
+                        ) : (
+                          <User size={13} className="text-[#9b9a97]" />
+                        )}
+                      </div>
+                      <span className="text-sm text-[#37352f] dark:text-[#e6e6e4] truncate">
+                        {m.name || <span className="text-[#9b9a97] italic text-xs">미설정</span>}
+                      </span>
+                    </div>
 
-                  {/* 관리 */}
-                  <div>
-                    {isAdmin && profile && m.id !== profile.id && (
+                    {/* 이메일 */}
+                    <span className="text-sm text-[#37352f] dark:text-[#e6e6e4] truncate">
+                      {m.email}
+                    </span>
+
+                    {/* 역할 */}
+                    <div>
+                      {isAdmin && profile && m.id !== profile.id ? (
+                        <select
+                          value={m.role}
+                          onChange={(e) => handleRoleChange(m.id, e.target.value as "admin" | "member")}
+                          className="text-xs px-2 py-1 border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-md bg-white dark:bg-[#1f1f1f] text-[#37352f] dark:text-[#e6e6e4] focus:outline-none cursor-pointer"
+                        >
+                          <option value="member">팀원</option>
+                          <option value="admin">관리자</option>
+                        </select>
+                      ) : (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4]">
+                          {m.role === "admin" ? "관리자" : "팀원"}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 관리 */}
+                    <div>
+                      {isAdmin && profile && m.id !== profile.id && (
+                        <button
+                          onClick={() => setDeleteTarget(m)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-red-500 border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        >
+                          <Trash2 size={12} />
+                          삭제
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ── 거절된 계정 섹션 (관리자만) ── */}
+        {isAdmin && rejectedMembers.length > 0 && (
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <X size={15} className="text-red-400" />
+              <h2 className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">
+                거절된 신청
+              </h2>
+              <span className="text-xs text-[#9b9a97]">({rejectedMembers.length}건)</span>
+            </div>
+
+            <div className="border border-[#e9e9e7] dark:border-[#2f2f2f] rounded-xl overflow-hidden">
+              <div className="divide-y divide-[#e9e9e7] dark:divide-[#2f2f2f]">
+                {rejectedMembers.map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center gap-4 px-4 py-3 hover:bg-[#fafaf9] dark:hover:bg-[#1f1f1f] transition-colors"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
+                      <UserX size={15} className="text-red-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-[#9b9a97] truncate">
+                        {m.name || "이름 미설정"}
+                      </p>
+                      <p className="text-xs text-[#9b9a97] truncate">{m.email}</p>
+                    </div>
+                    {/* 재승인 또는 삭제 */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleApprove(m.id, "approve")}
+                        disabled={approveLoading === m.id + "approve"}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-emerald-600 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors disabled:opacity-50"
+                      >
+                        <UserCheck size={11} />
+                        승인
+                      </button>
                       <button
                         onClick={() => setDeleteTarget(m)}
                         className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-red-500 border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                       >
-                        <Trash2 size={12} />
+                        <Trash2 size={11} />
                         삭제
                       </button>
-                    )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          )}
-        </div>
+          </section>
+        )}
       </div>
-
-      {/* 팀원 초대 모달 */}
-      {showInviteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-md mx-4 bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#3f3f3f] shadow-2xl">
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
-              <div className="flex items-center gap-2">
-                <UserPlus size={16} className="text-[#9b9a97]" />
-                <h2 className="text-base font-semibold text-[#37352f] dark:text-[#e6e6e4]">팀원 초대</h2>
-              </div>
-              <button
-                onClick={() => { setShowInviteModal(false); setGeneratedLink(null); setInviteMsg(null); }}
-                className="w-7 h-7 flex items-center justify-center rounded-md text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f] transition-colors"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* 탭: 이메일 / 링크 생성 */}
-            <div className="flex gap-0 px-6 pt-4 border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
-              <button
-                type="button"
-                onClick={() => { setInviteTab("email"); setGeneratedLink(null); setInviteMsg(null); }}
-                className={`flex items-center gap-1.5 px-3 pb-3 text-sm border-b-2 transition-colors ${
-                  inviteTab === "email"
-                    ? "border-[#37352f] dark:border-[#e6e6e4] text-[#37352f] dark:text-[#e6e6e4] font-semibold"
-                    : "border-transparent text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4]"
-                }`}
-              >
-                <UserPlus size={13} /> 이메일로 초대
-              </button>
-              <button
-                type="button"
-                onClick={() => { setInviteTab("link"); setGeneratedLink(null); setInviteMsg(null); }}
-                className={`flex items-center gap-1.5 px-3 pb-3 text-sm border-b-2 transition-colors ${
-                  inviteTab === "link"
-                    ? "border-[#37352f] dark:border-[#e6e6e4] text-[#37352f] dark:text-[#e6e6e4] font-semibold"
-                    : "border-transparent text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4]"
-                }`}
-              >
-                <Link size={13} /> 링크 생성
-              </button>
-            </div>
-
-            <form onSubmit={handleInvite} className="px-6 py-5 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-[#9b9a97] mb-1.5">이름 (선택)</label>
-                <input
-                  type="text"
-                  value={inviteName}
-                  onChange={(e) => setInviteName(e.target.value)}
-                  placeholder="홍길동"
-                  className="input-style w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#9b9a97] mb-1.5">이메일 <span className="text-red-500">*</span></label>
-                <input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="team@example.com"
-                  required
-                  className="input-style w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#9b9a97] mb-1.5">역할</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setInviteRole("member")}
-                    className={`flex-1 py-2 text-sm rounded-lg border transition-colors ${
-                      inviteRole === "member"
-                        ? "bg-[#37352f] dark:bg-[#e6e6e4] text-white dark:text-[#191919] border-[#37352f] dark:border-[#e6e6e4]"
-                        : "border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f]"
-                    }`}
-                  >
-                    팀원
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setInviteRole("admin")}
-                    className={`flex-1 py-2 text-sm rounded-lg border transition-colors ${
-                      inviteRole === "admin"
-                        ? "bg-purple-600 text-white border-purple-600"
-                        : "border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f]"
-                    }`}
-                  >
-                    관리자
-                  </button>
-                </div>
-              </div>
-
-              {/* 탭별 안내 */}
-              {inviteTab === "link" && (
-                <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 text-xs text-blue-700 dark:text-blue-300">
-                  이메일 발송 없이 초대 링크를 생성합니다.
-                  <br />
-                  생성된 링크를 카카오톡, 슬랙 등으로 직접 전달하세요.
-                </div>
-              )}
-              {inviteTab === "email" && (
-                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-xs text-amber-700 dark:text-amber-300">
-                  ⚡ 무료 플랜은 이메일 발송 한도가 있습니다. 한도 초과 시 자동으로 링크가 생성됩니다.
-                  <br />
-                  한도 없이 사용하려면 Supabase 대시보드 → Authentication → SMTP에서 커스텀 메일 서버를 연결하세요.
-                </div>
-              )}
-
-              {inviteMsg && (
-                <p className={`text-sm ${inviteMsg.type === "success" ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
-                  {inviteMsg.type === "success" ? "✓ " : "✗ "}{inviteMsg.text}
-                </p>
-              )}
-
-              {/* 생성된 초대 링크 */}
-              {generatedLink && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[#f7f6f3] dark:bg-[#1f1f1f] border border-[#e9e9e7] dark:border-[#3f3f3f]">
-                    <span className="flex-1 text-xs text-[#37352f] dark:text-[#e6e6e4] break-all font-mono leading-relaxed">
-                      {generatedLink}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleCopyLink}
-                      className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] hover:bg-[#f0efed] dark:hover:bg-[#3a3a3a] transition-colors"
-                    >
-                      {linkCopied ? <><Check size={12} className="text-emerald-500" /> 복사됨</> : <><Copy size={12} /> 복사</>}
-                    </button>
-                  </div>
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                    ⚠ 이 링크는 한 번만 사용 가능합니다. 안전하게 전달하세요.
-                  </p>
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => { setShowInviteModal(false); setGeneratedLink(null); setInviteMsg(null); }}
-                  className="flex-1 py-2 text-sm rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f] transition-colors"
-                >
-                  닫기
-                </button>
-                {!generatedLink && (
-                  <button
-                    type="submit"
-                    disabled={inviteLoading}
-                    className="flex-1 py-2 text-sm rounded-lg bg-[#37352f] dark:bg-[#e6e6e4] text-white dark:text-[#191919] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-                  >
-                    {inviteLoading
-                      ? (inviteTab === "link" ? "생성 중..." : "발송 중...")
-                      : (inviteTab === "link" ? "링크 생성" : "초대 보내기")}
-                  </button>
-                )}
-              </div>
-
-              <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] text-center">
-                초대받은 사람만 Hub에 접근할 수 있습니다.
-              </p>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* 삭제 확인 모달 */}
       {deleteTarget && (
@@ -459,8 +363,8 @@ export default function AdminPage() {
                 <AlertTriangle size={16} className="text-red-500" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-[#37352f] dark:text-[#e6e6e4]">팀원 제거</h3>
-                <p className="text-sm text-[#9b9a97] mt-1">정말 이 팀원을 제거하시겠습니까?</p>
+                <h3 className="text-base font-semibold text-[#37352f] dark:text-[#e6e6e4]">계정 삭제</h3>
+                <p className="text-sm text-[#9b9a97] mt-1">정말 이 계정을 삭제하시겠습니까?</p>
               </div>
             </div>
 
@@ -472,7 +376,7 @@ export default function AdminPage() {
             </div>
 
             <p className="text-xs text-red-500 dark:text-red-400 mb-4">
-              삭제 시 해당 계정의 접근 권한이 즉시 제거됩니다.
+              삭제 시 계정 및 모든 접근 권한이 즉시 제거됩니다.
             </p>
 
             <div className="flex gap-2">

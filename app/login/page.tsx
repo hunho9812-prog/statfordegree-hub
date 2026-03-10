@@ -24,9 +24,13 @@ function LoginForm() {
     }
     const errorParam = searchParams.get("error");
     if (errorParam === "unauthorized") {
-      setError("초대받지 않은 계정입니다. 관리자에게 초대를 요청하세요.");
+      setError("등록되지 않은 계정입니다. 회원가입을 신청해주세요.");
     } else if (errorParam === "invite_expired") {
-      setError("초대 링크가 만료되었습니다. 관리자에게 재초대를 요청하세요.");
+      setError("초대 링크가 만료되었습니다. 관리자에게 문의하세요.");
+    } else if (errorParam === "pending") {
+      setError("가입 신청이 아직 승인되지 않았습니다. 관리자 승인 후 로그인 가능합니다.");
+    } else if (errorParam === "rejected") {
+      setError("가입이 거절된 계정입니다. 관리자에게 문의하세요.");
     }
   }, [router, searchParams]);
 
@@ -168,7 +172,7 @@ function LoginForm() {
           </button>
 
           <p className="mt-4 text-xs text-center text-[#9b9a97] dark:text-[#6b6b6b]">
-            초대 링크를 통해 받은 분만 가입 가능합니다.
+            가입 후 관리자 승인이 필요합니다.
           </p>
         </div>
       </div>

@@ -53,30 +53,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (!error && data) {
-        setProfile(data as UserProfile);
+        const profile = data as UserProfile;
+
+        // 승인 대기 중인 계정 → 로그아웃
+        if (profile.status === "pending") {
+          setProfile(null);
+          await supabase.auth.signOut();
+          router.replace("/login?error=pending");
+          return;
+        }
+
+        // 거절된 계정 → 로그아웃
+        if (profile.status === "rejected") {
+          setProfile(null);
+          await supabase.auth.signOut();
+          router.replace("/login?error=rejected");
+          return;
+        }
+
+        setProfile(profile);
         return;
       }
 
-      // public.users 레코드 없음 → 자동 생성 시도
-      const role: "admin" | "member" | null =
-        u.email === ADMIN_EMAIL
-          ? "admin"
-          : (u.user_metadata?.role as "admin" | "member" | undefined) ?? null;
-
-      if (role) {
+      // public.users 레코드 없음 → 관리자 이메일이면 자동 생성
+      if (u.email === ADMIN_EMAIL) {
         const { data: newProfile } = await supabase
           .from("users")
           .upsert({
             id: u.id,
             email: u.email!,
             name: (u.user_metadata?.name as string) ?? "",
-            role,
+            role: "admin",
+            status: "approved",
           })
           .select()
           .single();
         setProfile(newProfile as UserProfile | null);
       } else {
-        // 초대받지 않은 계정 → 로그아웃
+        // 레코드 없는 일반 계정 → 로그아웃
         setProfile(null);
         await supabase.auth.signOut();
         router.replace("/login?error=unauthorized");

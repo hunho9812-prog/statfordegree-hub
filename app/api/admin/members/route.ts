@@ -43,49 +43,44 @@ export async function GET(req: NextRequest) {
   const isAdmin = callerProfile.role === "admin";
 
   if (isAdmin) {
-    // 관리자: auth.users 전체 조회 (초대 대기 포함)
+    // 관리자: public.users 전체 조회 (pending 포함)
     const adminClient = createAdminClient();
-    const { data: authData, error: authError } =
-      await adminClient.auth.admin.listUsers({ perPage: 1000 });
-    if (authError)
-      return NextResponse.json({ error: authError.message }, { status: 500 });
+    const { data: users, error } = await adminClient
+      .from("users")
+      .select("*")
+      .order("created_at");
 
-    const { data: publicUsers } = await adminClient.from("users").select("*");
-    const publicMap = new Map(
-      (publicUsers ?? []).map((u: Record<string, string>) => [u.id, u])
-    );
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-    const members = authData.users.map((au) => {
-      const pub = publicMap.get(au.id) as Record<string, string> | undefined;
-      return {
-        id: au.id,
-        name: (pub?.name ?? au.user_metadata?.name ?? "") as string,
-        email: au.email ?? "",
-        role: (pub?.role ?? au.user_metadata?.role ?? "member") as
-          | "admin"
-          | "member",
-        status: (au.confirmed_at ? "active" : "pending") as
-          | "active"
-          | "pending",
-        created_at: au.created_at,
-      };
-    });
+    const members = (users ?? []).map((u: Record<string, string>) => ({
+      id: u.id,
+      name: u.name ?? "",
+      email: u.email ?? "",
+      role: (u.role ?? "member") as "admin" | "member",
+      status: (u.status ?? "pending") as "pending" | "approved" | "rejected",
+      created_at: u.created_at,
+    }));
 
     return NextResponse.json({ members });
   } else {
-    // 일반 팀원: public.users 조회 (활성 멤버만)
+    // 일반 팀원: approved 멤버만 조회
     const { data: publicUsers, error } = await supabase
       .from("users")
-      .select("*");
-    if (error)
+      .select("*")
+      .eq("status", "approved");
+
+    if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     const members = (publicUsers ?? []).map((u: Record<string, string>) => ({
       id: u.id,
       name: u.name ?? "",
       email: u.email ?? "",
       role: (u.role ?? "member") as "admin" | "member",
-      status: "active" as const,
+      status: "approved" as const,
       created_at: u.created_at,
     }));
 

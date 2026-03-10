@@ -7,6 +7,7 @@ export interface UserProfile {
   email: string;
   name: string;
   role: "admin" | "member";
+  status: "pending" | "approved" | "rejected";
   created_at: string;
 }
 

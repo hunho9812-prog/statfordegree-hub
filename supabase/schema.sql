@@ -77,3 +77,53 @@ select id, email, '', 'admin'
 from   auth.users
 where  email = 'rlagusgh1214@naver.com'
 on conflict (id) do update set role = 'admin';
+
+
+-- ============================================================
+-- 관리자 승인 시스템 마이그레이션
+-- 기존 invite 기반에서 admin 승인 기반으로 전환
+-- ============================================================
+
+-- 1. status 컬럼 추가 (pending / approved / rejected)
+alter table public.users
+  add column if not exists status text not null default 'pending'
+    check (status in ('pending', 'approved', 'rejected'));
+
+-- 2. 기존 사용자는 모두 approved 처리 (기존에 활성화된 계정)
+update public.users set status = 'approved' where status = 'pending';
+
+-- 3. 관리자 계정 approved + admin 보장
+update public.users
+  set status = 'approved', role = 'admin'
+  where email = 'rlagusgh1214@naver.com';
+
+-- 4. 관리자가 다른 사용자의 status/role 업데이트 가능하도록 RLS 정책 추가
+drop policy if exists "users_update_admin" on public.users;
+create policy "users_update_admin" on public.users
+  for update using (
+    auth.uid() in (select id from public.users where role = 'admin')
+  );
+
+-- 5. 트리거 업데이트: 신규 가입자는 status='pending', 관리자 이메일은 'approved'
+create or replace function public.handle_new_auth_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.users (id, email, name, role, status)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'name', ''),
+    case when new.email = 'rlagusgh1214@naver.com' then 'admin'
+         else coalesce(new.raw_user_meta_data->>'role', 'member')
+    end,
+    case when new.email = 'rlagusgh1214@naver.com' then 'approved'
+         else 'pending'
+    end
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
