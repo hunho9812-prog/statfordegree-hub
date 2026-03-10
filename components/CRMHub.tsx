@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ChevronDown, ChevronRight, Users, Trash2, X, AlertTriangle } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, Users, Trash2, X, AlertTriangle, RefreshCw } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
 
 const MONTH_NAMES = [
@@ -65,7 +65,7 @@ function DeleteConfirmModal({
 
 export default function CRMHub() {
   const router = useRouter();
-  const { pages, createPage, updatePage, deletePage } = useWorkspaceStore();
+  const { pages, createPage, updatePage, deletePage, loadFromSupabase, isRefreshing } = useWorkspaceStore();
 
   const [expandedYears, setExpandedYears] = useState<Set<string>>(() => new Set());
   const [showYearInput, setShowYearInput] = useState(false);
@@ -189,13 +189,24 @@ export default function CRMHub() {
               년도를 펼친 뒤 월을 클릭하면 해당 월 고객관리 페이지로 이동합니다.
             </p>
           </div>
-          <button
-            onClick={() => setShowYearInput((v) => !v)}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[#37352f] dark:bg-[#e6e6e4] text-white dark:text-[#191919] hover:opacity-80 transition-opacity"
-          >
-            <Plus size={13} />
-            년도 추가
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => loadFromSupabase()}
+              disabled={isRefreshing}
+              title="새로고침"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+              새로고침
+            </button>
+            <button
+              onClick={() => setShowYearInput((v) => !v)}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[#37352f] dark:bg-[#e6e6e4] text-white dark:text-[#191919] hover:opacity-80 transition-opacity"
+            >
+              <Plus size={13} />
+              년도 추가
+            </button>
+          </div>
         </div>
 
         {/* Year input */}

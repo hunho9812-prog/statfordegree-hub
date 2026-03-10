@@ -464,6 +464,7 @@ const freshState = {
   manualPages: {} as Record<string, ManualPageData>,
   sidebarCollapsed: false,
   darkMode: false,
+  isRefreshing: false,
 };
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -881,6 +882,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       loadFromSupabase: async () => {
         if (!isSupabaseConfigured) return;
+        set({ isRefreshing: true });
+        try {
 
         const [pages, tasks, customers, statuses, manualNodesData, manualRoots, rootPageIdsConfig] =
           await Promise.all([
@@ -976,7 +979,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           // manualPages: Supabase에 데이터가 있으면 사용, 비어있으면 로컬 유지
           // (인증 실패로 fetch가 빈 배열을 반환해도 로컬 데이터 보호)
           manualPages: Object.keys(manualPages).length > 0 ? manualPages : current.manualPages,
+          isRefreshing: false,
         });
+        } catch (e) {
+          set({ isRefreshing: false });
+          throw e;
+        }
       },
     }),
     {

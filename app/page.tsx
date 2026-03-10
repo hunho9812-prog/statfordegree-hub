@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
 import { MENU_IDS } from "@/lib/store";
 
@@ -68,7 +69,7 @@ const BADGE_COLORS: Record<string, string> = {
 
 export default function HomePage() {
   const router = useRouter();
-  const { createPage, tasks } = useWorkspaceStore();
+  const { createPage, tasks, loadFromSupabase, isRefreshing } = useWorkspaceStore();
 
   const todoCount = tasks.filter((t) => t.status === "todo").length;
   const inProgressCount = tasks.filter((t) => t.status === "in-progress").length;
@@ -82,18 +83,29 @@ export default function HomePage() {
     <div className="flex-1 overflow-y-auto bg-white dark:bg-[#191919]">
       <div className="max-w-4xl mx-auto px-8 pt-16 pb-12">
         {/* Logo + Title */}
-        <div className="flex items-center gap-4 mb-3">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-2xl shadow-lg">
-            📚
+        <div className="flex items-center justify-between gap-4 mb-3">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-2xl shadow-lg">
+              📚
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-[#37352f] dark:text-[#e6e6e4] tracking-tight">
+                Statfordegree Hub
+              </h1>
+              <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b] mt-0.5">
+                팀 지식관리 시스템
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-[#37352f] dark:text-[#e6e6e4] tracking-tight">
-              Statfordegree Hub
-            </h1>
-            <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b] mt-0.5">
-              팀 지식관리 시스템
-            </p>
-          </div>
+          <button
+            onClick={() => loadFromSupabase()}
+            disabled={isRefreshing}
+            title="새로고침"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+            새로고침
+          </button>
         </div>
 
         {/* Stats */}

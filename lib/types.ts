@@ -102,6 +102,7 @@ export interface WorkspaceState {
   updateManualNode: (pageId: string, nodeId: string, updates: Partial<Pick<ManualNode, "text" | "isExpanded" | "isPinned">>) => void;
   deleteManualNode: (pageId: string, nodeId: string) => void;
   moveManualNode: (pageId: string, nodeId: string, afterNodeId: string) => void;
+  isRefreshing: boolean;
   toggleSidebar: () => void;
   toggleDarkMode: () => void;
   loadFromSupabase: () => Promise<void>;

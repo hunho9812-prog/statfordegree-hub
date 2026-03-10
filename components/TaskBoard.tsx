@@ -10,6 +10,7 @@ import {
   Calendar,
   User,
   Tag,
+  RefreshCw,
 } from "lucide-react";
 import {
   cn,
@@ -45,7 +46,7 @@ const defaultForm: NewTaskForm = {
 };
 
 export default function TaskBoard() {
-  const { tasks, createTask, updateTask, deleteTask } = useWorkspaceStore();
+  const { tasks, createTask, updateTask, deleteTask, loadFromSupabase, isRefreshing } = useWorkspaceStore();
   const [addingTo, setAddingTo] = useState<TaskStatus | null>(null);
   const [form, setForm] = useState<NewTaskForm>(defaultForm);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -86,11 +87,22 @@ export default function TaskBoard() {
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col bg-white dark:bg-[#191919]">
-      <div className="px-8 py-6 border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
-        <h1 className="text-2xl font-bold text-[#37352f] dark:text-[#e6e6e4]">업무 보드</h1>
-        <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b] mt-1">
-          팀 업무를 칸반 보드로 관리하세요
-        </p>
+      <div className="px-8 py-6 border-b border-[#e9e9e7] dark:border-[#2f2f2f] flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#37352f] dark:text-[#e6e6e4]">업무 보드</h1>
+          <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b] mt-1">
+            팀 업무를 칸반 보드로 관리하세요
+          </p>
+        </div>
+        <button
+          onClick={() => loadFromSupabase()}
+          disabled={isRefreshing}
+          title="새로고침"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+          새로고침
+        </button>
       </div>
 
       <div className="flex-1 overflow-x-auto p-8">
