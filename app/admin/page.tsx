@@ -22,7 +22,7 @@ export default function AdminPage() {
 
   // 초대 모달
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteTab, setInviteTab] = useState<"email" | "link">("email");
+  const [inviteTab, setInviteTab] = useState<"email" | "link">("link");
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
@@ -68,9 +68,24 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        // 이메일 rate limit 시 자동으로 링크 탭으로 전환
+        // 이메일 rate limit 시 자동으로 링크 생성 재시도
         if (data.rateLimited) {
           setInviteTab("link");
+          // 자동으로 링크 생성 재시도
+          try {
+            const linkRes = await fetch("/api/invite", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: inviteEmail, name: inviteName, role: inviteRole, linkOnly: true }),
+            });
+            const linkData = await linkRes.json();
+            if (linkRes.ok && linkData.inviteLink) {
+              setGeneratedLink(linkData.inviteLink);
+              setInviteMsg({ type: "success", text: "이메일 한도 초과로 초대 링크를 대신 생성했습니다. 아래 링크를 복사해서 전달하세요." });
+              fetchMembers();
+              return;
+            }
+          } catch { /* 링크 생성도 실패하면 아래 에러 표시 */ }
         }
         setInviteMsg({ type: "error", text: data.error ?? "초대 실패" });
       } else if (isLink && data.inviteLink) {
@@ -363,12 +378,19 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* 링크 탭 안내 */}
+              {/* 탭별 안내 */}
               {inviteTab === "link" && (
                 <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 text-xs text-blue-700 dark:text-blue-300">
                   이메일 발송 없이 초대 링크를 생성합니다.
                   <br />
                   생성된 링크를 카카오톡, 슬랙 등으로 직접 전달하세요.
+                </div>
+              )}
+              {inviteTab === "email" && (
+                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-xs text-amber-700 dark:text-amber-300">
+                  ⚡ 무료 플랜은 이메일 발송 한도가 있습니다. 한도 초과 시 자동으로 링크가 생성됩니다.
+                  <br />
+                  한도 없이 사용하려면 Supabase 대시보드 → Authentication → SMTP에서 커스텀 메일 서버를 연결하세요.
                 </div>
               )}
 
