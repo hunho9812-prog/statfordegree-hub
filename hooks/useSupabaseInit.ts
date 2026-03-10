@@ -54,7 +54,7 @@ export function useSupabaseInit() {
 
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      supabase.removeChannel(channel);
+      supabase?.removeChannel(channel);
     };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 }
