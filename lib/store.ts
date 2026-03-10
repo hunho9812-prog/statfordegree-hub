@@ -909,18 +909,30 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         // 기본 샘플 업무 제목 목록 (업로드·병합에서 완전히 제외)
         const DEFAULT_TASK_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
 
-        // Find data that exists locally but not in Supabase → upload it (migration)
-        // 단, 기본 샘플 업무는 로컬에만 있더라도 절대 업로드하지 않음
+        // Supabase가 진실의 원천(Source of Truth):
+        // Supabase에 데이터가 이미 존재하면 로컬 전용 데이터를 재업로드하지 않음
+        // (재업로드 시 다른 기기에서 삭제한 데이터가 복원되는 버그 방지)
+        // Supabase가 완전히 비어있을 때만 로컬 데이터를 첫 마이그레이션으로 업로드
+        const supabaseHasPages = Object.keys(pages).length > 0;
+        const supabaseHasTasks = tasks.filter((t) => !DEFAULT_TASK_TITLES.includes(t.title)).length > 0;
+        const supabaseHasCustomers = customers.length > 0;
+
         const supaPageIds = new Set(Object.keys(pages));
-        const localOnlyPages = Object.values(current.pages).filter((p) => !supaPageIds.has(p.id));
+        const localOnlyPages = supabaseHasPages
+          ? [] // Supabase에 데이터 있으면 로컬 전용 업로드 금지
+          : Object.values(current.pages).filter((p) => !supaPageIds.has(p.id));
 
         const supaTaskIds = new Set(tasks.map((t) => t.id));
-        const localOnlyTasks = current.tasks.filter(
-          (t) => !supaTaskIds.has(t.id) && !DEFAULT_TASK_TITLES.includes(t.title)
-        );
+        const localOnlyTasks = supabaseHasTasks
+          ? []
+          : current.tasks.filter(
+              (t) => !supaTaskIds.has(t.id) && !DEFAULT_TASK_TITLES.includes(t.title)
+            );
 
         const supaCustomerIds = new Set(customers.map((c) => c.id));
-        const localOnlyCustomers = current.customers.filter((c) => !supaCustomerIds.has(c.id));
+        const localOnlyCustomers = supabaseHasCustomers
+          ? []
+          : current.customers.filter((c) => !supaCustomerIds.has(c.id));
 
         const uploadOps: Promise<void>[] = [];
         if (localOnlyPages.length > 0) uploadOps.push(dbPages.upsertMany(localOnlyPages));
@@ -929,18 +941,17 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         if (uploadOps.length > 0) await Promise.all(uploadOps);
 
         // Seed workspace config if missing
-        if (Object.keys(pages).length === 0) {
+        if (!supabaseHasPages) {
           await Promise.all([
             dbCustomerStatuses.upsertMany(current.customerStatuses),
             dbWorkspaceConfig.set("rootPageIds", current.rootPageIds),
           ]);
         }
 
-        // Merge: Supabase is source of truth, supplement with local-only items
-        const mergedPages = {
-          ...pages,
-          ...Object.fromEntries(localOnlyPages.map((p) => [p.id, p])),
-        };
+        // Supabase가 있으면 그것만 사용, 없으면 로컬 첫 마이그레이션 데이터 사용
+        const mergedPages = supabaseHasPages
+          ? pages
+          : { ...pages, ...Object.fromEntries(localOnlyPages.map((p) => [p.id, p])) };
 
         // Supabase에 남아있는 기본 샘플 업무 항목 모두 삭제 (중복 포함)
         const defaultTasksInSupa = tasks.filter((t) => DEFAULT_TASK_TITLES.includes(t.title));
@@ -949,9 +960,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }
         const cleanedTasks = tasks.filter((t) => !DEFAULT_TASK_TITLES.includes(t.title));
 
-        // localOnlyTasks는 이미 기본 샘플 제목을 제외했으므로 안전하게 병합
-        const mergedTasks = [...cleanedTasks, ...localOnlyTasks];
-        const mergedCustomers = [...customers, ...localOnlyCustomers];
+        const mergedTasks = supabaseHasTasks
+          ? cleanedTasks
+          : [...cleanedTasks, ...localOnlyTasks];
+        const mergedCustomers = supabaseHasCustomers
+          ? customers
+          : [...customers, ...localOnlyCustomers];
 
         set({
           pages: Object.keys(mergedPages).length > 0 ? mergedPages : current.pages,
@@ -959,7 +973,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           tasks: mergedTasks,
           customers: mergedCustomers,
           customerStatuses: statuses.length > 0 ? statuses : current.customerStatuses,
-          manualPages,
+          // manualPages: Supabase에 데이터가 있으면 사용, 비어있으면 로컬 유지
+          // (인증 실패로 fetch가 빈 배열을 반환해도 로컬 데이터 보호)
+          manualPages: Object.keys(manualPages).length > 0 ? manualPages : current.manualPages,
         });
       },
     }),
