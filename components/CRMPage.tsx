@@ -630,6 +630,18 @@ function DataRow({
   onUpdate: (updates: Partial<Omit<Customer, "id" | "created_at">>) => void;
   onDelete: () => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  function handleDeleteClick() {
+    if (confirmDelete) {
+      onDelete();
+    } else {
+      setConfirmDelete(true);
+      // 3초 후 자동 취소
+      setTimeout(() => setConfirmDelete(false), 3000);
+    }
+  }
+
   return (
     <tr className="border-t border-[#e9e9e7] dark:border-[#2f2f2f] hover:bg-gray-50 dark:hover:bg-[#1f1f1f] group">
       <td className="px-3 py-2 min-w-[120px]">
@@ -680,10 +692,16 @@ function DataRow({
       </td>
       <td className="px-3 py-2">
         <button
-          onClick={onDelete}
-          className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity"
+          onClick={handleDeleteClick}
+          title={confirmDelete ? "한 번 더 클릭하면 삭제됩니다" : "삭제"}
+          className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-all ${
+            confirmDelete
+              ? "bg-red-500 text-white font-semibold animate-pulse"
+              : "text-[#c4c3bf] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+          }`}
         >
-          <Trash2 size={14} />
+          <Trash2 size={12} />
+          {confirmDelete && "삭제?"}
         </button>
       </td>
     </tr>

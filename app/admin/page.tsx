@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { UserPlus, Trash2, RefreshCw, Crown, User, X, AlertTriangle } from "lucide-react";
+import { UserPlus, Trash2, RefreshCw, Crown, User, X, AlertTriangle, Copy, Check, Link } from "lucide-react";
 
 interface Member {
   id: string;
@@ -22,11 +22,14 @@ export default function AdminPage() {
 
   // 초대 모달
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteTab, setInviteTab] = useState<"email" | "link">("email");
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteMsg, setInviteMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // 삭제 확인 모달
   const [deleteTarget, setDeleteTarget] = useState<Member | null>(null);
@@ -53,15 +56,27 @@ export default function AdminPage() {
     e.preventDefault();
     setInviteLoading(true);
     setInviteMsg(null);
+    setGeneratedLink(null);
+
+    const isLink = inviteTab === "link";
+
     try {
       const res = await fetch("/api/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail, name: inviteName, role: inviteRole }),
+        body: JSON.stringify({ email: inviteEmail, name: inviteName, role: inviteRole, linkOnly: isLink }),
       });
       const data = await res.json();
       if (!res.ok) {
+        // 이메일 rate limit 시 자동으로 링크 탭으로 전환
+        if (data.rateLimited) {
+          setInviteTab("link");
+        }
         setInviteMsg({ type: "error", text: data.error ?? "초대 실패" });
+      } else if (isLink && data.inviteLink) {
+        setGeneratedLink(data.inviteLink);
+        setInviteMsg({ type: "success", text: "초대 링크가 생성되었습니다. 아래 링크를 복사해서 전달하세요." });
+        fetchMembers();
       } else {
         setInviteMsg({ type: "success", text: `${inviteEmail}로 초대 메일을 발송했습니다.` });
         setInviteName("");
@@ -74,6 +89,14 @@ export default function AdminPage() {
     } finally {
       setInviteLoading(false);
     }
+  }
+
+  function handleCopyLink() {
+    if (!generatedLink) return;
+    navigator.clipboard.writeText(generatedLink).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
   }
 
   async function handleRoleChange(memberId: string, newRole: "admin" | "member") {
@@ -255,10 +278,36 @@ export default function AdminPage() {
                 <h2 className="text-base font-semibold text-[#37352f] dark:text-[#e6e6e4]">팀원 초대</h2>
               </div>
               <button
-                onClick={() => setShowInviteModal(false)}
+                onClick={() => { setShowInviteModal(false); setGeneratedLink(null); setInviteMsg(null); }}
                 className="w-7 h-7 flex items-center justify-center rounded-md text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f] transition-colors"
               >
                 <X size={16} />
+              </button>
+            </div>
+
+            {/* 탭: 이메일 / 링크 생성 */}
+            <div className="flex gap-0 px-6 pt-4 border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
+              <button
+                type="button"
+                onClick={() => { setInviteTab("email"); setGeneratedLink(null); setInviteMsg(null); }}
+                className={`flex items-center gap-1.5 px-3 pb-3 text-sm border-b-2 transition-colors ${
+                  inviteTab === "email"
+                    ? "border-[#37352f] dark:border-[#e6e6e4] text-[#37352f] dark:text-[#e6e6e4] font-semibold"
+                    : "border-transparent text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4]"
+                }`}
+              >
+                <UserPlus size={13} /> 이메일로 초대
+              </button>
+              <button
+                type="button"
+                onClick={() => { setInviteTab("link"); setGeneratedLink(null); setInviteMsg(null); }}
+                className={`flex items-center gap-1.5 px-3 pb-3 text-sm border-b-2 transition-colors ${
+                  inviteTab === "link"
+                    ? "border-[#37352f] dark:border-[#e6e6e4] text-[#37352f] dark:text-[#e6e6e4] font-semibold"
+                    : "border-transparent text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4]"
+                }`}
+              >
+                <Link size={13} /> 링크 생성
               </button>
             </div>
 
@@ -314,31 +363,65 @@ export default function AdminPage() {
                 </div>
               </div>
 
+              {/* 링크 탭 안내 */}
+              {inviteTab === "link" && (
+                <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 text-xs text-blue-700 dark:text-blue-300">
+                  이메일 발송 없이 초대 링크를 생성합니다.
+                  <br />
+                  생성된 링크를 카카오톡, 슬랙 등으로 직접 전달하세요.
+                </div>
+              )}
+
               {inviteMsg && (
                 <p className={`text-sm ${inviteMsg.type === "success" ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
                   {inviteMsg.type === "success" ? "✓ " : "✗ "}{inviteMsg.text}
                 </p>
               )}
 
+              {/* 생성된 초대 링크 */}
+              {generatedLink && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[#f7f6f3] dark:bg-[#1f1f1f] border border-[#e9e9e7] dark:border-[#3f3f3f]">
+                    <span className="flex-1 text-xs text-[#37352f] dark:text-[#e6e6e4] break-all font-mono leading-relaxed">
+                      {generatedLink}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleCopyLink}
+                      className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] hover:bg-[#f0efed] dark:hover:bg-[#3a3a3a] transition-colors"
+                    >
+                      {linkCopied ? <><Check size={12} className="text-emerald-500" /> 복사됨</> : <><Copy size={12} /> 복사</>}
+                    </button>
+                  </div>
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    ⚠ 이 링크는 한 번만 사용 가능합니다. 안전하게 전달하세요.
+                  </p>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => setShowInviteModal(false)}
+                  onClick={() => { setShowInviteModal(false); setGeneratedLink(null); setInviteMsg(null); }}
                   className="flex-1 py-2 text-sm rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f] transition-colors"
                 >
-                  취소
+                  닫기
                 </button>
-                <button
-                  type="submit"
-                  disabled={inviteLoading}
-                  className="flex-1 py-2 text-sm rounded-lg bg-[#37352f] dark:bg-[#e6e6e4] text-white dark:text-[#191919] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {inviteLoading ? "발송 중..." : "초대 보내기"}
-                </button>
+                {!generatedLink && (
+                  <button
+                    type="submit"
+                    disabled={inviteLoading}
+                    className="flex-1 py-2 text-sm rounded-lg bg-[#37352f] dark:bg-[#e6e6e4] text-white dark:text-[#191919] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    {inviteLoading
+                      ? (inviteTab === "link" ? "생성 중..." : "발송 중...")
+                      : (inviteTab === "link" ? "링크 생성" : "초대 보내기")}
+                  </button>
+                )}
               </div>
 
               <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] text-center">
-                초대 메일을 받은 사람만 Hub에 접근할 수 있습니다.
+                초대받은 사람만 Hub에 접근할 수 있습니다.
               </p>
             </form>
           </div>

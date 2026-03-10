@@ -46,30 +46,74 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. 요청 파라미터 파싱
-  const { email, name, role } = await req.json();
+  const { email, name, role, linkOnly } = await req.json();
   if (!email) {
     return NextResponse.json({ error: "이메일을 입력해주세요." }, { status: 400 });
   }
 
   const inviteRole: "admin" | "member" = role === "admin" ? "admin" : "member";
+  const redirectTo = `${SITE_URL}/auth/callback`;
 
   try {
     const adminClient = createAdminClient();
 
-    // 3. 초대 메일 발송
-    //    redirectTo → 반드시 Vercel 배포 URL로 설정해야 localhost 에러 방지
-    //    Supabase Dashboard > Authentication > URL Configuration 에도 동일 URL 등록 필요
+    // 3-A. linkOnly 모드: 이메일 없이 초대 링크만 생성
+    if (linkOnly) {
+      const { data: linkData, error: linkError } =
+        await adminClient.auth.admin.generateLink({
+          type: "invite",
+          email,
+          options: {
+            data: { name: name ?? "", role: inviteRole },
+            redirectTo,
+          },
+        });
+
+      if (linkError) {
+        return NextResponse.json({ error: linkError.message }, { status: 400 });
+      }
+
+      const userId = linkData?.user?.id;
+      if (userId) {
+        await adminClient.from("users").upsert({
+          id: userId,
+          email: linkData.user.email ?? email,
+          name: name ?? "",
+          role: inviteRole,
+        });
+      }
+
+      return NextResponse.json({ success: true, inviteLink: linkData?.properties?.action_link });
+    }
+
+    // 3-B. 이메일 초대 발송
     const { data: inviteData, error: inviteError } =
       await adminClient.auth.admin.inviteUserByEmail(email, {
         data: { name: name ?? "", role: inviteRole },
-        redirectTo: `${SITE_URL}/auth/callback`,
+        redirectTo,
       });
 
     if (inviteError) {
+      const msg = inviteError.message.toLowerCase();
+      const isRateLimit =
+        msg.includes("rate limit") ||
+        msg.includes("over_email_send_rate_limit") ||
+        msg.includes("email rate limit");
+
+      if (isRateLimit) {
+        return NextResponse.json(
+          {
+            error:
+              "이메일 발송 한도를 초과했습니다. '링크 생성' 탭을 사용하거나 잠시 후 다시 시도해주세요.",
+            rateLimited: true,
+          },
+          { status: 429 }
+        );
+      }
       return NextResponse.json({ error: inviteError.message }, { status: 400 });
     }
 
-    // 4. public.users 에도 미리 등록 (초대 수락 전에도 profile 조회 가능하도록)
+    // 4. public.users 에도 미리 등록
     if (inviteData?.user) {
       await adminClient.from("users").upsert({
         id: inviteData.user.id,
