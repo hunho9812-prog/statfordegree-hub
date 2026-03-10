@@ -935,7 +935,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           ...pages,
           ...Object.fromEntries(localOnlyPages.map((p) => [p.id, p])),
         };
-        const mergedTasks = [...tasks, ...localOnlyTasks];
+
+        // Supabase에 남아있는 기본 샘플 업무 항목 정리
+        const DEFAULT_TASK_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
+        const defaultTasksInSupa = tasks.filter((t) => DEFAULT_TASK_TITLES.includes(t.title));
+        if (defaultTasksInSupa.length > 0) {
+          defaultTasksInSupa.forEach((t) => dbTasks.delete(t.id));
+        }
+        const cleanedTasks = tasks.filter((t) => !DEFAULT_TASK_TITLES.includes(t.title));
+
+        const mergedTasks = [...cleanedTasks, ...localOnlyTasks];
         const mergedCustomers = [...customers, ...localOnlyCustomers];
 
         set({
