@@ -51,7 +51,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (u.email === ADMIN_EMAIL) {
           const { data: newProfile } = await supabase
             .from("users")
-            .insert({ id: u.id, email: u.email, role: "admin" })
+            .insert({
+              id: u.id,
+              email: u.email,
+              name: (u.user_metadata?.name as string) ?? "",
+              role: "admin",
+            })
             .select()
             .single();
           setProfile(newProfile as UserProfile);
