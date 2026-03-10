@@ -31,10 +31,10 @@ export async function GET(req: NextRequest) {
   }
 
   const isAdmin = callerProfile.role === "admin";
-  const adminClient = createAdminClient();
 
   if (isAdmin) {
     // 관리자: auth.users 전체 조회 (초대 대기 포함)
+    const adminClient = createAdminClient();
     const { data: authData, error: authError } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
     if (authError) return NextResponse.json({ error: authError.message }, { status: 500 });
 
