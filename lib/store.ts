@@ -11,7 +11,7 @@ import {
   dbManualPageRoots,
   dbWorkspaceConfig,
 } from "./db";
-import { isSupabaseConfigured } from "./supabase";
+import { isSupabaseConfigured, supabase } from "./supabase";
 
 // Fixed IDs for the manual page hierarchy
 export const MENU_IDS = {
@@ -881,7 +881,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
 
       loadFromSupabase: async () => {
-        if (!isSupabaseConfigured) return;
+        if (!isSupabaseConfigured || !supabase) return;
+
+        // 새 기기에서 로그인 직후 세션이 아직 확립되지 않은 경우를 방지합니다.
+        // 세션이 없으면 fetchAll()이 RLS에 의해 빈 결과를 반환하고,
+        // 그 경우 로컬 기본 데이터가 Supabase에 덮어써지는 치명적 버그가 발생합니다.
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
         set({ isRefreshing: true });
         try {
 

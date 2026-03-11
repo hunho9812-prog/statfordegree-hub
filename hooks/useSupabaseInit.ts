@@ -24,6 +24,21 @@ export function useSupabaseInit() {
   const { user } = useAuth();
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 탭/창이 다시 보이게 될 때 자동 새로고침
+  // → 다른 기기에서 변경한 내용을 노트북으로 전환 시 즉시 반영
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || !user) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadFromSupabase();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [user?.id, loadFromSupabase]);
+
   useEffect(() => {
     // 로그인 완료 전 또는 Supabase 미설정 시 중단
     if (!isSupabaseConfigured || !supabase || !user) return;
