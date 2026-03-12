@@ -25,7 +25,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                var s = JSON.parse(localStorage.getItem('statfordegree-hub-storage') || '{}');
+                var s = JSON.parse(localStorage.getItem('statfordegree-hub-ui') || '{}');
                 if (s.state && s.state.darkMode) {
                   document.documentElement.classList.add('dark');
                 }

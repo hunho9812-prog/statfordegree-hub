@@ -455,16 +455,19 @@ const customerDefaults: Partial<Customer> = {
   monthPageId: null,
 };
 
+// 초기 상태: 데이터는 항상 Supabase에서 로드 (localStorage 캐시 없음)
+// UI 설정(darkMode, sidebarCollapsed)만 localStorage에 저장됨
 const freshState = {
-  pages: initialPages,
-  rootPageIds: [MENU_IDS.MANUAL, MENU_IDS.TAX, MENU_IDS.ADMATCH, MENU_IDS.STATGENIE],
-  tasks: initialTasks,
-  customers: initialCustomers,
+  pages: {} as Record<string, Page>,
+  rootPageIds: [] as string[],
+  tasks: [] as Task[],
+  customers: [] as Customer[],
   customerStatuses: initialCustomerStatuses,
   manualPages: {} as Record<string, ManualPageData>,
   sidebarCollapsed: false,
   darkMode: false,
   isRefreshing: false,
+  isInitialLoading: true,
 };
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -880,49 +883,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         });
       },
 
+      // localStorage를 사용하지 않으므로 syncNow = Supabase에서 최신 데이터 pull
       syncNow: async () => {
-        if (!isSupabaseConfigured || !supabase) return;
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
-        set({ isRefreshing: true });
-        try {
-          const current = get();
-
-          // 기본 메뉴 페이지 ID (freshState에 포함된 템플릿 — Supabase에 강제 업로드 금지)
-          const defaultPageIds = new Set(Object.values(MENU_IDS) as string[]);
-
-          // Supabase에 현재 존재하는 ID 목록을 먼저 조회
-          const [supaPages, supaTasks, supaCustomers] = await Promise.all([
-            dbPages.fetchAll(),
-            dbTasks.fetchAll(),
-            dbCustomers.fetchAll(),
-          ]);
-          const supaPageIds = new Set(Object.keys(supaPages));
-          const supaTaskIds = new Set(supaTasks.map((t) => t.id));
-          const supaCustomerIds = new Set(supaCustomers.map((c) => c.id));
-
-          // Supabase에 없는 로컬 항목만 push (기본 템플릿 페이지 제외)
-          // 이미 Supabase에 있는 항목은 건드리지 않아 새 기기의 freshState가 실제 데이터를 덮어쓰는 사고를 방지
-          const pushOps: Promise<void>[] = [
-            ...Object.values(current.pages)
-              .filter((p) => !supaPageIds.has(p.id) && !defaultPageIds.has(p.id))
-              .map((p) => dbPages.upsert(p)),
-            ...current.tasks
-              .filter((t) => !supaTaskIds.has(t.id))
-              .map((t) => dbTasks.upsert(t)),
-            ...current.customers
-              .filter((c) => !supaCustomerIds.has(c.id))
-              .map((c) => dbCustomers.upsert(c)),
-          ];
-          if (pushOps.length > 0) await Promise.all(pushOps);
-        } catch (e) {
-          set({ isRefreshing: false });
-          throw e;
-        }
-
-        // Pull: isRefreshing은 loadFromSupabase 내부에서 다시 true→false 처리됨
-        set({ isRefreshing: false });
         await get().loadFromSupabase();
       },
 
@@ -949,7 +911,37 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             dbWorkspaceConfig.get("rootPageIds"),
           ]);
 
-        // Build manualPages from flat node list
+        // ── 최초 배포: Supabase가 완전히 비어있으면 기본 메뉴 페이지 시드 ──
+        const supabaseHasPages = Object.keys(pages).length > 0;
+        if (!supabaseHasPages) {
+          const defaultRootIds = [MENU_IDS.MANUAL, MENU_IDS.TAX, MENU_IDS.ADMATCH, MENU_IDS.STATGENIE];
+          await Promise.all([
+            dbPages.upsertMany(Object.values(initialPages)),
+            dbCustomerStatuses.upsertMany(initialCustomerStatuses),
+            dbWorkspaceConfig.set("rootPageIds", defaultRootIds),
+          ]);
+          set({
+            pages: initialPages,
+            rootPageIds: defaultRootIds,
+            tasks: [],
+            customers: [],
+            customerStatuses: initialCustomerStatuses,
+            manualPages: {},
+            isRefreshing: false,
+            isInitialLoading: false,
+          });
+          return;
+        }
+
+        // ── 기본 샘플 업무 항목 Supabase에서 삭제 (이전 버전 잔재 정리) ──
+        const DEFAULT_TASK_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
+        const defaultTasksInSupa = tasks.filter((t) => DEFAULT_TASK_TITLES.includes(t.title));
+        if (defaultTasksInSupa.length > 0) {
+          defaultTasksInSupa.forEach((t) => dbTasks.delete(t.id));
+        }
+        const cleanedTasks = tasks.filter((t) => !DEFAULT_TASK_TITLES.includes(t.title));
+
+        // ── manualPages 조립 ──
         const manualPages: Record<string, ManualPageData> = {};
         for (const { pageId, node } of manualNodesData) {
           if (!manualPages[pageId]) manualPages[pageId] = { rootItems: [], items: {} };
@@ -960,143 +952,44 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           manualPages[pid].rootItems = rootItems;
         }
 
-        const current = get();
-
-        // 기본 샘플 업무 제목 목록 (업로드·병합에서 완전히 제외)
-        const DEFAULT_TASK_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
-
-        // Supabase가 진실의 원천(Source of Truth):
-        // Supabase에 데이터가 이미 존재하면 로컬 전용 데이터를 재업로드하지 않음
-        // (재업로드 시 다른 기기에서 삭제한 데이터가 복원되는 버그 방지)
-        // Supabase가 완전히 비어있을 때만 로컬 데이터를 첫 마이그레이션으로 업로드
-        const supabaseHasPages = Object.keys(pages).length > 0;
-        const supabaseHasTasks = tasks.filter((t) => !DEFAULT_TASK_TITLES.includes(t.title)).length > 0;
-        const supabaseHasCustomers = customers.length > 0;
-
-        const supaPageIds = new Set(Object.keys(pages));
-        const localOnlyPages = supabaseHasPages
-          ? [] // Supabase에 데이터 있으면 로컬 전용 업로드 금지
-          : Object.values(current.pages).filter((p) => !supaPageIds.has(p.id));
-
-        const supaTaskIds = new Set(tasks.map((t) => t.id));
-        const localOnlyTasks = supabaseHasTasks
-          ? []
-          : current.tasks.filter(
-              (t) => !supaTaskIds.has(t.id) && !DEFAULT_TASK_TITLES.includes(t.title)
-            );
-
-        const supaCustomerIds = new Set(customers.map((c) => c.id));
-        const localOnlyCustomers = supabaseHasCustomers
-          ? []
-          : current.customers.filter((c) => !supaCustomerIds.has(c.id));
-
-        const uploadOps: Promise<void>[] = [];
-        if (localOnlyPages.length > 0) uploadOps.push(dbPages.upsertMany(localOnlyPages));
-        if (localOnlyTasks.length > 0) uploadOps.push(...localOnlyTasks.map((t) => dbTasks.upsert(t)));
-        if (localOnlyCustomers.length > 0) uploadOps.push(...localOnlyCustomers.map((c) => dbCustomers.upsert(c)));
-        if (uploadOps.length > 0) await Promise.all(uploadOps);
-
-        // Seed workspace config if missing
-        if (!supabaseHasPages) {
-          await Promise.all([
-            dbCustomerStatuses.upsertMany(current.customerStatuses),
-            dbWorkspaceConfig.set("rootPageIds", current.rootPageIds),
-          ]);
-        }
-
-        // Supabase가 있으면 그것만 사용, 없으면 로컬 첫 마이그레이션 데이터 사용
-        const mergedPages = supabaseHasPages
-          ? pages
-          : { ...pages, ...Object.fromEntries(localOnlyPages.map((p) => [p.id, p])) };
-
-        // Supabase에 남아있는 기본 샘플 업무 항목 모두 삭제 (중복 포함)
-        const defaultTasksInSupa = tasks.filter((t) => DEFAULT_TASK_TITLES.includes(t.title));
-        if (defaultTasksInSupa.length > 0) {
-          defaultTasksInSupa.forEach((t) => dbTasks.delete(t.id));
-        }
-        const cleanedTasks = tasks.filter((t) => !DEFAULT_TASK_TITLES.includes(t.title));
-
-        const mergedTasks = supabaseHasTasks
-          ? cleanedTasks
-          : [...cleanedTasks, ...localOnlyTasks];
-        const mergedCustomers = supabaseHasCustomers
-          ? customers
-          : [...customers, ...localOnlyCustomers];
-
-        // rootPageIds 결정: workspace_config > Supabase pages에서 도출 > 로컬 유지
+        // ── rootPageIds: workspace_config > pages에서 도출 ──
         const derivedRootPageIds = (rootPageIdsConfig as string[] | null) ??
-          (supabaseHasPages
-            ? Object.values(mergedPages)
-                .filter((p) => p.parentId === null)
-                .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-                .map((p) => p.id)
-            : current.rootPageIds);
+          Object.values(pages)
+            .filter((p) => p.parentId === null)
+            .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+            .map((p) => p.id);
 
-        // workspace_config에 없었던 경우 저장해 두어 다음 기기도 정확히 불러오게 함
-        if (supabaseHasPages && !rootPageIdsConfig) {
+        // workspace_config에 없었으면 저장해 두어 다음 기기도 정확히 조회
+        if (!rootPageIdsConfig) {
           dbWorkspaceConfig.set("rootPageIds", derivedRootPageIds);
         }
 
+        // ── Supabase 데이터로 상태 설정 (localStorage 캐시 불사용) ──
         set({
-          pages: Object.keys(mergedPages).length > 0 ? mergedPages : current.pages,
+          pages,
           rootPageIds: derivedRootPageIds,
-          tasks: mergedTasks,
-          customers: mergedCustomers,
-          customerStatuses: statuses.length > 0 ? statuses : current.customerStatuses,
-          // manualPages: Supabase에 데이터가 있으면 사용, 비어있으면 로컬 유지
-          // (인증 실패로 fetch가 빈 배열을 반환해도 로컬 데이터 보호)
-          manualPages: Object.keys(manualPages).length > 0 ? manualPages : current.manualPages,
+          tasks: cleanedTasks,
+          customers,
+          customerStatuses: statuses.length > 0 ? statuses : initialCustomerStatuses,
+          manualPages,
           isRefreshing: false,
+          isInitialLoading: false,
         });
         } catch (e) {
-          set({ isRefreshing: false });
+          set({ isRefreshing: false, isInitialLoading: false });
           throw e;
         }
       },
     }),
     {
-      name: "statfordegree-hub-storage",
-      version: 7,
-      migrate: (persistedState: unknown, version: number) => {
-        const s = persistedState as Record<string, unknown>;
-        const DEFAULT_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
-
-        if (version === 6) {
-          // v6 → v7: 기본 업무 항목 완전 제거 (중복 누적된 경우도 모두 삭제)
-          return {
-            ...s,
-            tasks: ((s.tasks as Task[]) ?? []).filter(
-              (t) => !DEFAULT_TITLES.includes(t.title)
-            ),
-          };
-        }
-        if (version === 5) {
-          // v5 → v7
-          return {
-            ...s,
-            tasks: ((s.tasks as Task[]) ?? []).filter(
-              (t) => !DEFAULT_TITLES.includes(t.title)
-            ),
-          };
-        }
-        if (version === 4) {
-          // v4 → v7
-          return {
-            ...freshState,
-            tasks: [],
-            customers: ((s.customers as Customer[]) ?? []).map((c) => ({
-              ...customerDefaults,
-              ...c,
-              monthPageId: (c as Customer).monthPageId ?? null,
-            })),
-            customerStatuses: (s.customerStatuses as StatusOption[]) ?? freshState.customerStatuses,
-            sidebarCollapsed: (s.sidebarCollapsed as boolean) ?? false,
-            darkMode: (s.darkMode as boolean) ?? false,
-          };
-        }
-        // 구버전: 전체 초기화
-        return freshState;
-      },
+      // 스토리지 키를 변경해 이전 localStorage 캐시(데이터 포함)를 자동으로 무시
+      // UI 설정(darkMode, sidebarCollapsed)만 저장 — 데이터는 항상 Supabase에서 로드
+      name: "statfordegree-hub-ui",
+      version: 1,
+      partialize: (state) => ({
+        darkMode: state.darkMode,
+        sidebarCollapsed: state.sidebarCollapsed,
+      }),
     }
   )
 );
