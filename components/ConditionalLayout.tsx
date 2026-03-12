@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import { useAuth } from "./AuthProvider";
-import { useWorkspaceStore } from "@/lib/store";
 
 // 로그인 없이 접근 허용되는 경로 (/auth/callback, /auth/signup 포함)
 const PUBLIC_PATHS = ["/login", "/auth"];
@@ -17,7 +16,6 @@ export default function ConditionalLayout({
   const pathname = usePathname();
   const { user, loading } = useAuth();
   const router = useRouter();
-  const isInitialLoading = useWorkspaceStore((s) => s.isInitialLoading);
 
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
@@ -44,18 +42,6 @@ export default function ConditionalLayout({
   // 미로그인 (redirect 진행 중)
   if (!user) {
     return null;
-  }
-
-  // 로그인 후 Supabase에서 초기 데이터 로딩 중 → 스피너
-  if (isInitialLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-white dark:bg-[#191919]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-[#9b9a97]">데이터 불러오는 중...</p>
-        </div>
-      </div>
-    );
   }
 
   return (
