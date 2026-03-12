@@ -467,6 +467,126 @@ const freshState = {
   isRefreshing: false,
 };
 
+// ── 일회성 localStorage → Supabase 마이그레이션 ──────────────────────────────
+// PC와 노트북 각각의 localStorage 데이터를 Supabase에 업로드합니다.
+// updatedAt 기준 충돌 해결: 더 최신인 항목이 Supabase에 저장됩니다.
+// 각 기기별로 딱 한 번만 실행됩니다 (localStorage 플래그 사용).
+const MIGRATION_FLAG = "statfordegree-hub-migrated-v1";
+
+export async function runMigrationIfNeeded(): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+  if (typeof window === "undefined") return;
+  if (localStorage.getItem(MIGRATION_FLAG) === "true") return;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+
+  const state = useWorkspaceStore.getState();
+  const defaultPageIds = new Set(Object.values(MENU_IDS) as string[]);
+  const DEFAULT_TASK_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
+
+  // 마이그레이션할 로컬 데이터 수집
+  const localUserPages = Object.values(state.pages).filter(
+    (p) => !defaultPageIds.has(p.id)
+  );
+  const localUserTasks = state.tasks.filter(
+    (t) => !DEFAULT_TASK_TITLES.includes(t.title)
+  );
+  const localUserCustomers = state.customers;
+
+  const hasLocalData =
+    localUserPages.length > 0 ||
+    localUserTasks.length > 0 ||
+    localUserCustomers.length > 0 ||
+    Object.keys(state.manualPages).length > 0;
+
+  if (!hasLocalData) {
+    localStorage.setItem(MIGRATION_FLAG, "true");
+    return;
+  }
+
+  console.log("[Migration] localStorage → Supabase 마이그레이션 시작");
+
+  // Supabase 현재 상태 조회 (충돌 해결용)
+  const [supaPages, supaTasks, supaCustomers, supaStatuses] = await Promise.all([
+    dbPages.fetchAll(),
+    dbTasks.fetchAll(),
+    dbCustomers.fetchAll(),
+    dbCustomerStatuses.fetchAll(),
+  ]);
+
+  const pushOps: Promise<void>[] = [];
+
+  // ── Pages: Supabase에 없거나 로컬이 더 최신이면 업로드
+  for (const localPage of localUserPages) {
+    const supaPage = supaPages[localPage.id];
+    if (!supaPage || localPage.updatedAt > supaPage.updatedAt) {
+      pushOps.push(dbPages.upsert(localPage));
+    }
+  }
+
+  // ── Tasks: Supabase에 없거나 로컬이 더 최신이면 업로드
+  for (const localTask of localUserTasks) {
+    const supaTask = supaTasks.find((t) => t.id === localTask.id);
+    if (!supaTask || localTask.updatedAt > supaTask.updatedAt) {
+      pushOps.push(dbTasks.upsert(localTask));
+    }
+  }
+
+  // ── Customers: Supabase에 없거나 로컬이 더 최신이면 업로드
+  for (const localCustomer of localUserCustomers) {
+    const supaCustomer = supaCustomers.find((c) => c.id === localCustomer.id);
+    if (!supaCustomer || localCustomer.updated_at > supaCustomer.updated_at) {
+      pushOps.push(dbCustomers.upsert(localCustomer));
+    }
+  }
+
+  // ── CustomerStatuses: Supabase가 비어있을 때만 업로드
+  if (supaStatuses.length === 0 && state.customerStatuses.length > 0) {
+    pushOps.push(dbCustomerStatuses.upsertMany(state.customerStatuses));
+  }
+
+  // ── ManualPages: 각 노드 업로드
+  for (const [pageId, mpd] of Object.entries(state.manualPages)) {
+    for (const node of Object.values(mpd.items)) {
+      pushOps.push(dbManualNodes.upsert(node, pageId));
+    }
+    if (mpd.rootItems.length > 0) {
+      pushOps.push(dbManualPageRoots.upsert(pageId, mpd.rootItems));
+    }
+  }
+
+  if (pushOps.length > 0) await Promise.all(pushOps);
+
+  // ── rootPageIds 병합: 로컬 사용자 페이지 + Supabase 사용자 페이지 합집합
+  const currentRootConfig = await dbWorkspaceConfig.get("rootPageIds");
+  const supaRootIds = (currentRootConfig as string[] | null) ?? [];
+  const localUserRootIds = state.rootPageIds.filter(
+    (id) => !defaultPageIds.has(id)
+  );
+  const mergedUserRootIds = [
+    ...new Set([
+      ...supaRootIds.filter((id) => !defaultPageIds.has(id)),
+      ...localUserRootIds,
+    ]),
+  ];
+  // 기본 메뉴 페이지 순서 앞에 유지, 사용자 페이지 뒤에 병합
+  const defaultRootOrder = state.rootPageIds.filter((id) =>
+    defaultPageIds.has(id)
+  );
+  const finalRootIds = [
+    ...defaultRootOrder,
+    ...mergedUserRootIds.filter((id) => !defaultRootOrder.includes(id)),
+  ];
+  await dbWorkspaceConfig.set("rootPageIds", finalRootIds);
+
+  // 마이그레이션 완료 표시
+  localStorage.setItem(MIGRATION_FLAG, "true");
+  console.log(
+    `[Migration] 완료: pages ${localUserPages.length}개, tasks ${localUserTasks.length}개, customers ${localUserCustomers.length}개 처리`
+  );
+}
+
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
