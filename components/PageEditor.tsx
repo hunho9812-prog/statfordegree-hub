@@ -75,8 +75,10 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   const titleSaveTimer = useRef<NodeJS.Timeout | null>(null);
   // 내가 마지막으로 저장한 content를 추적 (Realtime 에코 방지용)
   const lastLocalSaveRef = useRef<string | null>(page?.content ?? null);
-  // 사용자가 현재 타이핑 중인지 (외부 변경으로 덮어쓰기 방지용)
+  // 사용자가 현재 타이핑 중이거나 Supabase write 대기 중인지
   const isSavingRef = useRef(false);
+  // 마지막으로 updatePage를 호출한 시각 (타임스탬프 비교로 에코 구분)
+  const lastSaveTimeRef = useRef<string | null>(page?.updatedAt ?? null);
   const isEditingTitleRef = useRef(false);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
@@ -142,7 +144,9 @@ export default function PageEditor({ pageId }: { pageId: string }) {
             });
             saveTimeout.current = setTimeout(() => {
               const content = JSON.stringify(editor.getJSON());
+              const now = new Date().toISOString();
               lastLocalSaveRef.current = content;
+              lastSaveTimeRef.current = now;
               updatePage(pageId, { content });
               setSaveStatus("saved");
               isSavingRef.current = false;
@@ -156,7 +160,9 @@ export default function PageEditor({ pageId }: { pageId: string }) {
 
       saveTimeout.current = setTimeout(() => {
         const content = JSON.stringify(editor.getJSON());
+        const now = new Date().toISOString();
         lastLocalSaveRef.current = content;
+        lastSaveTimeRef.current = now;
         updatePage(pageId, { content });
         setSaveStatus("saved");
         isSavingRef.current = false;
@@ -345,15 +351,20 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   // Sync content with changes from other users (realtime)
   // - 내가 저장한 내용이 반영된 경우(에코)는 건너뜀
   // - 사용자가 타이핑 중이면 건너뜀 (입력 방해 방지)
+  // - 내 마지막 저장 시각보다 오래된 버전은 무시 (동기화 버튼으로 인한 롤백 방지)
   useEffect(() => {
     if (!editor || !page?.content) return;
-    if (page.content === lastLocalSaveRef.current) return;
-    if (isSavingRef.current) return;
+    if (page.content === lastLocalSaveRef.current) return; // 내 에코
+    if (isSavingRef.current) return; // 타이핑 중
+    // page.updatedAt이 내 마지막 저장 시각보다 오래됐으면 무시
+    // (Supabase write 완료 전에 sync가 실행된 경우)
+    if (lastSaveTimeRef.current && page.updatedAt <= lastSaveTimeRef.current) return;
     try {
       editor.commands.setContent(JSON.parse(page.content), false);
+      lastLocalSaveRef.current = page.content; // 외부 변경도 에코 기준 업데이트
     } catch { /* invalid JSON, skip */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page?.content]);
+  }, [page?.content, page?.updatedAt]);
 
   // Close emoji picker on outside click
   useEffect(() => {

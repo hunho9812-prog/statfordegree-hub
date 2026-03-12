@@ -964,9 +964,37 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           dbWorkspaceConfig.set("rootPageIds", derivedRootPageIds);
         }
 
+        // ── 페이지 병합: 로컬이 더 최신이면 로컬 유지 + Supabase에 재저장 ──
+        // (편집 후 동기화 버튼 클릭 시 Supabase write가 아직 완료 전일 수 있으므로
+        //  updatedAt 비교로 미저장 내용이 덮어써지는 것을 방지)
+        const current = get();
+        const finalPages: Record<string, Page> = {};
+        const pushOps: Promise<void>[] = [];
+
+        for (const [id, supaPage] of Object.entries(pages)) {
+          const localPage = current.pages[id];
+          if (localPage && localPage.updatedAt > supaPage.updatedAt) {
+            // 로컬이 더 최신 (Supabase write 대기 중) → 로컬 유지 + 재저장
+            finalPages[id] = localPage;
+            pushOps.push(dbPages.upsert(localPage));
+          } else {
+            finalPages[id] = supaPage;
+          }
+        }
+
+        // 로컬에만 있는 페이지 (Supabase write 완료 전 생성된 경우) 보존
+        for (const [id, localPage] of Object.entries(current.pages)) {
+          if (!pages[id]) {
+            finalPages[id] = localPage;
+            pushOps.push(dbPages.upsert(localPage));
+          }
+        }
+
+        if (pushOps.length > 0) await Promise.all(pushOps);
+
         // ── Supabase 데이터로 상태 설정 (localStorage 캐시 불사용) ──
         set({
-          pages,
+          pages: finalPages,
           rootPageIds: derivedRootPageIds,
           tasks: cleanedTasks,
           customers,
