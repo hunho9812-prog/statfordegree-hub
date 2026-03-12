@@ -889,26 +889,40 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         try {
           const current = get();
 
-          // Push all local data to Supabase (upsert = insert or update)
+          // 기본 메뉴 페이지 ID (freshState에 포함된 템플릿 — Supabase에 강제 업로드 금지)
+          const defaultPageIds = new Set(Object.values(MENU_IDS) as string[]);
+
+          // Supabase에 현재 존재하는 ID 목록을 먼저 조회
+          const [supaPages, supaTasks, supaCustomers] = await Promise.all([
+            dbPages.fetchAll(),
+            dbTasks.fetchAll(),
+            dbCustomers.fetchAll(),
+          ]);
+          const supaPageIds = new Set(Object.keys(supaPages));
+          const supaTaskIds = new Set(supaTasks.map((t) => t.id));
+          const supaCustomerIds = new Set(supaCustomers.map((c) => c.id));
+
+          // Supabase에 없는 로컬 항목만 push (기본 템플릿 페이지 제외)
+          // 이미 Supabase에 있는 항목은 건드리지 않아 새 기기의 freshState가 실제 데이터를 덮어쓰는 사고를 방지
           const pushOps: Promise<void>[] = [
-            ...Object.values(current.pages).map((p) => dbPages.upsert(p)),
-            ...current.tasks.map((t) => dbTasks.upsert(t)),
-            ...current.customers.map((c) => dbCustomers.upsert(c)),
-            ...current.customerStatuses.map((s) => dbCustomerStatuses.upsert(s)),
-            dbWorkspaceConfig.set("rootPageIds", current.rootPageIds),
+            ...Object.values(current.pages)
+              .filter((p) => !supaPageIds.has(p.id) && !defaultPageIds.has(p.id))
+              .map((p) => dbPages.upsert(p)),
+            ...current.tasks
+              .filter((t) => !supaTaskIds.has(t.id))
+              .map((t) => dbTasks.upsert(t)),
+            ...current.customers
+              .filter((c) => !supaCustomerIds.has(c.id))
+              .map((c) => dbCustomers.upsert(c)),
           ];
-          for (const [pageId, mpd] of Object.entries(current.manualPages)) {
-            for (const node of Object.values(mpd.items)) {
-              pushOps.push(dbManualNodes.upsert(node, pageId));
-            }
-            pushOps.push(dbManualPageRoots.upsert(pageId, mpd.rootItems));
-          }
-          await Promise.all(pushOps);
-        } finally {
+          if (pushOps.length > 0) await Promise.all(pushOps);
+        } catch (e) {
           set({ isRefreshing: false });
+          throw e;
         }
 
-        // Pull fresh data from Supabase
+        // Pull: isRefreshing은 loadFromSupabase 내부에서 다시 true→false 처리됨
+        set({ isRefreshing: false });
         await get().loadFromSupabase();
       },
 
@@ -1009,15 +1023,23 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           ? customers
           : [...customers, ...localOnlyCustomers];
 
+        // rootPageIds 결정: workspace_config > Supabase pages에서 도출 > 로컬 유지
+        const derivedRootPageIds = (rootPageIdsConfig as string[] | null) ??
+          (supabaseHasPages
+            ? Object.values(mergedPages)
+                .filter((p) => p.parentId === null)
+                .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+                .map((p) => p.id)
+            : current.rootPageIds);
+
+        // workspace_config에 없었던 경우 저장해 두어 다음 기기도 정확히 불러오게 함
+        if (supabaseHasPages && !rootPageIdsConfig) {
+          dbWorkspaceConfig.set("rootPageIds", derivedRootPageIds);
+        }
+
         set({
           pages: Object.keys(mergedPages).length > 0 ? mergedPages : current.pages,
-          rootPageIds: (rootPageIdsConfig as string[] | null) ??
-            (supabaseHasPages
-              ? Object.values(mergedPages)
-                  .filter((p) => p.parentId === null)
-                  .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-                  .map((p) => p.id)
-              : current.rootPageIds),
+          rootPageIds: derivedRootPageIds,
           tasks: mergedTasks,
           customers: mergedCustomers,
           customerStatuses: statuses.length > 0 ? statuses : current.customerStatuses,
