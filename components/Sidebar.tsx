@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -18,6 +18,7 @@ import {
   LogOut,
   Crown,
   UserCog,
+  RefreshCw,
 } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -32,8 +33,20 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
-  const { pages, rootPageIds, createPage, darkMode, toggleDarkMode } = useWorkspaceStore();
+  const { pages, rootPageIds, createPage, darkMode, toggleDarkMode, loadFromSupabase, isRefreshing } = useWorkspaceStore();
   const { user, profile, signOut } = useAuth();
+
+  // 마지막 동기화 시간 추적
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const prevIsRefreshing = useRef(false);
+
+  useEffect(() => {
+    // isRefreshing이 true → false로 바뀔 때 동기화 완료
+    if (prevIsRefreshing.current && !isRefreshing) {
+      setLastSynced(new Date());
+    }
+    prevIsRefreshing.current = isRefreshing;
+  }, [isRefreshing]);
 
   useEffect(() => {
     setMounted(true);
@@ -112,6 +125,14 @@ export default function Sidebar() {
           <Plus size={16} />
         </button>
         <div className="flex-1" />
+        <button
+          onClick={() => loadFromSupabase()}
+          disabled={isRefreshing}
+          className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97] disabled:opacity-50", hover)}
+          title="데이터 동기화"
+        >
+          <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} />
+        </button>
         <button
           onClick={toggleDarkMode}
           className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)}
@@ -316,6 +337,25 @@ export default function Sidebar() {
             </div>
           </div>
         )}
+
+        {/* 동기화 버튼 */}
+        <button
+          onClick={() => loadFromSupabase()}
+          disabled={isRefreshing}
+          className={cn(
+            "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors disabled:opacity-50",
+            isRefreshing ? "text-blue-500 dark:text-blue-400" : "text-[#9b9a97]",
+            hover
+          )}
+        >
+          <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} />
+          <span>{isRefreshing ? "동기화 중..." : "데이터 동기화"}</span>
+          {!isRefreshing && lastSynced && (
+            <span className="ml-auto text-[10px] text-[#c4c3bf] dark:text-[#4f4f4f]">
+              {lastSynced.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+        </button>
 
         {/* Dark mode */}
         <button
