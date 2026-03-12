@@ -106,4 +106,5 @@ export interface WorkspaceState {
   toggleSidebar: () => void;
   toggleDarkMode: () => void;
   loadFromSupabase: () => Promise<void>;
+  syncNow: () => Promise<void>;
 }

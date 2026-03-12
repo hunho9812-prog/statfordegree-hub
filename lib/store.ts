@@ -880,6 +880,38 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         });
       },
 
+      syncNow: async () => {
+        if (!isSupabaseConfigured || !supabase) return;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        set({ isRefreshing: true });
+        try {
+          const current = get();
+
+          // Push all local data to Supabase (upsert = insert or update)
+          const pushOps: Promise<void>[] = [
+            ...Object.values(current.pages).map((p) => dbPages.upsert(p)),
+            ...current.tasks.map((t) => dbTasks.upsert(t)),
+            ...current.customers.map((c) => dbCustomers.upsert(c)),
+            ...current.customerStatuses.map((s) => dbCustomerStatuses.upsert(s)),
+            dbWorkspaceConfig.set("rootPageIds", current.rootPageIds),
+          ];
+          for (const [pageId, mpd] of Object.entries(current.manualPages)) {
+            for (const node of Object.values(mpd.items)) {
+              pushOps.push(dbManualNodes.upsert(node, pageId));
+            }
+            pushOps.push(dbManualPageRoots.upsert(pageId, mpd.rootItems));
+          }
+          await Promise.all(pushOps);
+        } finally {
+          set({ isRefreshing: false });
+        }
+
+        // Pull fresh data from Supabase
+        await get().loadFromSupabase();
+      },
+
       loadFromSupabase: async () => {
         if (!isSupabaseConfigured || !supabase) return;
 
@@ -979,7 +1011,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         set({
           pages: Object.keys(mergedPages).length > 0 ? mergedPages : current.pages,
-          rootPageIds: (rootPageIdsConfig as string[] | null) ?? current.rootPageIds,
+          rootPageIds: (rootPageIdsConfig as string[] | null) ??
+            (supabaseHasPages
+              ? Object.values(mergedPages)
+                  .filter((p) => p.parentId === null)
+                  .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+                  .map((p) => p.id)
+              : current.rootPageIds),
           tasks: mergedTasks,
           customers: mergedCustomers,
           customerStatuses: statuses.length > 0 ? statuses : current.customerStatuses,

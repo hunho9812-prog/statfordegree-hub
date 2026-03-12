@@ -33,7 +33,7 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
-  const { pages, rootPageIds, createPage, darkMode, toggleDarkMode, loadFromSupabase, isRefreshing } = useWorkspaceStore();
+  const { pages, rootPageIds, createPage, darkMode, toggleDarkMode, syncNow, isRefreshing } = useWorkspaceStore();
   const { user, profile, signOut } = useAuth();
 
   // 마지막 동기화 시간 추적
@@ -126,7 +126,7 @@ export default function Sidebar() {
         </button>
         <div className="flex-1" />
         <button
-          onClick={() => loadFromSupabase()}
+          onClick={() => syncNow()}
           disabled={isRefreshing}
           className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97] disabled:opacity-50", hover)}
           title="데이터 동기화"
@@ -340,7 +340,7 @@ export default function Sidebar() {
 
         {/* 동기화 버튼 */}
         <button
-          onClick={() => loadFromSupabase()}
+          onClick={() => syncNow()}
           disabled={isRefreshing}
           className={cn(
             "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors disabled:opacity-50",
