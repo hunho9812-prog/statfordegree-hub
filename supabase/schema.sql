@@ -1,110 +1,47 @@
 -- ============================================================
--- Statfordegree Hub — Supabase SQL 스키마
+-- Statfordegree Hub — 완전한 Supabase SQL 스키마
 -- Supabase Dashboard > SQL Editor 에서 전체 복사·붙여넣기 후 실행
 -- ============================================================
 
--- 1. public.users 테이블 생성
---    auth.users(id)를 FK로 참조하여 계정 삭제 시 CASCADE 삭제
+
+-- ============================================================
+-- 1. users 테이블
+-- ============================================================
 create table if not exists public.users (
-  id           uuid        primary key references auth.users(id) on delete cascade,
-  email        text        not null unique,
-  name         text        not null default '',
-  role         text        not null default 'member' check (role in ('admin', 'member')),
-  created_at   timestamptz not null default now()
+  id         uuid        primary key references auth.users(id) on delete cascade,
+  email      text        not null unique,
+  name       text        not null default '',
+  role       text        not null default 'member' check (role in ('admin', 'member')),
+  status     text        not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz not null default now()
 );
 
--- 2. RLS 활성화
 alter table public.users enable row level security;
 
--- 기존 정책 제거 (재실행 시 오류 방지)
 drop policy if exists "users_select_self"   on public.users;
 drop policy if exists "users_select_team"   on public.users;
 drop policy if exists "users_insert_self"   on public.users;
 drop policy if exists "users_update_self"   on public.users;
+drop policy if exists "users_update_admin"  on public.users;
 
--- 3. RLS 정책 설정
---    로그인한 사용자 본인 레코드 조회 허용
 create policy "users_select_self" on public.users
   for select using (auth.uid() = id);
 
---    팀원이면 전체 팀원 목록 조회 허용 (사이드바 이름 표시 등)
 create policy "users_select_team" on public.users
-  for select using (
-    auth.uid() in (select id from public.users)
-  );
+  for select using (auth.uid() in (select id from public.users));
 
---    자신의 레코드 삽입 허용 (초대 수락 시 자동 생성)
 create policy "users_insert_self" on public.users
   for insert with check (auth.uid() = id);
 
---    자신의 레코드 수정 허용 (이름 변경 등)
 create policy "users_update_self" on public.users
   for update using (auth.uid() = id);
 
--- 4. 신규 auth.users 생성 시 public.users 자동 삽입 트리거
---    초대 메일 수락 → auth.users INSERT → 이 트리거로 public.users에도 자동 등록
-create or replace function public.handle_new_auth_user()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
-begin
-  insert into public.users (id, email, name, role)
-  values (
-    new.id,
-    new.email,
-    coalesce(new.raw_user_meta_data->>'name', ''),
-    coalesce(new.raw_user_meta_data->>'role', 'member')
-  )
-  on conflict (id) do nothing;   -- 이미 존재하면 스킵 (invite API에서 미리 삽입한 경우)
-  return new;
-end;
-$$;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_auth_user();
-
-
--- ============================================================
--- 관리자 계정 수동 등록 (최초 1회, 이미 존재하면 UPDATE)
--- rlagusgh1214@naver.com 으로 Supabase에 먼저 로그인한 뒤 실행하세요.
--- auth.users에 해당 이메일이 있어야 합니다.
--- ============================================================
-insert into public.users (id, email, name, role)
-select id, email, '', 'admin'
-from   auth.users
-where  email = 'rlagusgh1214@naver.com'
-on conflict (id) do update set role = 'admin';
-
-
--- ============================================================
--- 관리자 승인 시스템 마이그레이션
--- 기존 invite 기반에서 admin 승인 기반으로 전환
--- ============================================================
-
--- 1. status 컬럼 추가 (pending / approved / rejected)
-alter table public.users
-  add column if not exists status text not null default 'pending'
-    check (status in ('pending', 'approved', 'rejected'));
-
--- 2. 기존 사용자는 모두 approved 처리 (기존에 활성화된 계정)
-update public.users set status = 'approved' where status = 'pending';
-
--- 3. 관리자 계정 approved + admin 보장
-update public.users
-  set status = 'approved', role = 'admin'
-  where email = 'rlagusgh1214@naver.com';
-
--- 4. 관리자가 다른 사용자의 status/role 업데이트 가능하도록 RLS 정책 추가
-drop policy if exists "users_update_admin" on public.users;
 create policy "users_update_admin" on public.users
   for update using (
     auth.uid() in (select id from public.users where role = 'admin')
   );
 
--- 5. 트리거 업데이트: 신규 가입자는 status='pending', 관리자 이메일은 'approved'
+-- 신규 가입 시 public.users 자동 생성 트리거
 create or replace function public.handle_new_auth_user()
 returns trigger
 language plpgsql
@@ -127,3 +64,188 @@ begin
   return new;
 end;
 $$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_auth_user();
+
+-- 관리자 계정 등록 (auth.users에 이미 존재해야 함)
+insert into public.users (id, email, name, role, status)
+select id, email, '', 'admin', 'approved'
+from   auth.users
+where  email = 'rlagusgh1214@naver.com'
+on conflict (id) do update set role = 'admin', status = 'approved';
+
+
+-- ============================================================
+-- 2. pages 테이블
+-- ============================================================
+create table if not exists public.pages (
+  id          text        primary key,
+  title       text        not null default '',
+  emoji       text        not null default '📄',
+  content     text        not null default '',
+  parent_id   text        references public.pages(id) on delete cascade,
+  children    text[]      not null default '{}',
+  is_expanded boolean     not null default false,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+alter table public.pages enable row level security;
+
+drop policy if exists "pages_all_approved" on public.pages;
+create policy "pages_all_approved" on public.pages
+  for all using (
+    auth.uid() in (select id from public.users where status = 'approved')
+  );
+
+-- Realtime 활성화
+alter publication supabase_realtime add table public.pages;
+
+
+-- ============================================================
+-- 3. tasks 테이블
+-- ============================================================
+create table if not exists public.tasks (
+  id          text        primary key,
+  title       text        not null default '',
+  description text        not null default '',
+  status      text        not null default 'todo' check (status in ('todo', 'in-progress', 'done')),
+  priority    text        not null default 'medium' check (priority in ('low', 'medium', 'high')),
+  assignee    text        not null default '',
+  due_date    text,
+  tags        text[]      not null default '{}',
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+alter table public.tasks enable row level security;
+
+drop policy if exists "tasks_all_approved" on public.tasks;
+create policy "tasks_all_approved" on public.tasks
+  for all using (
+    auth.uid() in (select id from public.users where status = 'approved')
+  );
+
+alter publication supabase_realtime add table public.tasks;
+
+
+-- ============================================================
+-- 4. customers 테이블
+-- ============================================================
+create table if not exists public.customers (
+  id                 text        primary key,
+  name               text        not null default '',
+  assignee           text        not null default '',
+  route              text        not null default '' check (route in ('크몽', '메일', '')),
+  settlement_amount  numeric,
+  alba               text        not null default '',
+  total_amount       numeric,
+  balance            numeric,
+  review_proposed    boolean     not null default false,
+  balance_received   boolean     not null default false,
+  kmong_review       boolean     not null default false,
+  kakao_review       boolean     not null default false,
+  submit_date        text        not null default '',
+  status             text        not null default '',
+  memo               text        not null default '',
+  month_page_id      text,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
+);
+
+alter table public.customers enable row level security;
+
+drop policy if exists "customers_all_approved" on public.customers;
+create policy "customers_all_approved" on public.customers
+  for all using (
+    auth.uid() in (select id from public.users where status = 'approved')
+  );
+
+alter publication supabase_realtime add table public.customers;
+
+
+-- ============================================================
+-- 5. customer_statuses 테이블
+-- ============================================================
+create table if not exists public.customer_statuses (
+  id         text primary key,
+  label      text not null default '',
+  color      text not null default '#f3f0ff',
+  text_color text not null default '#7c3aed',
+  category   text not null default '할 일' check (category in ('할 일', '진행 중', '완료'))
+);
+
+alter table public.customer_statuses enable row level security;
+
+drop policy if exists "customer_statuses_all_approved" on public.customer_statuses;
+create policy "customer_statuses_all_approved" on public.customer_statuses
+  for all using (
+    auth.uid() in (select id from public.users where status = 'approved')
+  );
+
+alter publication supabase_realtime add table public.customer_statuses;
+
+
+-- ============================================================
+-- 6. manual_nodes 테이블 (아웃라이너 노드)
+-- ============================================================
+create table if not exists public.manual_nodes (
+  id          text    primary key,
+  page_id     text    not null references public.pages(id) on delete cascade,
+  text        text    not null default '',
+  children    text[]  not null default '{}',
+  parent_id   text,
+  is_expanded boolean not null default true,
+  is_pinned   boolean not null default false
+);
+
+alter table public.manual_nodes enable row level security;
+
+drop policy if exists "manual_nodes_all_approved" on public.manual_nodes;
+create policy "manual_nodes_all_approved" on public.manual_nodes
+  for all using (
+    auth.uid() in (select id from public.users where status = 'approved')
+  );
+
+alter publication supabase_realtime add table public.manual_nodes;
+
+
+-- ============================================================
+-- 7. manual_page_roots 테이블 (아웃라이너 루트 순서)
+-- ============================================================
+create table if not exists public.manual_page_roots (
+  page_id    text    primary key references public.pages(id) on delete cascade,
+  root_items text[]  not null default '{}'
+);
+
+alter table public.manual_page_roots enable row level security;
+
+drop policy if exists "manual_page_roots_all_approved" on public.manual_page_roots;
+create policy "manual_page_roots_all_approved" on public.manual_page_roots
+  for all using (
+    auth.uid() in (select id from public.users where status = 'approved')
+  );
+
+alter publication supabase_realtime add table public.manual_page_roots;
+
+
+-- ============================================================
+-- 8. workspace_config 테이블 (rootPageIds 등 전역 설정)
+-- ============================================================
+create table if not exists public.workspace_config (
+  key   text primary key,
+  value jsonb not null default 'null'
+);
+
+alter table public.workspace_config enable row level security;
+
+drop policy if exists "workspace_config_all_approved" on public.workspace_config;
+create policy "workspace_config_all_approved" on public.workspace_config
+  for all using (
+    auth.uid() in (select id from public.users where status = 'approved')
+  );
+
+alter publication supabase_realtime add table public.workspace_config;
