@@ -103,6 +103,7 @@ export interface WorkspaceState {
   deleteManualNode: (pageId: string, nodeId: string) => void;
   moveManualNode: (pageId: string, nodeId: string, afterNodeId: string) => void;
   isRefreshing: boolean;
+  syncError: boolean;
   toggleSidebar: () => void;
   toggleDarkMode: () => void;
   loadFromSupabase: () => Promise<void>;

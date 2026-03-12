@@ -465,6 +465,7 @@ const freshState = {
   sidebarCollapsed: false,
   darkMode: false,
   isRefreshing: false,
+  syncError: false,
 };
 
 // ── 일회성 localStorage → Supabase 마이그레이션 ──────────────────────────────
@@ -1008,43 +1009,48 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
-        set({ isRefreshing: true });
+        set({ isRefreshing: true, syncError: false });
         try {
           const current = get();
-
-          // 기본 메뉴 페이지 ID (freshState에 포함된 템플릿 — Supabase에 강제 업로드 금지)
           const defaultPageIds = new Set(Object.values(MENU_IDS) as string[]);
+          const DEFAULT_TASK_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
 
-          // Supabase에 현재 존재하는 ID 목록을 먼저 조회
+          // Supabase 현재 상태 조회
           const [supaPages, supaTasks, supaCustomers] = await Promise.all([
             dbPages.fetchAll(),
             dbTasks.fetchAll(),
             dbCustomers.fetchAll(),
           ]);
-          const supaPageIds = new Set(Object.keys(supaPages));
-          const supaTaskIds = new Set(supaTasks.map((t) => t.id));
-          const supaCustomerIds = new Set(supaCustomers.map((c) => c.id));
 
-          // Supabase에 없는 로컬 항목만 push (기본 템플릿 페이지 제외)
-          // 이미 Supabase에 있는 항목은 건드리지 않아 새 기기의 freshState가 실제 데이터를 덮어쓰는 사고를 방지
+          // 로컬에 없거나 로컬이 더 최신인 항목 push (기본 템플릿 페이지 제외)
           const pushOps: Promise<void>[] = [
             ...Object.values(current.pages)
-              .filter((p) => !supaPageIds.has(p.id) && !defaultPageIds.has(p.id))
+              .filter((p) => {
+                if (defaultPageIds.has(p.id)) return false;
+                const supa = supaPages[p.id];
+                return !supa || p.updatedAt > supa.updatedAt;
+              })
               .map((p) => dbPages.upsert(p)),
             ...current.tasks
-              .filter((t) => !supaTaskIds.has(t.id))
+              .filter((t) => {
+                if (DEFAULT_TASK_TITLES.includes(t.title)) return false;
+                const supa = supaTasks.find((s) => s.id === t.id);
+                return !supa || t.updatedAt > supa.updatedAt;
+              })
               .map((t) => dbTasks.upsert(t)),
             ...current.customers
-              .filter((c) => !supaCustomerIds.has(c.id))
+              .filter((c) => {
+                const supa = supaCustomers.find((s) => s.id === c.id);
+                return !supa || c.updated_at > supa.updated_at;
+              })
               .map((c) => dbCustomers.upsert(c)),
           ];
           if (pushOps.length > 0) await Promise.all(pushOps);
         } catch (e) {
-          set({ isRefreshing: false });
+          set({ isRefreshing: false, syncError: true });
           throw e;
         }
 
-        // Pull: isRefreshing은 loadFromSupabase 내부에서 다시 true→false 처리됨
         set({ isRefreshing: false });
         await get().loadFromSupabase();
       },
@@ -1058,7 +1064,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
-        set({ isRefreshing: true });
+        set({ isRefreshing: true, syncError: false });
         try {
 
         const [pages, tasks, customers, statuses, manualNodesData, manualRoots, rootPageIdsConfig] =
@@ -1172,7 +1178,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           isRefreshing: false,
         });
         } catch (e) {
-          set({ isRefreshing: false });
+          set({ isRefreshing: false, syncError: true });
           throw e;
         }
       },

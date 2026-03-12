@@ -33,20 +33,26 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
-  const { pages, rootPageIds, createPage, darkMode, toggleDarkMode, syncNow, isRefreshing } = useWorkspaceStore();
+  const { pages, rootPageIds, createPage, darkMode, toggleDarkMode, syncNow, isRefreshing, syncError } = useWorkspaceStore();
   const { user, profile, signOut } = useAuth();
 
-  // 마지막 동기화 시간 추적
+  // 동기화 완료 후 잠깐 초록 유지
+  const [syncSuccess, setSyncSuccess] = useState(false);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const prevIsRefreshing = useRef(false);
+  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // isRefreshing이 true → false로 바뀔 때 동기화 완료
     if (prevIsRefreshing.current && !isRefreshing) {
-      setLastSynced(new Date());
+      if (!syncError) {
+        setLastSynced(new Date());
+        setSyncSuccess(true);
+        if (successTimer.current) clearTimeout(successTimer.current);
+        successTimer.current = setTimeout(() => setSyncSuccess(false), 3000);
+      }
     }
     prevIsRefreshing.current = isRefreshing;
-  }, [isRefreshing]);
+  }, [isRefreshing, syncError]);
 
   useEffect(() => {
     setMounted(true);
@@ -70,6 +76,23 @@ export default function Sidebar() {
           p.emoji.includes(searchQuery)
       )
     : [];
+
+  // 동기화 상태 표시등
+  const syncDot = isRefreshing
+    ? "bg-green-400 animate-pulse"
+    : syncError
+    ? "bg-red-500"
+    : syncSuccess
+    ? "bg-green-500"
+    : "bg-gray-300 dark:bg-gray-600";
+
+  const syncDotTitle = isRefreshing
+    ? "동기화 중..."
+    : syncError
+    ? "동기화 실패"
+    : syncSuccess
+    ? "동기화 완료"
+    : "대기 중";
 
   const hover = "hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)]";
   const navItem = (active: boolean) =>
@@ -128,10 +151,11 @@ export default function Sidebar() {
         <button
           onClick={() => syncNow()}
           disabled={isRefreshing}
-          className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97] disabled:opacity-50", hover)}
-          title="데이터 동기화"
+          className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97] disabled:opacity-50 relative", hover)}
+          title={`데이터 동기화 (${syncDotTitle})`}
         >
           <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} />
+          <span className={cn("absolute top-1 right-1 w-2 h-2 rounded-full", syncDot)} />
         </button>
         <button
           onClick={toggleDarkMode}
@@ -344,13 +368,22 @@ export default function Sidebar() {
           disabled={isRefreshing}
           className={cn(
             "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors disabled:opacity-50",
-            isRefreshing ? "text-blue-500 dark:text-blue-400" : "text-[#9b9a97]",
+            syncError
+              ? "text-red-500 dark:text-red-400"
+              : isRefreshing
+              ? "text-blue-500 dark:text-blue-400"
+              : "text-[#9b9a97]",
             hover
           )}
         >
-          <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} />
-          <span>{isRefreshing ? "동기화 중..." : "데이터 동기화"}</span>
-          {!isRefreshing && lastSynced && (
+          <span className="relative flex-shrink-0">
+            <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} />
+            <span className={cn("absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-white dark:border-[#252525]", syncDot)} />
+          </span>
+          <span>
+            {isRefreshing ? "동기화 중..." : syncError ? "동기화 실패 — 재시도" : "데이터 동기화"}
+          </span>
+          {!isRefreshing && !syncError && lastSynced && (
             <span className="ml-auto text-[10px] text-[#c4c3bf] dark:text-[#4f4f4f]">
               {lastSynced.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
             </span>
