@@ -533,17 +533,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
 
       updatePage: (id, updates) => {
+        const updatedAt = new Date().toISOString();
         set((state) => ({
           pages: {
             ...state.pages,
             [id]: {
               ...state.pages[id],
               ...updates,
-              updatedAt: new Date().toISOString(),
+              updatedAt,
             },
           },
         }));
-        dbPages.update(id, { ...updates, updatedAt: new Date().toISOString() });
+        // update 대신 upsert 사용: 행이 없어도 생성, 있으면 업데이트 (더 안정적)
+        // update(UPDATE SQL)는 행이 없으면 0 rows affected로 조용히 실패함
+        const updatedPage = get().pages[id];
+        if (updatedPage) dbPages.upsert(updatedPage);
       },
 
       deletePage: (id) => {
