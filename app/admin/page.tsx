@@ -114,8 +114,8 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ── 승인 대기 섹션 (관리자 전용) ── */}
-        {isAdmin && (
+        {/* ── 승인 대기 섹션 (관리자 전용, pending 있을 때만) ── */}
+        {isAdmin && (membersLoading || pendingMembers.length > 0) && (
           <section>
             {/* 섹션 헤더 */}
             <div className="flex items-center gap-2 mb-3">
@@ -138,11 +138,6 @@ export default function AdminPage() {
                     <div className="h-3 w-32 rounded bg-amber-100 dark:bg-amber-900/30 animate-pulse" />
                     <div className="h-2.5 w-48 rounded bg-amber-100 dark:bg-amber-900/30 animate-pulse" />
                   </div>
-                </div>
-              ) : pendingMembers.length === 0 ? (
-                <div className="flex items-center gap-3 px-5 py-4 text-sm text-[#9b9a97]">
-                  <Clock size={15} className="text-amber-400 flex-shrink-0" />
-                  승인 대기 중인 가입 신청이 없습니다.
                 </div>
               ) : (
                 <div className="divide-y divide-amber-200 dark:divide-amber-800/30">
