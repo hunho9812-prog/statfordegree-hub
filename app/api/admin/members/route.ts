@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { createAdminClient, getSupabaseUrl, getServerAnonKey } from "@/lib/supabase-admin";
+import { getSupabaseUrl, getServerAnonKey } from "@/lib/supabase-admin";
 
 export async function GET(req: NextRequest) {
   let supabaseUrl: string;
@@ -42,48 +42,24 @@ export async function GET(req: NextRequest) {
 
   const isAdmin = callerProfile.role === "admin";
 
-  if (isAdmin) {
-    // 관리자: public.users 전체 조회 (pending 포함)
-    const adminClient = createAdminClient();
-    const { data: users, error } = await adminClient
-      .from("users")
-      .select("*")
-      .order("created_at");
+  // 관리자: 전체 조회 / 일반 팀원: approved만 조회
+  const query = supabase.from("users").select("*").order("created_at");
+  const { data: users, error } = isAdmin
+    ? await query
+    : await query.eq("status", "approved");
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    const members = (users ?? []).map((u: Record<string, string>) => ({
-      id: u.id,
-      name: u.name ?? "",
-      email: u.email ?? "",
-      role: (u.role ?? "member") as "admin" | "member",
-      status: (u.status ?? "pending") as "pending" | "approved" | "rejected",
-      created_at: u.created_at,
-    }));
-
-    return NextResponse.json({ members });
-  } else {
-    // 일반 팀원: approved 멤버만 조회
-    const { data: publicUsers, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("status", "approved");
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    const members = (publicUsers ?? []).map((u: Record<string, string>) => ({
-      id: u.id,
-      name: u.name ?? "",
-      email: u.email ?? "",
-      role: (u.role ?? "member") as "admin" | "member",
-      status: "approved" as const,
-      created_at: u.created_at,
-    }));
-
-    return NextResponse.json({ members });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  const members = (users ?? []).map((u: Record<string, string>) => ({
+    id: u.id,
+    name: u.name ?? "",
+    email: u.email ?? "",
+    role: (u.role ?? "member") as "admin" | "member",
+    status: (u.status ?? "pending") as "pending" | "approved" | "rejected",
+    created_at: u.created_at,
+  }));
+
+  return NextResponse.json({ members });
 }

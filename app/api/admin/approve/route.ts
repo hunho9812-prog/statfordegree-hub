@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { createAdminClient, getSupabaseUrl, getServerAnonKey } from "@/lib/supabase-admin";
+import { getSupabaseUrl, getServerAnonKey } from "@/lib/supabase-admin";
 
 export async function POST(req: NextRequest) {
   let supabaseUrl: string;
@@ -41,9 +41,8 @@ export async function POST(req: NextRequest) {
   }
 
   const status = action === "approve" ? "approved" : "rejected";
-  const admin = createAdminClient();
 
-  const { data: updated, error } = await admin
+  const { data: updated, error } = await supabase
     .from("users")
     .update({ status })
     .eq("id", userId)
