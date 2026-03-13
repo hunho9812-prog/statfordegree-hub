@@ -23,8 +23,9 @@ drop policy if exists "users_insert_self"  on public.users;
 drop policy if exists "users_update_self"  on public.users;
 drop policy if exists "users_update_admin" on public.users;
 
+-- 인증된 사용자면 누구나 팀원 목록 조회 가능 (재귀 참조 방지)
 create policy "users_select_team" on public.users
-  for select using (auth.uid() in (select id from public.users));
+  for select using (auth.uid() is not null);
 
 create policy "users_insert_self" on public.users
   for insert with check (auth.uid() = id);
