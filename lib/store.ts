@@ -1186,16 +1186,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     {
       name: "statfordegree-hub-storage",
       version: 7,
-      // UI 상태만 localStorage에 저장 — 데이터는 Supabase가 단일 소스
-      partialize: (state) => ({
-        ...state,
-        pages: {},
-        rootPageIds: [],
-        tasks: [],
-        customers: [],
-        customerStatuses: [],
-        manualPages: {},
-      }),
       migrate: (persistedState: unknown, version: number) => {
         const s = persistedState as Record<string, unknown>;
         const DEFAULT_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
