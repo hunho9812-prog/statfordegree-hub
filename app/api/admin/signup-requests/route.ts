@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
     const admin = createAdminClient();
 
-    // 호출자 권한 확인
+    // 관리자 권한 확인
     const { data: callerProfile } = await admin
       .from("team_members")
       .select("role")
@@ -22,29 +22,16 @@ export async function GET(req: NextRequest) {
       .maybeSingle();
 
     const isAdmin = callerProfile?.role === "admin" || user.email === ADMIN_EMAIL;
+    if (!isAdmin) return NextResponse.json({ error: "관리자 권한 필요" }, { status: 403 });
 
-    if (!callerProfile && !isAdmin) {
-      return NextResponse.json({ error: "팀원 정보를 찾을 수 없습니다." }, { status: 403 });
-    }
-
-    const { data: members, error } = await admin
-      .from("team_members")
-      .select("*")
-      .order("joined_at");
+    const { data: requests, error } = await admin
+      .from("signup_requests")
+      .select("id, email, name, created_at, status")
+      .order("created_at", { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // joined_at → created_at 매핑 (프론트엔드 호환성)
-    const result = (members ?? []).map((m: Record<string, string>) => ({
-      id: m.id,
-      name: m.name ?? "",
-      email: m.email ?? "",
-      role: (m.role ?? "member") as "admin" | "member",
-      status: "approved" as const,
-      created_at: m.joined_at,
-    }));
-
-    return NextResponse.json({ members: result });
+    return NextResponse.json({ requests: requests ?? [] });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "오류가 발생했습니다." },

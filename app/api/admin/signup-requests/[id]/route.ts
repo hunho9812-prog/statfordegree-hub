@@ -3,7 +3,10 @@ import { createServerClient } from "@supabase/ssr";
 import { createAdminClient, getSupabaseUrl, getServerAnonKey } from "@/lib/supabase-admin";
 import { ADMIN_EMAIL } from "@/lib/auth";
 
-export async function GET(req: NextRequest) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const supabase = createServerClient(getSupabaseUrl(), getServerAnonKey(), {
       cookies: { getAll: () => req.cookies.getAll(), setAll: () => {} },
@@ -13,8 +16,6 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
     const admin = createAdminClient();
-
-    // 호출자 권한 확인
     const { data: callerProfile } = await admin
       .from("team_members")
       .select("role")
@@ -22,32 +23,16 @@ export async function GET(req: NextRequest) {
       .maybeSingle();
 
     const isAdmin = callerProfile?.role === "admin" || user.email === ADMIN_EMAIL;
+    if (!isAdmin) return NextResponse.json({ error: "관리자 권한 필요" }, { status: 403 });
 
-    if (!callerProfile && !isAdmin) {
-      return NextResponse.json({ error: "팀원 정보를 찾을 수 없습니다." }, { status: 403 });
-    }
-
-    const { data: members, error } = await admin
-      .from("team_members")
-      .select("*")
-      .order("joined_at");
-
+    const { id } = await params;
+    const { error } = await admin.from("signup_requests").delete().eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // joined_at → created_at 매핑 (프론트엔드 호환성)
-    const result = (members ?? []).map((m: Record<string, string>) => ({
-      id: m.id,
-      name: m.name ?? "",
-      email: m.email ?? "",
-      role: (m.role ?? "member") as "admin" | "member",
-      status: "approved" as const,
-      created_at: m.joined_at,
-    }));
-
-    return NextResponse.json({ members: result });
+    return NextResponse.json({ success: true });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "오류가 발생했습니다." },
+      { error: err instanceof Error ? err.message : "삭제 실패" },
       { status: 500 }
     );
   }

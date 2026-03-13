@@ -1,30 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createAdminClient, getSupabaseUrl, getServerAnonKey } from "@/lib/supabase-admin";
+import { ADMIN_EMAIL } from "@/lib/auth";
 
 async function getCallerProfile(req: NextRequest) {
   const supabase = createServerClient(getSupabaseUrl(), getServerAnonKey(), {
-    cookies: {
-      getAll: () => req.cookies.getAll(),
-      setAll: () => {},
-    },
+    cookies: { getAll: () => req.cookies.getAll(), setAll: () => {} },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: profile } = await supabase
-    .from("users")
+  const admin = createAdminClient();
+  const { data: profile } = await admin
+    .from("team_members")
     .select("id, role")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
+
+  // 관리자 이메일이면 프로필이 없어도 admin으로 처리
+  if (!profile && user.email === ADMIN_EMAIL) {
+    return { id: user.id, role: "admin" as const };
+  }
 
   return profile;
 }
 
-// PATCH /api/admin/users/[id] — 권한 변경
+// PATCH /api/admin/users/[id] — 역할 변경
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -41,17 +43,13 @@ export async function PATCH(
   }
 
   if (id === caller.id) {
-    return NextResponse.json(
-      { error: "자신의 권한은 변경할 수 없습니다." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "자신의 권한은 변경할 수 없습니다." }, { status: 400 });
   }
 
   const admin = createAdminClient();
-  const { error } = await admin.from("users").update({ role }).eq("id", id);
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  const { error } = await admin.from("team_members").update({ role }).eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
   return NextResponse.json({ success: true });
 }
 
@@ -68,19 +66,17 @@ export async function DELETE(
   const { id } = await params;
 
   if (id === caller.id) {
-    return NextResponse.json(
-      { error: "자기 자신은 삭제할 수 없습니다." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "자기 자신은 삭제할 수 없습니다." }, { status: 400 });
   }
 
   try {
     const admin = createAdminClient();
-    // auth.users에서 삭제하면 CASCADE로 public.users도 삭제됨
+    // team_members에서 먼저 삭제
+    await admin.from("team_members").delete().eq("id", id);
+    // auth.users에서 삭제
     const { error } = await admin.auth.admin.deleteUser(id);
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
     return NextResponse.json({ success: true });
   } catch (err) {
     return NextResponse.json(

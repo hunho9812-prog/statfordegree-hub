@@ -34,8 +34,6 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  // loading = auth 세션 확인 중 (true → false가 최대한 빠르게)
-  // profile 로드는 별도 비동기 → loading에 포함 안 함
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const loadingProfileFor = useRef<string | null>(null);
@@ -47,67 +45,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const { data, error } = await supabase
-        .from("users")
+        .from("team_members")
         .select("*")
         .eq("id", u.id)
         .single();
 
       if (!error && data) {
         const existingProfile = data as UserProfile;
-
-        // 관리자 이메일이면 항상 admin + approved 보장
+        // 관리자 이메일이면 항상 admin role 강제 적용
         if (u.email === ADMIN_EMAIL) {
-          if (existingProfile.role !== "admin" || existingProfile.status !== "approved") {
-            await supabase
-              .from("users")
-              .update({ role: "admin", status: "approved" })
-              .eq("id", u.id);
-          }
-          // DB 값에 관계없이 항상 admin role 강제 적용
-          setProfile({ ...existingProfile, role: "admin", status: "approved" });
-          return;
+          setProfile({ ...existingProfile, role: "admin" });
+        } else {
+          setProfile(existingProfile);
         }
-
-        // 승인 대기 중인 계정 → 로그아웃
-        if (existingProfile.status === "pending") {
-          setProfile(null);
-          await supabase.auth.signOut();
-          router.replace("/login?error=pending");
-          return;
-        }
-
-        // 거절된 계정 → 로그아웃
-        if (existingProfile.status === "rejected") {
-          setProfile(null);
-          await supabase.auth.signOut();
-          router.replace("/login?error=rejected");
-          return;
-        }
-
-        setProfile(existingProfile);
         return;
       }
 
-      // public.users 레코드 없음 → 관리자 이메일이면 자동 생성
+      // team_members 레코드 없음
       if (u.email === ADMIN_EMAIL) {
-        const { data: newProfile } = await supabase
-          .from("users")
-          .upsert({
-            id: u.id,
-            email: u.email!,
-            name: (u.user_metadata?.name as string) ?? "",
-            role: "admin",
-            status: "approved",
-          })
-          .select()
-          .single();
-        setProfile(newProfile as UserProfile | null);
-      } else {
-        // 레코드 없는 일반 계정 → 로그아웃
-        setProfile(null);
-        await supabase.auth.signOut();
-        router.replace("/login?error=unauthorized");
+        // 관리자 이메일이면 임시 프로필로 접근 허용
+        setProfile({
+          id: u.id,
+          email: u.email!,
+          name: (u.user_metadata?.name as string) ?? "관리자",
+          role: "admin",
+          joined_at: new Date().toISOString(),
+        });
+        return;
       }
+
+      // team_members에 없는 일반 계정 → 미승인 → 로그아웃
+      setProfile(null);
+      await supabase.auth.signOut();
+      router.replace("/login?error=unauthorized");
     } finally {
       loadingProfileFor.current = null;
     }
@@ -125,16 +95,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(u);
 
         if (u) {
-          // profile 로드는 백그라운드에서 (await 없음)
-          // → loading을 DB 쿼리가 끝날 때까지 기다리지 않음
           loadProfile(u);
         } else {
           setProfile(null);
           loadingProfileFor.current = null;
         }
 
-        // auth 세션 확인이 끝나면 즉시 loading 해제
-        // profile은 비동기로 채워짐
         setLoading(false);
       }
     );

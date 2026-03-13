@@ -7,8 +7,7 @@ export interface UserProfile {
   email: string;
   name: string;
   role: "admin" | "member";
-  status: "pending" | "approved" | "rejected";
-  created_at: string;
+  joined_at: string;
 }
 
 export async function signIn(email: string, password: string) {
@@ -19,23 +18,4 @@ export async function signIn(email: string, password: string) {
 export async function signOut() {
   if (!supabase) return;
   await supabase.auth.signOut();
-}
-
-export async function getUserProfile(userId: string): Promise<UserProfile | null> {
-  if (!supabase) return null;
-  const { data } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", userId)
-    .single();
-  return data as UserProfile | null;
-}
-
-export async function getAllUsers(): Promise<UserProfile[]> {
-  if (!supabase) return [];
-  const { data } = await supabase
-    .from("users")
-    .select("*")
-    .order("created_at");
-  return (data ?? []) as UserProfile[];
 }

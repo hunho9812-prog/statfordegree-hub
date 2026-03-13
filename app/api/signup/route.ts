@@ -19,71 +19,73 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
     const admin = createAdminClient();
 
-    // 이미 존재하는 이메일인지 확인
-    const { data: existing } = await admin
-      .from("users")
-      .select("id, status")
-      .eq("email", email.toLowerCase())
+    // 관리자 이메일은 별도 가입 불가
+    if (normalizedEmail === ADMIN_EMAIL.toLowerCase()) {
+      return NextResponse.json(
+        { error: "이미 등록된 이메일입니다." },
+        { status: 409 }
+      );
+    }
+
+    // 이미 team_members에 있는지 확인 (이미 승인된 계정)
+    const { data: existingMember } = await admin
+      .from("team_members")
+      .select("id")
+      .eq("email", normalizedEmail)
       .maybeSingle();
 
-    if (existing) {
-      if (existing.status === "pending") {
+    if (existingMember) {
+      return NextResponse.json(
+        { error: "이미 가입된 계정입니다. 로그인해 주세요." },
+        { status: 409 }
+      );
+    }
+
+    // signup_requests에 이미 있는지 확인
+    const { data: existingRequest } = await admin
+      .from("signup_requests")
+      .select("id, status")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+
+    if (existingRequest) {
+      if (existingRequest.status === "pending") {
         return NextResponse.json(
           { error: "이미 가입 신청된 계정입니다. 관리자 승인을 기다려 주세요." },
           { status: 409 }
         );
       }
-      if (existing.status === "approved") {
+      if (existingRequest.status === "approved") {
         return NextResponse.json(
           { error: "이미 가입된 계정입니다. 로그인해 주세요." },
           { status: 409 }
         );
       }
-      if (existing.status === "rejected") {
-        return NextResponse.json(
-          { error: "가입이 거절된 계정입니다. 관리자에게 문의하세요." },
-          { status: 409 }
-        );
+      if (existingRequest.status === "rejected") {
+        // 거절된 경우 재신청 허용: 기존 레코드 업데이트
+        await admin
+          .from("signup_requests")
+          .update({ name: name.trim(), password, status: "pending", created_at: new Date().toISOString() })
+          .eq("id", existingRequest.id);
+        return NextResponse.json({ success: true });
       }
     }
 
-    // 관리자 클라이언트로 사용자 생성 (이메일 확인 불필요, 이메일 발송 없음)
-    const { data, error } = await admin.auth.admin.createUser({
-      email: email.toLowerCase(),
-      password,
-      email_confirm: true,
-      user_metadata: { name: name.trim() },
-    });
+    // 새 가입 신청 저장 (auth 계정 미생성)
+    const { error: insertError } = await admin
+      .from("signup_requests")
+      .insert({
+        email: normalizedEmail,
+        name: name.trim(),
+        password,           // 승인 시 auth 계정 생성에 사용, 이후 삭제
+        status: "pending",
+      });
 
-    if (error) {
-      if (
-        error.message.toLowerCase().includes("already registered") ||
-        error.message.toLowerCase().includes("already been registered") ||
-        error.message.toLowerCase().includes("user already exists")
-      ) {
-        return NextResponse.json(
-          { error: "이미 등록된 이메일입니다." },
-          { status: 409 }
-        );
-      }
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    // 트리거가 public.users를 자동 생성하지만, 명시적으로 상태 보장
-    if (data.user) {
-      const isAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-      await admin.from("users").upsert(
-        {
-          id: data.user.id,
-          email: email.toLowerCase(),
-          name: name.trim(),
-          role: isAdmin ? "admin" : "member",
-          status: isAdmin ? "approved" : "pending",
-        },
-        { onConflict: "id" }
-      );
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
