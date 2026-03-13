@@ -53,34 +53,35 @@ export function useSupabaseInit() {
       debounceTimer.current = setTimeout(() => loadFromSupabase(), DEBOUNCE_MS);
     };
 
-    // @supabase/ssr의 createBrowserClient는 쿠키 기반 세션을 사용하므로
-    // Realtime WebSocket에 인증 토큰을 명시적으로 전달해야 합니다.
-    // 이를 하지 않으면 구독은 맺어지지만 이벤트를 수신하지 못합니다.
+    // Realtime WebSocket에 인증 토큰을 먼저 설정한 뒤 채널 구독
+    // (토큰 설정 전에 구독하면 이벤트를 수신하지 못할 수 있음)
+    let channels: ReturnType<typeof supabase.channel>[] = [];
+    let cancelled = false;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return;
       if (session?.access_token) {
         supabase!.realtime.setAuth(session.access_token);
       }
+
+      channels = REALTIME_TABLES.map((table) =>
+        supabase!
+          .channel(`realtime:public:${table}`)
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table },
+            scheduleReload
+          )
+          .subscribe((status, err) => {
+            if (err) {
+              console.error(`[Realtime] ${table} 구독 오류:`, err);
+            }
+          })
+      );
     });
 
-    // 테이블별 독립 채널 생성
-    // 단일 채널에 여러 테이블을 묶으면 하나의 구독 실패가 전체에 영향을 줄 수 있으므로
-    // 테이블마다 별도 채널을 사용합니다.
-    const channels = REALTIME_TABLES.map((table) =>
-      supabase!
-        .channel(`realtime:public:${table}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table },
-          scheduleReload
-        )
-        .subscribe((status, err) => {
-          if (err) {
-            console.error(`[Realtime] ${table} 구독 오류:`, err);
-          }
-        })
-    );
-
     return () => {
+      cancelled = true;
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       channels.forEach((ch) => supabase?.removeChannel(ch));
     };
