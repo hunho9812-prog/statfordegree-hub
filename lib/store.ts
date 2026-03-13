@@ -112,133 +112,23 @@ function quote(text: string) {
 }
 
 function makeAnalysisManualContent(): string {
-  return JSON.stringify({
-    type: "doc",
-    content: [
-      calloutYellow("분석 시작 전 반드시 읽어주세요."),
-
-      h2("📁 SPSS 파일 정리법"),
-      blist(
-        "맨 왼쪽에 No 변수 만들어주기",
-        "인구통계 범주화 한 변수는 기존 인구통계 변수 바로 옆에 붙여주기",
-        "EFA에서 삭제되는 문항, 역코딩 후 원래 문항 등 분석에 사용하지 않는 문항은 맨 위로 이동",
-        "하위요인 네이밍 후 같은 하위요인끼리 정리",
-        "평균 또는 합계 계산 시 변수이름+평균 형식으로 네이밍 (예: 자기효능감평균, 자기효능감합계)",
-        "상위요인은 전체평균 / 전체합계 사용",
-        "일반적 특성 각 범주 라벨링"
-      ),
-
-      h2("⚠️ 분석 시 주의사항"),
-      blist(
-        "변수 수정 과정에서 원래 변수 삭제 금지",
-        "데이터 수정 후 이전 SPSS 파일 히스토리 보관",
-        "분석 시작 날짜에 고객에게 분석 시작 안내",
-        "분석 전 논문 주제와 분석방법 전체 흐름 확인"
-      ),
-
-      h2("📊 모논문 없을 때 표 해석 규칙"),
-
-      h3("소수점 규칙"),
-      blist(
-        "t / F / p 값 → #.000 형식",
-        "기술통계 최소값, 최대값, 평균, 표준편차 → 0.00 형식",
-        "p=.000 → p<.001로 변경"
-      ),
-
-      h3("표 작성 기본 규칙"),
-      blist(
-        "표의 세로선 제거",
-        "굵은 선은 필수 아님",
-        "(N=) 표시는 필요할 때만 사용",
-        "표와 해석 글씨는 모두 바탕글로 통일"
-      ),
-
-      h3("1️⃣ 빈도분석 해석 작성 방식"),
-      p("① 어떤 분석을 진행했는지 서술"),
-      quote("응답자의 일반적 특성을 알아보기 위하여 빈도분석을 실시하였으며, 그 결과를 <표 1>과 같이 나타내었다."),
-      p("② 가장 많은 집단부터 순서대로 서술"),
-      quote("성별에서는 여성이 127명(62.6%)으로 남성보다 높은 비율을 차지하였다. 연령은 30대, 40대, 20대, 50대, 10대 순으로 나타났다."),
-
-      h3("차이검정 해석 작성 규칙"),
-      p("표 순서: N → M → SD → t/F → p → Scheffe"),
-      {
-        type: "paragraph",
-        content: [{ type: "text", marks: [{ type: "bold" }], text: "사후검정 규칙:" }],
-      },
-      blist(
-        "ANOVA 유의하지만 사후검정 안 나뉘면 (n/a)",
-        "사후검정 알파벳 a,b,c 순서",
-        "ANOVA 유의하지 않으면 사후검정 기재하지 않음"
-      ),
-
-      h3("상관관계 해석 규칙"),
-      p("서술 순서 예시 (상위요인 4개): 외상후성장→의도적반추 / 외상후성장→자기노출 / 외상후성장→사회적지지 / 의도적반추→자기노출 / 의도적반추→사회적지지 / 자기노출→사회적지지"),
-
-      h3("회귀분석 표 작성 규칙"),
-      p("표에는 아래 항목을 포함:"),
-      blist("B", "SE", "Beta", "t", "p", "VIF", "R²", "Adjusted R²", "Durbin-Watson"),
-      p("더미변수 사용 시 Reference 표시"),
-    ],
-  });
+  return makeEmptyDoc("분석 시 메뉴얼");
 }
 
 function makeProcessManualContent(): string {
-  return JSON.stringify({
-    type: "doc",
-    content: [
-      h2("1. 엑셀 데이터 클리닝"),
-      blist(
-        "역문항 확인",
-        "하위문항 확인",
-        "변수계산 방식 확인",
-        "No 변수 추가",
-        "문항번호 정리",
-        "한글 응답을 숫자로 변환",
-        "역코딩 후 변수 계산"
-      ),
-
-      h2("2. SPSS 데이터 클리닝"),
-      {
-        type: "paragraph",
-        content: [{ type: "text", marks: [{ type: "bold" }], text: "확인사항:" }],
-      },
-      blist(
-        "빈도분석으로 결측치 확인",
-        "기술통계로 이상치 확인",
-        "역코딩",
-        "신뢰도 분석",
-        "변수 계산",
-        "정규성 검정"
-      ),
-    ],
-  });
+  return makeEmptyDoc("분석과정 메뉴얼");
 }
 
 function makeSpssContent(): string {
-  return JSON.stringify({
-    type: "doc",
-    content: [
-      p("각 분석 항목을 클릭하여 세부 내용을 확인하세요."),
-    ],
-  });
+  return makeEmptyDoc("통계분석(SPSS)");
 }
 
 function makeAmosContent(): string {
-  return JSON.stringify({
-    type: "doc",
-    content: [
-      p("각 분석 항목을 클릭하여 세부 내용을 확인하세요."),
-    ],
-  });
+  return makeEmptyDoc("통계분석(AMOS)");
 }
 
 function makePocketContent(): string {
-  return JSON.stringify({
-    type: "doc",
-    content: [
-      p("자주 쓰는 자료를 모아두는 저장 페이지입니다. 각 항목을 클릭하여 자료를 확인하세요."),
-    ],
-  });
+  return makeEmptyDoc("통계주머니");
 }
 
 function makePage(
@@ -385,48 +275,7 @@ const initialPages: Record<string, Page> = Object.fromEntries([
   makePage(MENU_IDS.MANUAL_POCKET_APA, "APA 형식", "📝", MENU_IDS.MANUAL_POCKET, [], makeEmptyDoc("APA 형식")),
 
   // 크레도/응대 체크리스트
-  makePage(
-    MENU_IDS.MANUAL_CHECKLIST,
-    "크레도 / 응대 체크리스트",
-    "✅",
-    MENU_IDS.MANUAL,
-    [],
-    JSON.stringify({
-      type: "doc",
-      content: [
-        {
-          type: "taskList",
-          content: [
-            {
-              type: "taskItem",
-              attrs: { checked: false },
-              content: [{ type: "paragraph", content: [{ type: "text", text: "고객 첫 응대 완료" }] }],
-            },
-            {
-              type: "taskItem",
-              attrs: { checked: false },
-              content: [{ type: "paragraph", content: [{ type: "text", text: "요구사항 파악" }] }],
-            },
-            {
-              type: "taskItem",
-              attrs: { checked: false },
-              content: [{ type: "paragraph", content: [{ type: "text", text: "분석 일정 확인" }] }],
-            },
-            {
-              type: "taskItem",
-              attrs: { checked: false },
-              content: [{ type: "paragraph", content: [{ type: "text", text: "분석 결과 전달" }] }],
-            },
-            {
-              type: "taskItem",
-              attrs: { checked: false },
-              content: [{ type: "paragraph", content: [{ type: "text", text: "AS 안내 및 마무리" }] }],
-            },
-          ],
-        },
-      ],
-    })
-  ),
+  makePage(MENU_IDS.MANUAL_CHECKLIST, "크레도 / 응대 체크리스트", "✅", MENU_IDS.MANUAL, [], makeEmptyDoc("크레도 / 응대 체크리스트")),
 
   // Other root pages
   makePage(MENU_IDS.TAX, "세금 메뉴얼", "💰", null, [], makeEmptyDoc("세금 메뉴얼")),
