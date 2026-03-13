@@ -18,6 +18,7 @@ import {
   LogOut,
   Crown,
   UserCog,
+  ClipboardList,
   RefreshCw,
 } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
@@ -140,6 +141,13 @@ export default function Sidebar() {
             <UserCog size={16} />
           </button>
         </Link>
+        {profile?.role === "admin" && (
+          <Link href="/admin/requests">
+            <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="신청관리">
+              <ClipboardList size={16} />
+            </button>
+          </Link>
+        )}
         <button
           onClick={handleNewPage}
           className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)}
@@ -281,6 +289,15 @@ export default function Sidebar() {
             <span>팀원관리</span>
           </div>
         </Link>
+
+        {profile?.role === "admin" && (
+          <Link href="/admin/requests">
+            <div className={navItem(pathname === "/admin/requests")}>
+              <ClipboardList size={15} className="text-[#9b9a97]" />
+              <span>신청관리</span>
+            </div>
+          </Link>
+        )}
       </div>
 
       {/* Divider */}

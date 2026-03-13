@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { Trash2, RefreshCw, Crown, User, AlertTriangle, Check, X, Clock, UserCheck, UserX, Bell } from "lucide-react";
+import { Trash2, RefreshCw, Crown, User, AlertTriangle, Check, X } from "lucide-react";
 
 interface Member {
   id: string;
@@ -21,8 +21,6 @@ export default function AdminPage() {
   const [membersLoading, setMembersLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<Member | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [approveLoading, setApproveLoading] = useState<string | null>(null);
-  const [approveError, setApproveError] = useState<string | null>(null);
 
   const fetchMembers = useCallback(async () => {
     setMembersLoading(true);
@@ -38,28 +36,6 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => { fetchMembers(); }, [fetchMembers]);
-
-  async function handleApprove(memberId: string, action: "approve" | "reject") {
-    setApproveLoading(memberId + action);
-    setApproveError(null);
-    try {
-      const res = await fetch("/api/admin/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: memberId, action }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        await fetchMembers();
-      } else {
-        setApproveError(data.error ?? "처리 중 오류가 발생했습니다.");
-      }
-    } catch {
-      setApproveError("네트워크 오류가 발생했습니다.");
-    } finally {
-      setApproveLoading(null);
-    }
-  }
 
   async function handleRoleChange(memberId: string, newRole: "admin" | "member") {
     const res = await fetch(`/api/admin/users/${memberId}`, {
@@ -78,9 +54,7 @@ export default function AdminPage() {
     if (res.ok) { setDeleteTarget(null); fetchMembers(); }
   }
 
-  const pendingMembers  = members.filter((m) => m.status === "pending");
   const approvedMembers = members.filter((m) => m.status === "approved");
-  const rejectedMembers = members.filter((m) => m.status === "rejected");
 
   return (
     <div className="flex-1 overflow-y-auto bg-white dark:bg-[#191919]">
@@ -102,88 +76,6 @@ export default function AdminPage() {
             새로고침
           </button>
         </div>
-
-        {/* 오류 배너 */}
-        {approveError && (
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50">
-            <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-            <p className="flex-1 text-sm text-red-700 dark:text-red-300">{approveError}</p>
-            <button onClick={() => setApproveError(null)} className="text-red-400 hover:text-red-600">
-              <X size={14} />
-            </button>
-          </div>
-        )}
-
-        {/* ── 승인 대기 섹션 (관리자 전용, pending 있을 때만) ── */}
-        {isAdmin && (membersLoading || pendingMembers.length > 0) && (
-          <section>
-            {/* 섹션 헤더 */}
-            <div className="flex items-center gap-2 mb-3">
-              <Bell size={15} className="text-amber-500" />
-              <h2 className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">
-                가입 승인 대기
-              </h2>
-              {!membersLoading && pendingMembers.length > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                  {pendingMembers.length}건
-                </span>
-              )}
-            </div>
-
-            <div className="border-2 border-amber-200 dark:border-amber-800/50 rounded-xl overflow-hidden bg-amber-50/30 dark:bg-amber-950/10">
-              {membersLoading ? (
-                <div className="flex items-center gap-3 px-5 py-4">
-                  <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 animate-pulse" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 w-32 rounded bg-amber-100 dark:bg-amber-900/30 animate-pulse" />
-                    <div className="h-2.5 w-48 rounded bg-amber-100 dark:bg-amber-900/30 animate-pulse" />
-                  </div>
-                </div>
-              ) : (
-                <div className="divide-y divide-amber-200 dark:divide-amber-800/30">
-                  {pendingMembers.map((m) => (
-                    <div key={m.id} className="flex items-center gap-4 px-5 py-4">
-                      <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
-                        <Clock size={15} className="text-amber-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[#37352f] dark:text-[#e6e6e4] truncate">
-                          {m.name || <span className="text-[#9b9a97] italic text-xs font-normal">이름 미설정</span>}
-                        </p>
-                        <p className="text-xs text-[#9b9a97] truncate">{m.email}</p>
-                      </div>
-                      <span className="text-xs text-[#9b9a97] hidden sm:block flex-shrink-0">
-                        {new Date(m.created_at).toLocaleDateString("ko-KR")}
-                      </span>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => handleApprove(m.id, "approve")}
-                          disabled={approveLoading === m.id + "approve"}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white transition-colors disabled:opacity-50"
-                        >
-                          {approveLoading === m.id + "approve"
-                            ? <RefreshCw size={11} className="animate-spin" />
-                            : <UserCheck size={12} />}
-                          승인
-                        </button>
-                        <button
-                          onClick={() => handleApprove(m.id, "reject")}
-                          disabled={approveLoading === m.id + "reject"}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-200 dark:border-red-800/50 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50"
-                        >
-                          {approveLoading === m.id + "reject"
-                            ? <RefreshCw size={11} className="animate-spin" />
-                            : <UserX size={12} />}
-                          거절
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-        )}
 
         {/* ── 팀원 목록 ── */}
         <section>
@@ -274,48 +166,6 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {/* ── 거절된 계정 (관리자만) ── */}
-        {isAdmin && rejectedMembers.length > 0 && (
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <X size={15} className="text-red-400" />
-              <h2 className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">거절된 신청</h2>
-              <span className="text-xs text-[#9b9a97]">({rejectedMembers.length}건)</span>
-            </div>
-            <div className="border border-[#e9e9e7] dark:border-[#2f2f2f] rounded-xl overflow-hidden">
-              <div className="divide-y divide-[#e9e9e7] dark:divide-[#2f2f2f]">
-                {rejectedMembers.map((m) => (
-                  <div key={m.id} className="flex items-center gap-4 px-4 py-3 hover:bg-[#fafaf9] dark:hover:bg-[#1f1f1f] transition-colors">
-                    <div className="w-9 h-9 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
-                      <UserX size={15} className="text-red-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-[#9b9a97] truncate">{m.name || "이름 미설정"}</p>
-                      <p className="text-xs text-[#9b9a97] truncate">{m.email}</p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => handleApprove(m.id, "approve")}
-                        disabled={approveLoading === m.id + "approve"}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-emerald-600 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors disabled:opacity-50"
-                      >
-                        <UserCheck size={11} />
-                        승인
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(m)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-red-500 border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                      >
-                        <Trash2 size={11} />
-                        삭제
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
       </div>
 
       {/* 삭제 확인 모달 */}
