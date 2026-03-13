@@ -11,6 +11,7 @@ import {
   UserX,
   Bell,
   Trash2,
+  ShieldAlert,
 } from "lucide-react";
 
 interface Member {
@@ -23,34 +24,45 @@ interface Member {
 }
 
 export default function RequestsPage() {
-  const { profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const isAdmin = profile?.role === "admin";
+  // auth 세션은 확인됐지만 profile이 아직 로드 중인 상태 감지
+  const profileLoading = !authLoading && !!user && profile === null;
 
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchMembers = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const res = await fetch("/api/admin/members");
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         setMembers(data.members ?? []);
+      } else {
+        setFetchError(data.error ?? `오류 (${res.status})`);
       }
+    } catch {
+      setFetchError("네트워크 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchMembers();
-  }, [fetchMembers]);
+    // profile 로드가 완전히 끝난 뒤 fetch
+    if (!authLoading && !profileLoading && isAdmin) {
+      fetchMembers();
+    }
+  }, [authLoading, profileLoading, isAdmin, fetchMembers]);
 
   async function handleAction(memberId: string, action: "approve" | "reject") {
     setActionLoading(memberId + action);
-    setError(null);
+    setActionError(null);
     try {
       const res = await fetch("/api/admin/approve", {
         method: "POST",
@@ -61,10 +73,10 @@ export default function RequestsPage() {
       if (res.ok) {
         await fetchMembers();
       } else {
-        setError(data.error ?? "처리 중 오류가 발생했습니다.");
+        setActionError(data.error ?? "처리 중 오류가 발생했습니다.");
       }
     } catch {
-      setError("네트워크 오류가 발생했습니다.");
+      setActionError("네트워크 오류가 발생했습니다.");
     } finally {
       setActionLoading(null);
     }
@@ -72,14 +84,14 @@ export default function RequestsPage() {
 
   async function handleDelete(memberId: string) {
     setActionLoading(memberId + "delete");
-    setError(null);
+    setActionError(null);
     try {
       const res = await fetch(`/api/admin/users/${memberId}`, { method: "DELETE" });
       if (res.ok) {
         await fetchMembers();
       } else {
         const data = await res.json();
-        setError(data.error ?? "삭제 중 오류가 발생했습니다.");
+        setActionError(data.error ?? "삭제 중 오류가 발생했습니다.");
       }
     } finally {
       setActionLoading(null);
@@ -89,9 +101,20 @@ export default function RequestsPage() {
   const pendingMembers = members.filter((m) => m.status === "pending");
   const rejectedMembers = members.filter((m) => m.status === "rejected");
 
-  if (!isAdmin) {
+  // 인증 또는 profile 로딩 중
+  if (authLoading || profileLoading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-white dark:bg-[#191919]">
+        <RefreshCw size={18} className="animate-spin text-[#9b9a97]" />
+      </div>
+    );
+  }
+
+  // 관리자가 아닌 경우
+  if (!isAdmin) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-white dark:bg-[#191919]">
+        <ShieldAlert size={28} className="text-[#c4c3bf]" />
         <p className="text-sm text-[#9b9a97]">관리자만 접근할 수 있습니다.</p>
       </div>
     );
@@ -111,19 +134,32 @@ export default function RequestsPage() {
           </div>
           <button
             onClick={fetchMembers}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors border border-[#e9e9e7] dark:border-[#2f2f2f]"
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors border border-[#e9e9e7] dark:border-[#2f2f2f] disabled:opacity-50"
           >
-            <RefreshCw size={13} />
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
             새로고침
           </button>
         </div>
 
-        {/* 오류 배너 */}
-        {error && (
+        {/* API 조회 오류 */}
+        {fetchError && (
           <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50">
             <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-            <p className="flex-1 text-sm text-red-700 dark:text-red-300">{error}</p>
-            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-700 dark:text-red-300">데이터를 불러오지 못했습니다</p>
+              <p className="text-xs text-red-500 mt-0.5">{fetchError}</p>
+            </div>
+            <button onClick={fetchMembers} className="text-xs text-red-500 hover:underline flex-shrink-0">재시도</button>
+          </div>
+        )}
+
+        {/* 액션 오류 */}
+        {actionError && (
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50">
+            <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+            <p className="flex-1 text-sm text-red-700 dark:text-red-300">{actionError}</p>
+            <button onClick={() => setActionError(null)} className="text-red-400 hover:text-red-600">
               <X size={14} />
             </button>
           </div>
@@ -176,7 +212,7 @@ export default function RequestsPage() {
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
                         onClick={() => handleAction(m.id, "approve")}
-                        disabled={actionLoading === m.id + "approve"}
+                        disabled={!!actionLoading}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white transition-colors disabled:opacity-50"
                       >
                         {actionLoading === m.id + "approve"
@@ -186,7 +222,7 @@ export default function RequestsPage() {
                       </button>
                       <button
                         onClick={() => handleAction(m.id, "reject")}
-                        disabled={actionLoading === m.id + "reject"}
+                        disabled={!!actionLoading}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-200 dark:border-red-800/50 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50"
                       >
                         {actionLoading === m.id + "reject"
@@ -247,7 +283,7 @@ export default function RequestsPage() {
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <button
                           onClick={() => handleAction(m.id, "approve")}
-                          disabled={actionLoading === m.id + "approve"}
+                          disabled={!!actionLoading}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-emerald-600 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors disabled:opacity-50"
                         >
                           <UserCheck size={11} />
@@ -255,7 +291,7 @@ export default function RequestsPage() {
                         </button>
                         <button
                           onClick={() => handleDelete(m.id)}
-                          disabled={actionLoading === m.id + "delete"}
+                          disabled={!!actionLoading}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-red-500 border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50"
                         >
                           {actionLoading === m.id + "delete"
