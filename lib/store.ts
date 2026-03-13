@@ -1188,8 +1188,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       version: 7,
       // UI 상태만 localStorage에 저장 — 데이터는 Supabase가 단일 소스
       partialize: (state) => ({
-        sidebarCollapsed: state.sidebarCollapsed,
-        darkMode: state.darkMode,
+        ...state,
+        pages: {},
+        rootPageIds: [],
+        tasks: [],
+        customers: [],
+        customerStatuses: [],
+        manualPages: {},
       }),
       migrate: (persistedState: unknown, version: number) => {
         const s = persistedState as Record<string, unknown>;
