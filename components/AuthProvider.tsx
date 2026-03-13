@@ -62,10 +62,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .from("users")
               .update({ role: "admin", status: "approved" })
               .eq("id", u.id);
-            setProfile({ ...existingProfile, role: "admin", status: "approved" });
-          } else {
-            setProfile(existingProfile);
           }
+          // DB 값에 관계없이 항상 admin role 강제 적용
+          setProfile({ ...existingProfile, role: "admin", status: "approved" });
           return;
         }
 
