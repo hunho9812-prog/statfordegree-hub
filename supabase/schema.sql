@@ -18,25 +18,41 @@ create table if not exists public.users (
 
 alter table public.users enable row level security;
 
+-- RLS 헬퍼 함수: security definer로 RLS 우회하여 재귀 방지
+create or replace function public.is_approved()
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.users where id = auth.uid() and status = 'approved'
+  );
+$$;
+
+create or replace function public.is_admin()
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.users where id = auth.uid() and role = 'admin'
+  );
+$$;
+
 drop policy if exists "users_select_team"  on public.users;
 drop policy if exists "users_insert_self"  on public.users;
 drop policy if exists "users_update_self"  on public.users;
 drop policy if exists "users_update_admin" on public.users;
 
--- 인증된 사용자면 누구나 팀원 목록 조회 가능 (재귀 참조 방지)
+-- 인증된 사용자면 누구나 팀원 목록 조회 가능
 create policy "users_select_team" on public.users
   for select using (auth.uid() is not null);
 
+-- 자신의 레코드 삽입 (회원가입 시)
 create policy "users_insert_self" on public.users
   for insert with check (auth.uid() = id);
 
+-- 자신의 레코드 수정
 create policy "users_update_self" on public.users
   for update using (auth.uid() = id);
 
+-- 관리자는 모든 레코드 수정 가능
 create policy "users_update_admin" on public.users
-  for update using (
-    auth.uid() in (select id from public.users where role = 'admin')
-  );
+  for update using (public.is_admin());
 
 -- 신규 가입 시 public.users 자동 삽입
 create or replace function public.handle_new_auth_user()
@@ -87,34 +103,34 @@ alter table public.pages enable row level security;
 
 drop policy if exists "pages_approved" on public.pages;
 create policy "pages_approved" on public.pages
-  for all using (
-    auth.uid() in (select id from public.users where status = 'approved')
-  );
+  for all using (public.is_approved());
+
+alter publication supabase_realtime add table public.pages;
 
 
 -- ================================================================
 -- [3] tasks
 -- ================================================================
 create table if not exists public.tasks (
-  id          text not null default '' primary key,
-  title       text not null default '',
-  description text not null default '',
-  status      text not null default 'todo' check (status in ('todo', 'in-progress', 'done')),
-  priority    text not null default 'medium' check (priority in ('low', 'medium', 'high')),
-  assignee    text not null default '',
+  id          text   primary key,
+  title       text   not null default '',
+  description text   not null default '',
+  status      text   not null default 'todo' check (status in ('todo', 'in-progress', 'done')),
+  priority    text   not null default 'medium' check (priority in ('low', 'medium', 'high')),
+  assignee    text   not null default '',
   due_date    text,
   tags        text[] not null default '{}',
-  created_at  text not null default '',
-  updated_at  text not null default ''
+  created_at  text   not null default '',
+  updated_at  text   not null default ''
 );
 
 alter table public.tasks enable row level security;
 
 drop policy if exists "tasks_approved" on public.tasks;
 create policy "tasks_approved" on public.tasks
-  for all using (
-    auth.uid() in (select id from public.users where status = 'approved')
-  );
+  for all using (public.is_approved());
+
+alter publication supabase_realtime add table public.tasks;
 
 
 -- ================================================================
@@ -145,9 +161,9 @@ alter table public.customers enable row level security;
 
 drop policy if exists "customers_approved" on public.customers;
 create policy "customers_approved" on public.customers
-  for all using (
-    auth.uid() in (select id from public.users where status = 'approved')
-  );
+  for all using (public.is_approved());
+
+alter publication supabase_realtime add table public.customers;
 
 
 -- ================================================================
@@ -165,9 +181,9 @@ alter table public.customer_statuses enable row level security;
 
 drop policy if exists "customer_statuses_approved" on public.customer_statuses;
 create policy "customer_statuses_approved" on public.customer_statuses
-  for all using (
-    auth.uid() in (select id from public.users where status = 'approved')
-  );
+  for all using (public.is_approved());
+
+alter publication supabase_realtime add table public.customer_statuses;
 
 
 -- ================================================================
@@ -187,9 +203,9 @@ alter table public.manual_nodes enable row level security;
 
 drop policy if exists "manual_nodes_approved" on public.manual_nodes;
 create policy "manual_nodes_approved" on public.manual_nodes
-  for all using (
-    auth.uid() in (select id from public.users where status = 'approved')
-  );
+  for all using (public.is_approved());
+
+alter publication supabase_realtime add table public.manual_nodes;
 
 
 -- ================================================================
@@ -204,9 +220,9 @@ alter table public.manual_page_roots enable row level security;
 
 drop policy if exists "manual_page_roots_approved" on public.manual_page_roots;
 create policy "manual_page_roots_approved" on public.manual_page_roots
-  for all using (
-    auth.uid() in (select id from public.users where status = 'approved')
-  );
+  for all using (public.is_approved());
+
+alter publication supabase_realtime add table public.manual_page_roots;
 
 
 -- ================================================================
@@ -221,6 +237,6 @@ alter table public.workspace_config enable row level security;
 
 drop policy if exists "workspace_config_approved" on public.workspace_config;
 create policy "workspace_config_approved" on public.workspace_config
-  for all using (
-    auth.uid() in (select id from public.users where status = 'approved')
-  );
+  for all using (public.is_approved());
+
+alter publication supabase_realtime add table public.workspace_config;
