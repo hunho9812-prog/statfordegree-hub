@@ -17,7 +17,7 @@ import EditorMenuBar from "./EditorMenuBar";
 import SlashCommandMenu, { SLASH_COMMANDS } from "./SlashCommandMenu";
 import { ToggleBlock } from "./extensions/ToggleBlock";
 import { CalloutBlock } from "./extensions/CalloutBlock";
-import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical } from "lucide-react";
+import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical, Paperclip } from "lucide-react";
 import { useRouter } from "next/navigation";
 import MonthPageManager from "./MonthPageManager";
 import CRMPage from "./CRMPage";
@@ -70,6 +70,9 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   const [blockMenuOpen, setBlockMenuOpen] = useState(false);
   const [blockMenuCoords, setBlockMenuCoords] = useState({ x: 0, y: 0 });
   const [dropBtnIdx, setDropBtnIdx] = useState<number | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadDocEndRef = useRef<number>(0);
 
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const titleSaveTimer = useRef<NodeJS.Timeout | null>(null);
@@ -334,6 +337,61 @@ export default function PageEditor({ pageId }: { pageId: string }) {
     setDropBtnIdx(null);
   }, []);
 
+  // ── File upload ──────────────────────────────────────────────────────────────
+  const handleUploadClick = useCallback((docEnd: number) => {
+    uploadDocEndRef.current = docEnd;
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editor) return;
+    const docEnd = uploadDocEndRef.current;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const dataUrl = evt.target?.result as string;
+      if (file.type.startsWith("image/")) {
+        editor
+          .chain()
+          .focus()
+          .insertContentAt(docEnd, {
+            type: "paragraph",
+            content: [{
+              type: "text",
+              marks: [],
+              text: " ",
+            }],
+          })
+          .run();
+        editor
+          .chain()
+          .focus()
+          .setTextSelection(docEnd + 1)
+          .insertContent(`<img src="${dataUrl}" alt="${file.name}" class="tiptap-image" />`)
+          .run();
+      } else {
+        const sizeText = file.size < 1024 * 1024
+          ? `${(file.size / 1024).toFixed(1)} KB`
+          : `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+        editor
+          .chain()
+          .focus()
+          .insertContentAt(docEnd, {
+            type: "paragraph",
+            content: [{
+              type: "text",
+              text: `📎 ${file.name} (${sizeText})`,
+              marks: [{ type: "link", attrs: { href: dataUrl, target: "_blank" } }],
+            }],
+          })
+          .run();
+      }
+    };
+    reader.readAsDataURL(file);
+    // Reset input so same file can be re-uploaded
+    e.target.value = "";
+  }, [editor]);
+
   // Drop-indicator position (blue line shown while dragging)
   const dropIndicator = useMemo(() => {
     if (dropBtnIdx === null || !dragStateRef.current) return null;
@@ -440,6 +498,14 @@ export default function PageEditor({ pageId }: { pageId: string }) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#191919]">
+      {/* Hidden file input for uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       {/* Fixed toolbar */}
       {editor && <EditorMenuBar editor={editor} />}
 
@@ -669,6 +735,16 @@ export default function PageEditor({ pageId }: { pageId: string }) {
               title="블록 추가"
             >
               <Plus size={12} />
+            </button>
+
+            {/* 📎 File upload */}
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handleUploadClick(btn.docEnd)}
+              className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-500 dark:hover:text-gray-300 transition-colors"
+              title="파일 업로드"
+            >
+              <Paperclip size={11} />
             </button>
 
             {/* 🗑️ Delete block */}
