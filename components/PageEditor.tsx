@@ -17,7 +17,7 @@ import EditorMenuBar from "./EditorMenuBar";
 import SlashCommandMenu, { SLASH_COMMANDS } from "./SlashCommandMenu";
 import { ToggleBlock } from "./extensions/ToggleBlock";
 import { CalloutBlock } from "./extensions/CalloutBlock";
-import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical } from "lucide-react";
+import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical, ImageUp, FileUp, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import MonthPageManager from "./MonthPageManager";
 import CRMPage from "./CRMPage";
@@ -85,6 +85,10 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadPosRef = useRef<number>(0);
+  const [uploading, setUploading] = useState(false);
 
   const closeSlashMenu = useCallback(() => {
     setSlashMenu((s) => ({ ...s, open: false }));
@@ -259,6 +263,44 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       } catch { /* ignore */ }
     }, 0);
   }, [editor]);
+
+  // ── File / Image upload ───────────────────────────────────────────────────────
+  const doUpload = useCallback(async (file: File, isImage: boolean) => {
+    if (!editor) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) { alert(json.error || "업로드 실패"); return; }
+
+      const pos = uploadPosRef.current;
+      if (isImage) {
+        editor.chain().focus().insertContentAt(pos, `<img src="${json.url}" alt="${json.name}" class="tiptap-image" />`).run();
+      } else {
+        editor.chain().focus().insertContentAt(pos,
+          `<a href="${json.url}" target="_blank" rel="noopener noreferrer" class="tiptap-file-link">📎 ${json.name}</a>`
+        ).run();
+      }
+    } catch {
+      alert("업로드 중 오류가 발생했습니다.");
+    } finally {
+      setUploading(false);
+    }
+  }, [editor]);
+
+  const handleImageInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) doUpload(file, true);
+    e.target.value = "";
+  }, [doUpload]);
+
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) doUpload(file, false);
+    e.target.value = "";
+  }, [doUpload]);
 
   // Delete a single block by its ProseMirror range.
   const handleDeleteBlock = useCallback((docStart: number, docEnd: number) => {
@@ -744,6 +786,39 @@ export default function PageEditor({ pageId }: { pageId: string }) {
                     </div>
                   </button>
                 ))}
+                {/* 미디어 그룹에 파일 업로드 항목 추가 */}
+                {group === "미디어" && (
+                  <>
+                    <button
+                      onClick={() => {
+                        uploadPosRef.current = editor.state.selection.from;
+                        setBlockMenuOpen(false);
+                        imageInputRef.current?.click();
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 text-left text-[#37352f] dark:text-[#e6e6e4] hover:bg-gray-50 dark:hover:bg-[#2f2f2f] transition-colors"
+                    >
+                      <span className="flex-shrink-0 text-gray-400"><ImageUp size={18} /></span>
+                      <div>
+                        <p className="text-sm font-medium leading-4">이미지 업로드</p>
+                        <p className="text-xs text-gray-400 leading-4">컴퓨터에서 이미지 파일 삽입</p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        uploadPosRef.current = editor.state.selection.from;
+                        setBlockMenuOpen(false);
+                        fileInputRef.current?.click();
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 text-left text-[#37352f] dark:text-[#e6e6e4] hover:bg-gray-50 dark:hover:bg-[#2f2f2f] transition-colors"
+                    >
+                      <span className="flex-shrink-0 text-gray-400"><FileUp size={18} /></span>
+                      <div>
+                        <p className="text-sm font-medium leading-4">파일 업로드</p>
+                        <p className="text-xs text-gray-400 leading-4">PDF, 문서 등 파일 첨부</p>
+                      </div>
+                    </button>
+                  </>
+                )}
               </div>
             );
           })}
@@ -753,6 +828,32 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       {/* Close block menu on outside click */}
       {blockMenuOpen && (
         <div className="fixed inset-0 z-[99]" onClick={() => setBlockMenuOpen(false)} />
+      )}
+
+      {/* Hidden file inputs for upload */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImageInputChange}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="*/*"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
+      {/* Upload loading overlay */}
+      {uploading && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/20">
+          <div className="bg-white dark:bg-[#252525] rounded-xl shadow-xl px-6 py-4 flex items-center gap-3">
+            <Loader2 size={20} className="animate-spin text-blue-500" />
+            <span className="text-sm text-[#37352f] dark:text-[#e6e6e4]">파일 업로드 중...</span>
+          </div>
+        </div>
       )}
     </div>
   );
