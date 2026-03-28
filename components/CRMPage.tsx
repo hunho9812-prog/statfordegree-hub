@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useWorkspaceStore } from "@/lib/store";
 import type { Customer, CustomerRoute, StatusOption, StatusCategory } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
-import { Plus, Trash2, Settings, X, Check, GripVertical } from "lucide-react";
+import { Plus, Trash2, Settings, X, Check, GripVertical, ArrowRightLeft } from "lucide-react";
 
 const ASSIGNEES = ["김은호", "김세윤", "김현호", "오승준"];
 const ROUTES: CustomerRoute[] = ["크몽", "메일", ""];
@@ -617,6 +617,104 @@ function AddTriggerRow({ onAdd }: { onAdd: () => void }) {
   );
 }
 
+// ─── Move modal ───────────────────────────────────────────────────────────────
+
+function MoveModal({
+  currentMonthPageId,
+  onMove,
+  onClose,
+}: {
+  currentMonthPageId: string | null;
+  onMove: (targetMonthPageId: string | null) => void;
+  onClose: () => void;
+}) {
+  const { pages } = useWorkspaceStore();
+  const [selected, setSelected] = useState<string | null>(null);
+
+  // 연도 페이지 목록 (최신순)
+  const yearPages = Object.values(pages)
+    .filter((p) => /^(\d{4})년/.test(p.title))
+    .sort((a, b) => {
+      const ay = parseInt(a.title.match(/^(\d{4})/)?.[1] ?? "0");
+      const by = parseInt(b.title.match(/^(\d{4})/)?.[1] ?? "0");
+      return by - ay;
+    });
+
+  // 연도 하위 월 페이지
+  const getMonths = (yearPageId: string) =>
+    (pages[yearPageId]?.children ?? [])
+      .map((id) => pages[id])
+      .filter(Boolean)
+      .filter((p) => /^\d{1,2}월$/.test(p.title))
+      .sort((a, b) => parseInt(a.title) - parseInt(b.title));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-xs mx-4 bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#3f3f3f] shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
+          <h3 className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">다른 달로 이동</h3>
+          <button onClick={onClose} className="text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4]">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="max-h-72 overflow-y-auto py-2">
+          {yearPages.length === 0 && (
+            <p className="px-5 py-4 text-sm text-[#9b9a97]">이동할 수 있는 달이 없습니다.</p>
+          )}
+          {yearPages.map((yearPage) => {
+            const months = getMonths(yearPage.id);
+            if (months.length === 0) return null;
+            return (
+              <div key={yearPage.id}>
+                <p className="px-4 pt-2 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                  {yearPage.title.replace("고객관리양식", "").trim()}
+                </p>
+                {months.map((mp) => {
+                  const isCurrent = mp.id === currentMonthPageId;
+                  const isSelected = selected === mp.id;
+                  return (
+                    <button
+                      key={mp.id}
+                      disabled={isCurrent}
+                      onClick={() => setSelected(mp.id)}
+                      className={`w-full flex items-center justify-between px-4 py-2 text-sm transition-colors ${
+                        isCurrent
+                          ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                          : isSelected
+                          ? "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400"
+                          : "text-[#37352f] dark:text-[#e6e6e4] hover:bg-gray-50 dark:hover:bg-[#2f2f2f]"
+                      }`}
+                    >
+                      <span>{mp.title}</span>
+                      {isCurrent && <span className="text-[10px] text-gray-400">현재</span>}
+                      {isSelected && !isCurrent && <Check size={14} className="text-blue-500" />}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+        <div className="px-5 py-3 border-t border-[#e9e9e7] dark:border-[#2f2f2f] flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 text-sm rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f] transition-colors"
+          >
+            취소
+          </button>
+          <button
+            disabled={!selected}
+            onClick={() => { if (selected) { onMove(selected); onClose(); } }}
+            className="flex-1 py-2 text-sm rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            이동
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Data row ─────────────────────────────────────────────────────────────────
 
 function DataRow({
@@ -624,13 +722,16 @@ function DataRow({
   statuses,
   onUpdate,
   onDelete,
+  onMove,
 }: {
   customer: Customer;
   statuses: StatusOption[];
   onUpdate: (updates: Partial<Omit<Customer, "id" | "created_at">>) => void;
   onDelete: () => void;
+  onMove: (targetMonthPageId: string | null) => void;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
 
   function handleDeleteClick() {
     if (confirmDelete) {
@@ -691,18 +792,34 @@ function DataRow({
         <TextCell value={customer.memo} onChange={(v) => onUpdate({ memo: v })} placeholder="메모" />
       </td>
       <td className="px-3 py-2">
-        <button
-          onClick={handleDeleteClick}
-          title={confirmDelete ? "한 번 더 클릭하면 삭제됩니다" : "삭제"}
-          className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-all ${
-            confirmDelete
-              ? "bg-red-500 text-white font-semibold animate-pulse"
-              : "text-[#c4c3bf] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-          }`}
-        >
-          <Trash2 size={12} />
-          {confirmDelete && "삭제?"}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowMoveModal(true)}
+            title="다른 달로 이동"
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-[#c4c3bf] hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all"
+          >
+            <ArrowRightLeft size={12} />
+          </button>
+          <button
+            onClick={handleDeleteClick}
+            title={confirmDelete ? "한 번 더 클릭하면 삭제됩니다" : "삭제"}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-all ${
+              confirmDelete
+                ? "bg-red-500 text-white font-semibold animate-pulse"
+                : "text-[#c4c3bf] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+            }`}
+          >
+            <Trash2 size={12} />
+            {confirmDelete && "삭제?"}
+          </button>
+        </div>
+        {showMoveModal && (
+          <MoveModal
+            currentMonthPageId={customer.monthPageId}
+            onMove={(targetId) => onMove(targetId)}
+            onClose={() => setShowMoveModal(false)}
+          />
+        )}
       </td>
     </tr>
   );
@@ -804,6 +921,7 @@ export default function CRMPage({
               statuses={customerStatuses}
               onUpdate={(updates) => updateCustomer(c.id, updates)}
               onDelete={() => deleteCustomer(c.id)}
+              onMove={(targetMonthPageId) => updateCustomer(c.id, { monthPageId: targetMonthPageId })}
             />
           ))}
           {showAddForm ? (
