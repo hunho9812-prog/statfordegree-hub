@@ -20,6 +20,7 @@ import {
   UserCog,
   ClipboardList,
   RefreshCw,
+  BarChart2,
 } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -121,6 +122,11 @@ export default function Sidebar() {
             <LayoutDashboard size={16} />
           </button>
         </Link>
+        <Link href="/statfordegree">
+          <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="스탯포디그리">
+            <BarChart2 size={16} />
+          </button>
+        </Link>
         <Link href="/tasks">
           <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="업무 보드">
             <CheckSquare size={16} />
@@ -189,13 +195,13 @@ export default function Sidebar() {
       <div className="flex items-center justify-between px-3 pt-3 pb-1">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs font-bold">S</span>
+            <span className="text-white text-xs font-bold">W</span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4] truncate leading-tight">
-              Statfordegree Hub
+              워코라
             </p>
-            <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] leading-tight">워크스페이스</p>
+            <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] leading-tight">통합 포털</p>
           </div>
         </div>
         <button
@@ -259,6 +265,13 @@ export default function Sidebar() {
           <div className={navItem(pathname === "/")}>
             <LayoutDashboard size={15} className="text-[#9b9a97]" />
             <span>홈</span>
+          </div>
+        </Link>
+
+        <Link href="/statfordegree">
+          <div className={navItem(pathname === "/statfordegree")}>
+            <BarChart2 size={15} className="text-[#9b9a97]" />
+            <span>스탯포디그리</span>
           </div>
         </Link>
 
