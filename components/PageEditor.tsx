@@ -650,7 +650,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
                   새 페이지
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {page.children.map((childId) => {
                   const child = pages[childId];
                   if (!child) return null;
@@ -658,20 +658,17 @@ export default function PageEditor({ pageId }: { pageId: string }) {
                     <button
                       key={childId}
                       onClick={() => router.push(`/p/${childId}`)}
-                      className="flex items-center gap-3 px-3 py-3 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] hover:bg-[rgba(55,53,47,0.04)] dark:hover:bg-[rgba(255,255,255,0.04)] text-left transition-colors group"
+                      className="flex flex-col items-start px-4 py-4 rounded-xl border border-[#e9e9e7] dark:border-[#3f3f3f] hover:shadow-md hover:-translate-y-0.5 text-left transition-all duration-150 group bg-white dark:bg-[#1e1e1c]"
                     >
-                      <span className="text-2xl flex-shrink-0 leading-none">{child.emoji}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[#37352f] dark:text-[#e6e6e4] truncate group-hover:text-black dark:group-hover:text-white transition-colors">
-                          {child.title || "제목 없음"}
+                      <span className="text-3xl leading-none mb-3">{child.emoji || "📄"}</span>
+                      <p className="text-sm font-medium text-[#37352f] dark:text-[#e6e6e4] line-clamp-2 group-hover:text-black dark:group-hover:text-white transition-colors">
+                        {child.title || "제목 없음"}
+                      </p>
+                      {child.children.length > 0 && (
+                        <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] mt-1">
+                          하위 페이지 {child.children.length}개
                         </p>
-                        {child.children.length > 0 && (
-                          <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] mt-0.5">
-                            하위 페이지 {child.children.length}개
-                          </p>
-                        )}
-                      </div>
-                      <ChevronRight size={15} className="text-[#c4c3bf] dark:text-[#4f4f4f] group-hover:text-[#9b9a97] transition-colors flex-shrink-0" />
+                      )}
                     </button>
                   );
                 })}

@@ -169,6 +169,14 @@ function doc(title: string, ...nodes: object[]) {
   });
 }
 
+function makeManualRootContent(): string {
+  return doc(
+    "메뉴얼",
+    calloutBlue("📋", "SPSS 분석 가이드 · 고객 응대 크레도 · 응대 체크리스트"),
+    p("아래 하위 페이지를 클릭해서 각 메뉴얼로 이동하세요.")
+  );
+}
+
 function makeAnalysisManualContent(): string {
   return doc(
     "분석 시 메뉴얼",
@@ -177,48 +185,28 @@ function makeAnalysisManualContent(): string {
     blist(
       "맨 왼쪽에 No 변수 만들어주기.",
       "인구통계 범주화 한 변수는 기존 인구통계 변수 바로 옆에 붙여주기.",
-      "EFA에서 삭제되는 문항, 역코딩 진행 후 원래 문항 등 분석에 사용하지 않는 문항은 맨 위로 옮겨놓기 (분석에 안 쓰이는 문항. 삭제 X)",
+      "EFA에서 삭제되는 문항, 역코딩 진행 후 원래 문항 등 분석에 사용하지 않는 문항은 맨 위로 옮겨놓기 (삭제 X)",
       "하위요인 네이밍 한 후 같은 하위요인끼리 뭉쳐놓기.",
       "평균 or 합계 계산할 때 '자기효능감 평균', '자기효능감합계' 등 '변수이름+평균' 형식으로 네이밍하기.",
-      "상위요인은 '전체평균', '전체합계' 붙이기 (상위요인과 하위요인 구분 위해)",
+      "상위요인은 '전체평균', '전체합계' 붙이기",
       "일반적 특성 각 범주 라벨링하기!"
     ),
     h2("⚠️ 분석 시 주의할 점"),
     blist(
-      "범주화 등 변수 수정 과정에서 원래 변수 삭제하지 않기 (AS 과정에서 원래 변수가 필요한 경우 많음)",
-      "데이터 수정 등의 작업 진행 후 이전 SPSS 파일 삭제하지 않고 히스토리 저장하기 (AS 과정에서 이전 데이터가 필요한 경우 많음)",
+      "범주화 등 변수 수정 과정에서 원래 변수 삭제하지 않기 (AS 과정에서 필요한 경우 많음)",
+      "데이터 수정 후 이전 SPSS 파일 삭제하지 않고 히스토리 저장하기",
       "시작 날짜에 고객님께 분석 시작한다고 언급하기",
-      "분석 시작하기 전 논문 주제, 자료분석방법 읽고 큰 틀 이해하기"
+      "분석 시작 전 논문 주제, 자료분석방법 읽고 큰 틀 이해하기"
     ),
     h2("📊 모논문 없을 때 표해석 양식"),
-    h3("소수점 자리수 / 소수점 앞 0 생략 여부"),
     blist(
-      "모든 분석에서 t/F, p는 #.000으로 작성해줍니다.",
-      "기술통계와 차이검정에서 최소값, 최대값, M(평균), SD(표준편차)의 경우 0.00으로 작성해줍니다.",
-      "유의확률 .000은 <.001로 바꿔줍니다!!"
+      "모든 분석에서 t/F, p는 #.000으로 작성",
+      "기술통계·차이검정의 M(평균), SD(표준편차)는 0.00으로 작성",
+      "유의확률 .000은 <.001로 바꾸기",
+      "표의 세로선은 모두 없애기",
+      "표와 해석 글씨는 바탕글로 통일 (AS 할 때 편함)"
     ),
-    h3("표 밑 유의확률"),
-    blist(
-      "표 밑의 유의확률 표시는 해당 표에서 어떤 유의확률 값이 나타났는지에 따라 다르게 써야합니다.",
-      "표의 세로선은 모두 없애줍니다.",
-      "표와 해석 글씨는 바탕글로 통일해줍니다 (AS 할 때 편함)"
-    ),
-    h3("빈도분석 표 형식"),
-    p("1. 어떤 분석을 진행하였고 표 몇 번에 해당하는지 서술"),
-    quote("응답자의 일반적 특성을 알아보기 위하여 빈도분석을 실시하였으며, 그 결과를 <표 1>과 같이 나타내었다."),
-    p("2. 각 변수마다 응답이 가장 많은 집단부터 가장 적은 집단 순서대로 빈도와 퍼센트를 서술해줍니다."),
-    h3("차이검정 표 형식"),
-    blist(
-      "표 형식: N, M, SD, t/F, p, Scheffe 순으로",
-      "ANOVA 결과는 유의한데(p가 0.05보다 작은데) 사후검정이 나눠지지 않으면 (n/a)로 기재.",
-      "사후검정 알파벳은 첫 집단부터 a, b, c…로 지정",
-      "ANOVA 결과는 유의하지 않으면(p가 0.05보다 큰데) 사후검정이 나눠지더라도 기재 X."
-    ),
-    h3("회귀분석 표 형식"),
-    blist(
-      "표 형식 → B, SE, β, t, p, VIF, R², 수정된 R², Durbin-Watson 모두 표기 (더미변수 투입한 경우 Ref도 표기)",
-    ),
-    quote("차이검정에서 유의한 차이를 보인 인구통계 변수를 통제변수로 투입한 후 다중회귀분석을 실시하였고 결과는 <표 >와 같다.\n\n먼저 다중공선성 검정을 위해 살펴본 분산팽창지수(VIF) 값은 모두 10 미만으로 나타나 다중공선성 문제는 없음을 확인하였다. 또한, Durbin-Watson 값은 2에 가까워 잔차의 자기상관성 문제도 없었다.")
+    p("각 분석별 표 형식 및 해석 틀은 하위 SPSS 페이지에서 확인하세요.")
   );
 }
 
@@ -229,133 +217,63 @@ function makeProcessManualContent(): string {
     h2("1] 엑셀 받고 데이터 클리닝 (이 부분 너무 중요함. 검토 여러 번..!)"),
     h3("1] 역문항, 하위문항 확인하기"),
     blist(
-      "어떤 문항이 역문항에 해당되는지, 각 척도는 어떤 하위문항으로 구성되어 있는지, 하위문항은 각각 몇 번에 해당하는지",
-      "변수계산은 평균이랑 합계 중 어떤 걸로 할지 확인하기 (연구계획서 척도 설명 부분에 나와있음. 없으면 물어보기)"
+      "어떤 문항이 역문항에 해당되는지, 각 척도는 어떤 하위문항으로 구성되어 있는지, 각 번호 확인",
+      "변수계산은 평균 or 합계 중 어떤 걸로 할지 확인 (연구계획서 척도 설명 부분)"
     ),
-    h3("2] 맨 왼쪽에 No 추가 (데이터마다 일련번호 부여하면 AS 시 작업이 용이함) — -obs"),
-    h3("3] 문항 번호 넣기 (열번호)"),
+    h3("2] 맨 왼쪽에 No 추가 (일련번호 부여)"),
+    h3("3] 문항 번호 넣기"),
     blist(
       "개인특성1, 개인특성2 …… (오른쪽 아래 드래그로 한 번에 가능)",
-      "위와 같이 번호만 바뀌는 문항명은 변수 계산 할 때 유리하다. ex) '변수계산'에서 sum(직무만족도1 to 직무만족도9)"
+      "예시: sum(직무만족도1 to 직무만족도9) — 직무만족도1부터 9까지 모두 더하는 함수"
     ),
-    h3("4] 설문지 보면서 한글을 숫자로 변경 (자동화 프로그램 사용 영상)"),
-    h3("5] 역코딩 후 변수계산 (자동화툴 사용 영상)"),
+    h3("4] 설문지 보면서 한글을 숫자로 변경 (자동화 프로그램 사용)"),
+    h3("5] 역코딩 후 변수계산"),
     h3("추가] 복수 응답 코딩 방법 (countif 함수 이용)"),
     h2("2] SPSS 연동 후 데이터 클리닝"),
     h3("1) 빈도분석으로 결측치 확인"),
     blist(
-      "인구통계변수(성별, 연령대)에 결측치가 있는 경우 물어보기",
-      "방법1: 가장 많이 응답한 숫자 넣기 (여성이 남성보다 많은 경우 결측치를 모두 여성으로 채움)",
-      "방법2: 결측치가 있는 응답자 삭제 (방법1보다 추천하지는 않음)",
-      "척도(ex. 직무만족도1)에 결측치가 있는 경우 그냥 넘어가면 됨. SPSS가 알아서 제외 후 평균내줌.",
-      "척도(ex. 직무만족도1) 오타 확인 — 문항 전체 빈도분석 돌려서 값 확인. 가끔 44, 55 등 오타 있음 → 4, 5로 수정"
+      "인구통계변수(성별, 연령대)에 결측치 있는 경우 고객님께 물어보기",
+      "방법1: 가장 많이 응답한 숫자 채우기 / 방법2: 결측치 있는 응답자 삭제",
+      "척도 결측치는 SPSS가 알아서 제외 후 평균내줌",
+      "오타 확인: 44, 55 등 이상 값 → 4, 5로 수정"
     ),
     h3("2) 기술통계로 이상치 확인"),
-    p("최소값과 최대값 확인 후 이상치 있는지 확인 (오타로 인해 44, 55 등의 숫자가 있을 수 있음). 어떻게 처리할지 고객에게 물어봄."),
-    h3("3) 역코딩 하기 (엑셀 파일에서 했으면 넘어가기)"),
-    p("SPSS로 역코딩하는 방법: 꼭 '다른 변수로 코딩 변경' 이용!"),
+    p("최소값·최대값 확인 후 이상치 처리 방법 고객에게 물어봄."),
+    h3("3) 역코딩 ('다른 변수로 코딩 변경' 이용!)"),
     h3("4) 신뢰도 분석"),
-    p("신뢰도가 0.6보다 낮은 경우 → 문항 삭제 or 데이터 수정 (3인톡방에 물어보기)"),
-    h3("5) 정규성 검정 (필수는 아님. 연구계획서에 정규성검정 or 비모수검정이 있다면 해줘야 함)"),
+    p("신뢰도 0.6 미만 → 문항 삭제 or 데이터 수정 (3인톡방에 물어보기)"),
+    h3("5) 정규성 검정 (연구계획서에 비모수검정이 있을 때만)"),
     blist(
-      "연구계획서에 비모수 검정이 있거나 정규성 검정을 시행한다고 적혀있다.",
-      "표본의 개수가 30 미만이다."
+      "연구계획서에 비모수 검정 or 정규성 검정이 적혀있는 경우",
+      "표본의 개수가 30 미만인 경우"
     ),
-    h2("3] 통계분석 (SPSS) — 하위 페이지 참고"),
-    h2("4] 통계분석 (AMOS) — 하위 페이지 참고"),
+    h2("3] 통계분석 → SPSS/AMOS 하위 페이지 참고"),
     h2("5] 메모 (도움말 남기기)"),
     p("해석 아카이브 형식과 동일하게, 고객님의 예시(빨간색 표시) 수정해주기."),
-    p("해석 작성 챗GPTs 링크: https://chatgpt.com/g/g-KBJrZ74Ld-seupodi-haeseog-jagseong-doumi")
+    p("해석 작성 챗GPTs: https://chatgpt.com/g/g-KBJrZ74Ld")
   );
 }
 
 function makeSpssContent(): string {
   return doc(
     "통계분석(SPSS)",
-    h2("SPSS 분석 항목"),
-    blist(
-      "2] 탐색적 요인분석 (EFA) — 이쁘게 안 묶이면 3인톡방에 말해주기",
-      "3] 교차검정",
-      "4] 빈도분석",
-      "4-1] 복수응답 빈도분석",
-      "5] 기술통계분석",
-      "6] 상관관계분석",
-      "7] 차이검정",
-      "8] 다중회귀분석",
-      "9] Baron&Kenny 이용한 매개효과",
-      "10] Baron&Kenny 이용한 조절효과 (+ 상호작용항 만들기)",
-      "10-1] 조절효과 그래프 만들기",
-      "11] 매개된 조절효과",
-      "12] 프로세스 매크로 (1, 4, 5, 6번)"
-    ),
-    h2("탐색적 요인분석 EFA"),
-    p("EFA가 잘 묶이지 않을 경우 대처 방법:"),
-    blist(
-      "1. 척도를 가져왔을 때 수정하지 않은 경우 EFA를 하지 않아도 되는 걸 말씀드리기.",
-      "2. 구조방정식 논문 진행하면 EFA 대신 CFA로 바로 넘어가기.",
-      "3. 죽어도 EFA를 해야한다 → 하위요인을 삭제하고 진행하기."
-    ),
-    h2("상관관계분석 해석 틀"),
-    p("상위요인 변수가 4개일 때: 외상후성장과 의도적반추 / 외상후성장과 자기노출 / 외상후성장과 사회적지지 / 의도적반추와 자기노출 / 의도적반추와 사회적지지 / 자기노출과 사회적지지 순서대로 서술."),
-    p("왼쪽 요인은 상위요인만, 오른쪽 요인은 상위요인과 하위요인 모두 언급."),
-    h2("다중회귀분석 해석 틀"),
-    quote("차이검정에서 유의한 차이를 보인 인구통계 변수를 통제변수로 투입한 후 다중회귀분석을 실시하였고 결과는 <표 >와 같다.\n\n먼저 다중공선성 검정을 위해 살펴본 분산팽창지수(VIF) 값은 모두 10 미만으로 나타나 다중공선성 문제는 없음을 확인하였다. 또한, Durbin-Watson 값은 2에 가까워 잔차의 자기상관성 문제도 없었다. 회귀모형의 설명력(R²)은 00%로 나타났으며, 모형은 통계적으로 유의한 것으로 확인되었다(F=, p<.001)."),
-    h2("프로세스 매크로"),
-    blist(
-      "Model 1: 조절효과",
-      "Model 4: 매개효과",
-      "Model 5: 조절된 직접효과",
-      "Model 6: 이중매개효과"
-    )
+    calloutBlue("📈", "각 분석방법을 클릭하면 상세 메뉴얼로 이동합니다"),
+    p("아래 하위 페이지를 클릭해서 각 분석 메뉴얼로 이동하세요.")
   );
 }
 
 function makeAmosContent(): string {
   return doc(
     "통계분석(AMOS)",
-    h2("AMOS 분석 항목"),
-    blist(
-      "1] CFA (확인적 요인분석)",
-      "2] 판별타당성",
-      "3] 구조방정식 (SEM)",
-      "4] AMOS 매개효과",
-      "5] AMOS 조절효과 (다중집단 비교분석)"
-    ),
-    h2("1] CFA 표해석 메뉴얼"),
-    h3("집중타당성 기준"),
-    blist(
-      "요인적재치: 사회과학 연구에서 .4 이상일 때 유의한 변수, .5 이상일 때 중요한 변수",
-      "C.R.(개념신뢰도): .7 이상이면 집중타당성 있음",
-      "AVE(평균분산추출): .5 이상일 때 수렴타당도 있음"
-    ),
-    p("AVE가 0.5보다 낮을 때: 문항 삭제를 통해 AVE를 올려본다. 도저히 안 올라가면 개념신뢰도가 0.6보다 높을 경우 타당도가 적절할 수 있다는 선행연구 인용 (Fornell & Larcker, 1981)."),
-    h3("모형적합도 기준"),
-    p("X² 통계량의 경우 p=0.000으로 적합도의 기준에 미치지 못하나, 샘플의 개수가 증가할수록 X² 값도 증가하게 되므로 다른 적합지수와 함께 고려하여 적합도를 판단하여야한다 (배병렬, 2014)"),
-    h3("오류: sample moment matrix is not positive definite"),
-    p("상관행렬을 계산할 수 없는 상태. 발생 이유: 1. 문항 하나가 분산이 0인 경우 / 2. 특정 변수가 다른 변수와 완전히 똑같거나 반대인 경우"),
-    h2("2] 판별타당성"),
-    p("판별타당성 충족 안 될 경우 (상관계수 > AVE 제곱근): 상관계수 ± 2×표준오차값이 1을 포함하지 않는지 확인하는 방법으로 2차 검증 수행."),
-    h2("4] AMOS 매개효과 관련 파일"),
-    blist(
-      "AMOS이용매개효과.pdf",
-      "AMOS이용다중매개논문.pdf",
-      "이중매개팬텀변수.pdf"
-    ),
-    h2("5] AMOS 조절효과 관련 파일"),
-    blist(
-      "측정동일성!amos조절효과_조충경님.pdf",
-      "측정동일성형태동일성_든든한고등어.pdf",
-      "amos다중집단비교분석.pdf"
-    )
+    calloutBlue("🔷", "AMOS 분석 메뉴얼 — CFA, 판별타당성, 구조방정식, 매개/조절효과"),
+    p("아래 하위 페이지를 클릭해서 각 분석 메뉴얼로 이동하세요.")
   );
 }
 
 function makePocketContent(): string {
   return doc(
     "통계주머니",
-    calloutBlue("🗨️", "통계주머니 — 자주 쓰는 자료 모음"),
-    h2("연구모형 제작 PPT"),
-    p("연구모형 예시.pptx 파일 첨부"),
+    calloutBlue("🗨️", "자주 쓰는 자료 모음"),
     h2("한글표 제작 꿀팁"),
     h3("단축키"),
     blist(
@@ -367,49 +285,361 @@ function makePocketContent(): string {
     blist(
       "입력방법: 입력 > 입력 도우미 > 상용구 > 상용구 내용",
       "사용방법: 준말 입력 후 Alt + i",
-      "예시 'd': R²=, Adj.R²=, F=, p<.001, Durbin-Watson=",
-      "예시 'k': Kaiser-Meyer-Olkin Measure of Sampling Adequacy"
+      "'d': R²=, Adj.R²=, F=, p<.001, Durbin-Watson=",
+      "'k': Kaiser-Meyer-Olkin Measure of Sampling Adequacy"
     ),
-    h3("표 폭 줄이기 (표 다이어트)"),
+    h3("표 폭 줄이기"),
     p("blog.naver.com/lavieenrose77/221967385573 참고"),
-    h2("Graph"),
-    p("조절효과그래프.xlsx 파일 첨부"),
     h2("엑셀(Excel) 함수"),
-    p("함수 종합.xlsx 파일 첨부"),
+    p("함수 종합.xlsx 파일 참고"),
+    h2("Graph"),
+    p("조절효과그래프.xlsx 파일 참고"),
     h2("IPA와 Borich 요구도"),
     h3("IPA 분석"),
-    blist(
-      "IPA 산출.xlsx 파일 참고",
-      "IPA 분석 예시.hwp 파일 참고"
-    ),
+    blist("IPA 산출.xlsx / IPA 분석 예시.hwp 파일 참고"),
     h3("Borich 요구도"),
-    blist(
-      "borich 요구도 산출.xlsx 파일 참고",
-      "Borich 요구도 예시.hwp 파일 참고"
-    ),
+    blist("borich 요구도 산출.xlsx / Borich 요구도 예시.hwp 파일 참고"),
     h2("분석 표 양식 주머니"),
-    p("각 분석에 대한 표 양식을 모아보았습니다. 모논문과 해당 모음집 참고하여 제작에 도움이 되셨으면 좋겠습니다."),
     blist(
       "SPSS: SPSS통계표메모아카이브.zip",
       "AMOS: AMOS.zip"
     ),
     h2("APA 형식"),
-    p("APA 형식이란 사회과학, 교육, 심리학 등 학문 분야에서 널리 쓰이는 표준 논문 작성 및 인용 스타일입니다. 간혹 APA 형식으로 작성을 부탁하시는 고객님이 계십니다."),
+    p("사회과학, 교육, 심리학 등 학문 분야의 표준 논문 작성 및 인용 스타일"),
     h2("국건영 메뉴얼"),
     p("blog.naver.com/kimpubli1214/224245377569 참고")
   );
 }
 
-function makeManualRootContent(): string {
+// ── SPSS 서브페이지 콘텐츠 ──────────────────────────────────────────────────
+
+function makeSpssEfaContent(): string {
   return doc(
-    "메뉴얼",
-    calloutBlue("📋", "SPSS 분석 가이드 · 고객 응대 크레도 · 응대 체크리스트"),
-    h2("📊 분석 시 메뉴얼"),
-    p("SPSS 파일 정리법, 분석 시 주의할 점, 표해석 양식, 분석과정 메뉴얼, SPSS/AMOS 통계분석 가이드, 통계주머니"),
-    h2("✅ 크레도 / 응대 체크리스트"),
-    p("고객 응대 크레도 6원칙, 응대 멘트 메뉴얼, 분석 중·표해석·결과물 전달 체크리스트")
+    "탐색적 요인분석 (EFA)",
+    calloutBlue("🔍", "EFA — Exploratory Factor Analysis"),
+    h2("EFA가 잘 묶이지 않을 경우 대처 방법"),
+    blist(
+      "1. 척도를 가져왔을 때 수정하지 않은 경우 → EFA를 하지 않아도 된다고 말씀드리기",
+      "2. 구조방정식 논문 진행하면 EFA 대신 CFA로 바로 넘어가기",
+      "3. 죽어도 EFA를 해야 한다 → 하위요인을 삭제하고 진행하기"
+    ),
+    h2("EFA 관련 블로그"),
+    p("[SPSS 결과 해석하기] 9. 탐색적 요인분석"),
+    p("blog.naver.com/kimpubli1214/223268804837")
   );
 }
+
+function makeSpssCrossContent(): string {
+  return doc(
+    "교차분석",
+    calloutBlue("✖️", "교차분석 — 범주형 변수 간 연관성 분석"),
+    h2("교차분석 시 주의사항"),
+    blist(
+      "기대빈도가 5 미만인 셀이 전체의 20%를 초과하지 않아야 함",
+      "Chi-square 검정 결과와 Cramer's V 효과크기 함께 보고"
+    ),
+    h2("해석 방법"),
+    p("χ²(df)=값, p=값 형태로 보고. 유의한 경우 각 범주별 비율 언급.")
+  );
+}
+
+function makeSpssFreqContent(): string {
+  return doc(
+    "빈도분석",
+    calloutBlue("📊", "빈도분석 — 일반적 특성 파악"),
+    h2("표 형식"),
+    blist(
+      "열: 구분 / 빈도 / 퍼센트",
+      "유의확률 없음 (빈도분석에는 p 값이 없음)"
+    ),
+    h2("해석 형식"),
+    h3("1. 어떤 분석을 진행하였고 표 몇 번에 해당하는지 서술"),
+    quote("응답자의 일반적 특성을 알아보기 위하여 빈도분석을 실시하였으며, 그 결과를 <표 1>과 같이 나타내었다."),
+    h3("2. 각 변수마다 응답이 가장 많은 집단부터 가장 적은 집단 순서대로 빈도와 퍼센트 서술"),
+    quote("성별에서는 여성이 127명(62.6%)으로 남성 76명(37.4%)보다 높은 비율을 차지하였다. 연령을 살펴보면, 30대가 68명(33.5%)으로 가장 많았으며, 이어 40대가 59명(29.1%), 20대가 37명(18.2%), 50대가 25명(12.3%), 10대가 14명(6.9%) 순으로 나타났다."),
+    h2("복수응답 빈도분석"),
+    p("SPSS: 분석 > 다중반응 > 빈도분석")
+  );
+}
+
+function makeSpssDescContent(): string {
+  return doc(
+    "기술통계",
+    calloutBlue("📉", "기술통계 — 평균, 표준편차 파악"),
+    h2("표 형식"),
+    blist(
+      "열: 변수명 / N / 최솟값 / 최댓값 / M / SD",
+      "M(평균), SD(표준편차)는 소수점 둘째 자리까지 (0.00 형식)"
+    ),
+    h2("해석 방법"),
+    p("각 변수의 평균과 표준편차를 보고하고, 측정 척도 범위 기준으로 해석.")
+  );
+}
+
+function makeSpssCorrContent(): string {
+  return doc(
+    "상관관계 분석",
+    calloutBlue("🔗", "상관관계 분석 — Pearson 상관계수"),
+    h2("표 형식"),
+    blist(
+      "대각선 기준 아래(또는 위) 삼각형만 표기",
+      "유의수준: * p<.05, ** p<.01, *** p<.001"
+    ),
+    h2("해석 순서 (상위요인 4개일 때)"),
+    p("A와 B / A와 C / A와 D / B와 C / B와 D / C와 D 순서로 서술"),
+    p("왼쪽 요인은 상위요인만, 오른쪽 요인은 상위요인과 하위요인 모두 언급"),
+    h2("해석 예시"),
+    quote("대상자의 외상 후 성장은 의도적 반추(r=.599, p<.01)와 유의한 정(+)의 상관관계를 나타냈다. 또한 자기노출(r=.319, p<.01)과 유의한 정(+)의 상관관계를 보였으며..."),
+    h2("참고 블로그"),
+    p("[SPSS 결과 해석하기] 3. 상관관계분석"),
+    p("blog.naver.com/kimpubli1214/223188535601")
+  );
+}
+
+function makeSpssDiffContent(): string {
+  return doc(
+    "차이검정",
+    calloutBlue("⚖️", "차이검정 — t검정, ANOVA"),
+    h2("표 형식"),
+    p("N, M, SD, t/F, p, Scheffe 순으로"),
+    blist(
+      "응답자 수가 1인 집단이라 표준편차가 0일 때 → 0.00으로 써주기"
+    ),
+    h2("⚠️ 사후검정 작성할 때 유의사항"),
+    blist(
+      "ANOVA 결과는 유의한데(p<.05) 사후검정이 나눠지지 않으면 (n/a)로 기재",
+      "사후검정 알파벳은 첫 집단부터 a, b, c… 로 지정",
+      "ANOVA 결과가 유의하지 않으면(p>.05) 사후검정이 나눠지더라도 기재 X"
+    ),
+    h2("해석 작성 순서"),
+    blist(
+      "1. 응답자의 일반적 특성에 따라 어떤 변수의 차이를 알아보는지 서술",
+      "2. 유의한 차이가 나타난 인구통계 변수와 차이가 나타나지 않은 변수 각각 모두 (t/F=, p=) 서술",
+      "3. 유의한 인구통계 변수만 가장 평균이 높은 집단과 낮은 집단 언급",
+      "4. Scheffe 사후검정 결과 서술"
+    )
+  );
+}
+
+function makeSpssRegContent(): string {
+  return doc(
+    "다중회귀분석",
+    calloutBlue("📐", "다중회귀분석 — Multiple Regression"),
+    h2("표 형식"),
+    p("B, SE, β, t, p, VIF, R², 수정된 R², Durbin-Watson 모두 표기"),
+    p("더미변수 투입한 경우 Ref도 표기"),
+    h2("해석 작성 틀"),
+    quote("차이검정에서 유의한 차이를 보인 인구통계 변수를 통제변수로 투입한 후 다중회귀분석을 실시하였고 결과는 <표 >와 같다."),
+    h3("1. 다중공선성 검정"),
+    quote("먼저 다중공선성 검정을 위해 살펴본 분산팽창지수(VIF) 값은 1.256~3.147로 모두 10 미만으로 나타나 변수 간의 다중공선성 문제는 없음을 확인하였다. 또한, Durbin-Watson 값은 2.202로 2에 가까워 잔차의 자기상관성 문제도 없었다."),
+    h3("2. 모형 적합도"),
+    quote("회귀모형의 설명력(R²)은 70.7%로 나타났으며, 모형은 통계적으로 유의한 것으로 확인되었다(F=21.664, p<.001)."),
+    h3("3. 유의한 독립변수 서술"),
+    quote("회귀분석 결과, 태도요인(β=.351, t=5.203, p<.001), 경험요인(β=.259, t=3.531, p=.001)이 유의한 정(+)의 영향을 미치는 것으로 나타났다."),
+    h2("더미변수 참고"),
+    p("blog.naver.com/kimpubli1214— SPSS로 더미변수 만드는 방법")
+  );
+}
+
+function makeSpssMedContent(): string {
+  return doc(
+    "매개효과",
+    calloutBlue("🔀", "매개효과 — Baron & Kenny / PROCESS Macro 4번"),
+    h2("Baron & Kenny 매개효과"),
+    blist(
+      "1단계: X → Y 회귀분석 (유의해야 함)",
+      "2단계: X → M 회귀분석 (유의해야 함)",
+      "3단계: X, M → Y 회귀분석",
+      "매개효과: 3단계에서 X의 β가 감소하면 매개 (완전 or 부분)"
+    ),
+    h2("참고 블로그"),
+    p("[SPSS 결과 해석하기] 7. 매개효과 위계적 회귀분석"),
+    p("blog.naver.com/kimpubli1214/223251339862"),
+    h2("PROCESS Macro 4번 매개효과"),
+    p("PROCESS Macro 4번으로 매개효과 검증하기 — blog.naver.com/kimpubli1214"),
+    h2("이중매개 (PROCESS Macro 6번)"),
+    p("[SPSS 결과 해석하기] 8. 프로세스 매크로 6번 이중매개효과"),
+    p("blog.naver.com/kimpubli1214/223252381973")
+  );
+}
+
+function makeSpssModContent(): string {
+  return doc(
+    "조절효과",
+    calloutBlue("🎛️", "조절효과 — Baron & Kenny / PROCESS Macro 1번"),
+    h2("Baron & Kenny 조절효과"),
+    blist(
+      "1단계: X → Y",
+      "2단계: X, M → Y",
+      "3단계: X, M, X×M → Y (상호작용항 투입)",
+      "X×M(상호작용항)이 유의하면 조절효과 있음"
+    ),
+    h2("PROCESS Macro 1번 표 형식"),
+    p("step1: X → Y / step2: X, M → Y / step3: X, M, X×M → Y"),
+    h2("PROCESS Macro 1번 해석 틀"),
+    quote("대인관계성향이 외모관리행동에 미치는 영향에서 연령의 조절효과를 검증하기 위해 위계적 회귀분석을 실시한 결과를 <표 9>에 제시하였다. 1단계에서는 독립변인인 대인관계성향이 외모관리행동에 미치는 영향을 검증하였고, 2단계에서는 독립변인인 대인관계성향과 조절변인인 연령이 외모관리행동에 미치는 영향을 분석하였다. 3단계에서는 대인관계성향과 연령의 상호작용항을 추가로 투입하여 외모관리행동에 미치는 영향을 검증하였다."),
+    h2("조절효과 그래프 만들기"),
+    blist(
+      "그래프 만들기: blog.naver.com/kimpubli1214/222964405846",
+      "논문 형식으로 가공하기: blog.naver.com/kimpubli1214/224060096428"
+    ),
+    h2("매개된 조절효과"),
+    blist(
+      "Muller et al.(2005)의 접근법 (SPSS 위계적회귀분석)"
+    )
+  );
+}
+
+function makeSpssProcContent(): string {
+  return doc(
+    "PROCESS Macro",
+    calloutBlue("⚙️", "PROCESS Macro — Hayes (2013)"),
+    h2("모델 번호"),
+    blist(
+      "Model 1: 조절효과",
+      "Model 4: 매개효과 (단순/이중)",
+      "Model 5: 조절된 직접효과",
+      "Model 6: 이중매개효과"
+    ),
+    h2("공통 주의사항"),
+    blist(
+      "PROCESS 실행 전 반드시 변수 계산 완료 확인",
+      "부트스트래핑 횟수: 5,000 이상 권장",
+      "신뢰구간(95% CI)이 0을 포함하지 않으면 유의"
+    ),
+    h2("Model 4 매개효과 해석"),
+    p("직접효과(c')와 간접효과(a×b) 보고. Boot CI가 0 미포함이면 간접효과 유의."),
+    h2("Model 1 조절효과 해석"),
+    p("상호작용 계수(B)가 유의하고 CI가 0 미포함이면 조절효과 있음."),
+    h2("Model 6 이중매개 해석"),
+    p("blog.naver.com/kimpubli1214/223252381973 참고")
+  );
+}
+
+// ── AMOS 서브페이지 콘텐츠 ──────────────────────────────────────────────────
+
+function makeAmosCfaContent(): string {
+  return doc(
+    "CFA (확인적 요인분석)",
+    calloutBlue("🔷", "CFA — Confirmatory Factor Analysis"),
+    h2("집중타당성 기준"),
+    blist(
+      "요인적재치: .4 이상 유의, .5 이상 중요 (최현철, 2016)",
+      "C.R.(개념신뢰도): .7 이상",
+      "AVE(평균분산추출): .5 이상"
+    ),
+    h2("AVE가 0.5보다 낮을 때"),
+    quote("평균분산추출(AVE)값이 0.5보다 낮게 나왔을 때 개념 신뢰도가 0.6보다 높을 경우 타당도가 적절할 수 있다는 선행연구에 따라 집중타당성이 있다고 판단하였다(Fornell & Larcker, 1981)."),
+    blist(
+      "1. 문항 삭제를 통해 AVE를 올려본다",
+      "2. 도저히 안 올라가면 위의 인용구 사용"
+    ),
+    h2("모형적합도 기준"),
+    p("X²: p=.000이어도 표본 크기 때문일 수 있음 → 다른 지수와 함께 판단 (배병렬, 2014)"),
+    blist(
+      "CFI / TLI: .90 이상",
+      "RMSEA: .08 이하",
+      "SRMR: .08 이하"
+    ),
+    h2("오류: sample moment matrix is not positive definite"),
+    blist(
+      "원인 1: 문항 하나가 분산이 0인 경우 (ex. 100명 전원이 같은 점수)",
+      "원인 2: 특정 변수가 다른 변수와 완전히 동일하거나 반대"
+    ),
+    h2("AVE & CR 계산 방법"),
+    blist(
+      "1) 스탯지니 접속 — stat-genie.com",
+      "2) 표준화 요인적재량 입력",
+      "3) 결과 확인 (AVE, CR 자동 계산)"
+    )
+  );
+}
+
+function makeAmosDiscContent(): string {
+  return doc(
+    "판별타당성",
+    calloutBlue("✅", "판별타당성 — Discriminant Validity"),
+    h2("판별타당성 기준"),
+    p("상관계수의 제곱값이 AVE보다 작아야 함 (Fornell & Larcker, 1981)"),
+    p("또는: 상관계수 ± 2 × 표준오차 의 신뢰구간에 1이 포함되지 않아야 함"),
+    h2("판별타당성이 충족 안 될 경우"),
+    quote("본 연구의 측정모델 내 판별타당성 검증을 위해 변수 간 상관관계를 확인한 결과, 태도와 이용의도의 상관계수가 AVE 제곱근을 상회하는 것으로 나타나 판별타당성을 확보하지 못함을 알 수 있었다. 이에 변수 간 상관계수의 신뢰구간을 확인하는 방법을 적용하여 판별타당성에 대한 2차 검증을 수행하였다.\n\n측정변수의 신뢰구간을 상관계수±2 × 표준오차값으로 산출하여 확인한 결과, 모든 변수의 상관계수 신뢰구간 내에 1이 포함되지 않는 것으로 나타나 측정모델의 판별타당성 기준을 충족하고 판별타당성을 확보하였다."),
+    h2("표 채우는 방법"),
+    blist(
+      "1. 상관관계 채우기 (상관관계 분석 과정과 동일)",
+      "2. AVE 제곱근 계산: stat-genie.com에서 표준화 요인적재량 입력 후 확인",
+      "3. 대각선에 AVE 제곱근 기입"
+    )
+  );
+}
+
+function makeAmosSemContent(): string {
+  return doc(
+    "구조방정식 (SEM)",
+    calloutBlue("🔗", "SEM — Structural Equation Modeling"),
+    h2("분석 순서"),
+    blist(
+      "1. CFA로 측정모형 확인",
+      "2. 판별타당성 확인",
+      "3. 구조방정식 모형 설정 및 실행",
+      "4. 모형적합도 확인 및 보고",
+      "5. 경로계수 보고"
+    ),
+    h2("표 형식"),
+    blist(
+      "열: 경로 (변수명 → 변수명) / B / β / S.E. / C.R. / p",
+      "모형적합도: χ², df, p, CFI, TLI, RMSEA, SRMR 보고"
+    ),
+    h2("모형적합도 기재 방법"),
+    blist(
+      "1. AMOS 결과 파일에서 Model Fit 탭 확인",
+      "2. 표에 기재 (모논문 형식 우선)"
+    ),
+    h2("참고"),
+    p("CFA와 구조방정식 모형적합도가 동일한 논문 참고")
+  );
+}
+
+function makeAmosMedContent(): string {
+  return doc(
+    "AMOS 매개효과",
+    calloutBlue("🔀", "AMOS 매개효과 — Bootstrapping"),
+    h2("분석 방법"),
+    blist(
+      "Bootstrapping으로 간접효과 유의성 검정",
+      "팬텀 변수(Phantom Variable) 방법으로 이중매개 검증"
+    ),
+    h2("관련 파일"),
+    blist(
+      "AMOS이용매개효과.pdf",
+      "AMOS이용다중매개논문.pdf",
+      "이중매개팬텀변수.pdf"
+    )
+  );
+}
+
+function makeAmosModContent(): string {
+  return doc(
+    "AMOS 조절효과",
+    calloutBlue("🎛️", "AMOS 조절효과 — 다중집단 비교분석"),
+    h2("측정동일성 검증 순서"),
+    blist(
+      "1. 형태동일성 (Configural Invariance): 자유모형",
+      "2. 측정동일성 (Metric Invariance): 요인부하량 동일 제약",
+      "3. 구조동일성 (Scalar Invariance): 절편 동일 제약",
+      "각 단계마다 CFI 차이 .01 이하, RMSEA 차이 .015 이하 확인"
+    ),
+    h2("관련 파일"),
+    blist(
+      "측정동일성!amos조절효과_조충경님.pdf",
+      "측정동일성형태동일성_든든한고등어.pdf",
+      "측정동일성형태동일성구조동일성amos_김민경님.pdf",
+      "amos다중집단비교분석.pdf"
+    )
+  );
+}
+
+
 
 function makeChecklistContent(): string {
   return doc(
@@ -833,6 +1063,56 @@ export async function runMigrationIfNeeded(): Promise<void> {
   console.log(
     `[Migration] 완료: pages ${localUserPages.length}개, tasks ${localUserTasks.length}개, customers ${localUserCustomers.length}개 처리`
   );
+}
+
+const FORCE_RESEED_V9_FLAG = "manual_force_reseed_v9";
+
+export async function forceReseedManualPages(): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+  if (typeof window === "undefined") return;
+  if (localStorage.getItem(FORCE_RESEED_V9_FLAG) === "true") return;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+
+  const seeds: Record<string, string> = {
+    [MENU_IDS.MANUAL]: makeManualRootContent(),
+    [MENU_IDS.MANUAL_ANALYSIS]: makeAnalysisManualContent(),
+    [MENU_IDS.MANUAL_PROCESS]: makeProcessManualContent(),
+    [MENU_IDS.MANUAL_SPSS]: makeSpssContent(),
+    [MENU_IDS.MANUAL_SPSS_EFA]: makeSpssEfaContent(),
+    [MENU_IDS.MANUAL_SPSS_CROSS]: makeSpssCrossContent(),
+    [MENU_IDS.MANUAL_SPSS_FREQ]: makeSpssFreqContent(),
+    [MENU_IDS.MANUAL_SPSS_DESC]: makeSpssDescContent(),
+    [MENU_IDS.MANUAL_SPSS_CORR]: makeSpssCorrContent(),
+    [MENU_IDS.MANUAL_SPSS_DIFF]: makeSpssDiffContent(),
+    [MENU_IDS.MANUAL_SPSS_REG]: makeSpssRegContent(),
+    [MENU_IDS.MANUAL_SPSS_MED]: makeSpssMedContent(),
+    [MENU_IDS.MANUAL_SPSS_MOD]: makeSpssModContent(),
+    [MENU_IDS.MANUAL_SPSS_PROC]: makeSpssProcContent(),
+    [MENU_IDS.MANUAL_AMOS]: makeAmosContent(),
+    [MENU_IDS.MANUAL_AMOS_CFA]: makeAmosCfaContent(),
+    [MENU_IDS.MANUAL_AMOS_DISC]: makeAmosDiscContent(),
+    [MENU_IDS.MANUAL_AMOS_SEM]: makeAmosSemContent(),
+    [MENU_IDS.MANUAL_AMOS_MED]: makeAmosMedContent(),
+    [MENU_IDS.MANUAL_AMOS_MOD]: makeAmosModContent(),
+    [MENU_IDS.MANUAL_POCKET]: makePocketContent(),
+    [MENU_IDS.MANUAL_CHECKLIST]: makeChecklistContent(),
+  };
+
+  const state = useWorkspaceStore.getState();
+  const ops: Promise<void>[] = [];
+  for (const [id, content] of Object.entries(seeds)) {
+    const page = state.pages[id];
+    if (page) {
+      const updated = { ...page, content, updatedAt: new Date().toISOString() };
+      ops.push(dbPages.upsert(updated));
+    }
+  }
+  if (ops.length > 0) await Promise.all(ops);
+
+  localStorage.setItem(FORCE_RESEED_V9_FLAG, "true");
+  await useWorkspaceStore.getState().loadFromSupabase();
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -1400,7 +1680,22 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           [MENU_IDS.MANUAL_ANALYSIS]: makeAnalysisManualContent(),
           [MENU_IDS.MANUAL_PROCESS]: makeProcessManualContent(),
           [MENU_IDS.MANUAL_SPSS]: makeSpssContent(),
+          [MENU_IDS.MANUAL_SPSS_EFA]: makeSpssEfaContent(),
+          [MENU_IDS.MANUAL_SPSS_CROSS]: makeSpssCrossContent(),
+          [MENU_IDS.MANUAL_SPSS_FREQ]: makeSpssFreqContent(),
+          [MENU_IDS.MANUAL_SPSS_DESC]: makeSpssDescContent(),
+          [MENU_IDS.MANUAL_SPSS_CORR]: makeSpssCorrContent(),
+          [MENU_IDS.MANUAL_SPSS_DIFF]: makeSpssDiffContent(),
+          [MENU_IDS.MANUAL_SPSS_REG]: makeSpssRegContent(),
+          [MENU_IDS.MANUAL_SPSS_MED]: makeSpssMedContent(),
+          [MENU_IDS.MANUAL_SPSS_MOD]: makeSpssModContent(),
+          [MENU_IDS.MANUAL_SPSS_PROC]: makeSpssProcContent(),
           [MENU_IDS.MANUAL_AMOS]: makeAmosContent(),
+          [MENU_IDS.MANUAL_AMOS_CFA]: makeAmosCfaContent(),
+          [MENU_IDS.MANUAL_AMOS_DISC]: makeAmosDiscContent(),
+          [MENU_IDS.MANUAL_AMOS_SEM]: makeAmosSemContent(),
+          [MENU_IDS.MANUAL_AMOS_MED]: makeAmosMedContent(),
+          [MENU_IDS.MANUAL_AMOS_MOD]: makeAmosModContent(),
           [MENU_IDS.MANUAL_POCKET]: makePocketContent(),
           [MENU_IDS.MANUAL_CHECKLIST]: makeChecklistContent(),
         };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useWorkspaceStore, runMigrationIfNeeded } from "@/lib/store";
+import { useWorkspaceStore, runMigrationIfNeeded, forceReseedManualPages } from "@/lib/store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -45,7 +45,9 @@ export function useSupabaseInit() {
 
     // 최초 로드: 마이그레이션 먼저 실행 후 Supabase 데이터 로드
     // runMigrationIfNeeded: localStorage 데이터를 Supabase로 한 번만 업로드 (각 기기별)
-    runMigrationIfNeeded().then(() => loadFromSupabase());
+    runMigrationIfNeeded()
+      .then(() => forceReseedManualPages())
+      .then(() => loadFromSupabase());
 
     // 300ms 디바운스 재로드: 연속 이벤트를 하나의 fetch로 묶음
     const scheduleReload = () => {
