@@ -1,8 +1,10 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
+import type { NodeViewProps } from "@tiptap/react";
 
-function VideoView({ node }: { node: { attrs: { src: string; title: string } } }) {
-  const { src, title } = node.attrs;
+function VideoView({ node }: NodeViewProps) {
+  const src = node.attrs.src as string;
+  const title = node.attrs.title as string;
   const isYoutube = /youtube\.com|youtu\.be/.test(src);
   const embedSrc = isYoutube
     ? src.replace("watch?v=", "embed/").replace("youtu.be/", "www.youtube.com/embed/")
