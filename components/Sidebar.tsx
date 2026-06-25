@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   FileText,
   CheckSquare,
   Users,
@@ -34,6 +35,7 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [statOpen, setStatOpen] = useState(true);
 
   const { pages, rootPageIds, createPage, darkMode, toggleDarkMode, syncNow, isRefreshing, syncError } = useWorkspaceStore();
   const { user, profile, signOut } = useAuth();
@@ -137,7 +139,7 @@ export default function Sidebar() {
             <Users size={16} />
           </button>
         </Link>
-        <Link href="/p/menu-manual">
+        <Link href="/manual">
           <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="메뉴얼">
             <BookOpen size={16} />
           </button>
@@ -268,33 +270,57 @@ export default function Sidebar() {
           </div>
         </Link>
 
-        <Link href="/statfordegree">
-          <div className={navItem(pathname === "/statfordegree")}>
+        {/* 스탯포디그리 아코디언 */}
+        <div>
+          <button
+            onClick={() => setStatOpen((v) => !v)}
+            className={cn(
+              "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-colors",
+              hover,
+              (pathname === "/statfordegree" || pathname === "/tasks" || pathname === "/crm" || pathname === "/manual" || pathname === "/p/menu-manual")
+                ? "bg-[rgba(55,53,47,0.08)] dark:bg-[rgba(255,255,255,0.06)] text-[#37352f] dark:text-[#e6e6e4]"
+                : "text-[#37352f] dark:text-[#e6e6e4]"
+            )}
+          >
             <BarChart2 size={15} className="text-[#9b9a97]" />
-            <span>스탯포디그리</span>
-          </div>
-        </Link>
+            <span className="flex-1 text-left">스탯포디그리</span>
+            <ChevronDown
+              size={14}
+              className={cn("text-[#9b9a97] transition-transform duration-200", statOpen ? "rotate-0" : "-rotate-90")}
+            />
+          </button>
 
-        <Link href="/tasks">
-          <div className={navItem(pathname === "/tasks")}>
-            <CheckSquare size={15} className="text-[#9b9a97]" />
-            <span>업무 보드</span>
-          </div>
-        </Link>
+          {statOpen && (
+            <div className="ml-3 mt-0.5 mb-0.5 relative">
+              {/* 연결선 */}
+              <div className="absolute left-[7px] top-0 bottom-0 w-px bg-[#e9e9e7] dark:bg-[#3f3f3f]" />
 
-        <Link href="/crm">
-          <div className={navItem(pathname === "/crm")}>
-            <Users size={15} className="text-[#9b9a97]" />
-            <span>고객관리</span>
-          </div>
-        </Link>
+              <Link href="/tasks">
+                <div className={cn(navItem(pathname === "/tasks"), "pl-5 relative")}>
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[14px] h-px bg-[#e9e9e7] dark:bg-[#3f3f3f]" />
+                  <CheckSquare size={14} className="text-[#9b9a97]" />
+                  <span>업무 보드</span>
+                </div>
+              </Link>
 
-        <Link href="/p/menu-manual">
-          <div className={navItem(pathname === "/manual" || pathname === "/p/menu-manual")}>
-            <BookOpen size={15} className="text-[#9b9a97]" />
-            <span>메뉴얼</span>
-          </div>
-        </Link>
+              <Link href="/crm">
+                <div className={cn(navItem(pathname === "/crm"), "pl-5 relative")}>
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[14px] h-px bg-[#e9e9e7] dark:bg-[#3f3f3f]" />
+                  <Users size={14} className="text-[#9b9a97]" />
+                  <span>고객관리</span>
+                </div>
+              </Link>
+
+              <Link href="/manual">
+                <div className={cn(navItem(pathname === "/manual" || pathname === "/p/menu-manual"), "pl-5 relative")}>
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[14px] h-px bg-[#e9e9e7] dark:bg-[#3f3f3f]" />
+                  <BookOpen size={14} className="text-[#9b9a97]" />
+                  <span>메뉴얼</span>
+                </div>
+              </Link>
+            </div>
+          )}
+        </div>
 
         <Link href="/admin">
           <div className={navItem(pathname === "/admin")}>
