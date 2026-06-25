@@ -17,6 +17,9 @@ import { isSupabaseConfigured, supabase } from "./supabase";
 export const MENU_IDS = {
   MANUAL: "menu-manual",
   MANUAL_ANALYSIS: "menu-manual-analysis",
+  MANUAL_ANALYSIS_FILES: "menu-manual-analysis-files",
+  MANUAL_ANALYSIS_CAUTION: "menu-manual-analysis-caution",
+  MANUAL_ANALYSIS_FORMAT: "menu-manual-analysis-format",
   MANUAL_PROCESS: "menu-manual-process",
   MANUAL_SPSS: "menu-manual-spss",
   MANUAL_SPSS_EFA: "menu-manual-spss-efa",
@@ -196,35 +199,68 @@ function makeManualRootContent(): string {
 function makeAnalysisManualContent(): string {
   return doc(
     "분석 시 메뉴얼",
-    calloutYellow("분석 시작 전 반드시 숙지하세요."),
-    toggleH2("📁 SPSS 파일 정리법",
-      blist(
-        "맨 왼쪽에 No 변수 만들어주기.",
-        "인구통계 범주화 한 변수는 기존 인구통계 변수 바로 옆에 붙여주기.",
-        "EFA에서 삭제되는 문항, 역코딩 진행 후 원래 문항 등 분석에 사용하지 않는 문항은 맨 위로 옮겨놓기 (삭제 X)",
-        "하위요인 네이밍 한 후 같은 하위요인끼리 뭉쳐놓기.",
-        "평균 or 합계 계산할 때 '자기효능감 평균', '자기효능감합계' 등 '변수이름+평균' 형식으로 네이밍하기.",
-        "상위요인은 '전체평균', '전체합계' 붙이기",
-        "일반적 특성 각 범주 라벨링하기!"
-      )
-    ),
-    toggleH2("⚠️ 분석 시 주의할 점",
-      blist(
-        "범주화 등 변수 수정 과정에서 원래 변수 삭제하지 않기 (AS 과정에서 필요한 경우 많음)",
-        "데이터 수정 후 이전 SPSS 파일 삭제하지 않고 히스토리 저장하기",
-        "시작 날짜에 고객님께 분석 시작한다고 언급하기",
-        "분석 시작 전 논문 주제, 자료분석방법 읽고 큰 틀 이해하기"
-      )
-    ),
-    toggleH2("📊 모논문 없을 때 표해석 양식",
+    calloutYellow("분석 시작 전 반드시 숙지하세요. 아래 하위 페이지를 클릭해 각 항목을 확인하세요."),
+    p("아래 하위 페이지를 클릭하면 세부 내용을 확인할 수 있습니다.")
+  );
+}
+
+function makeAnalysisFilesContent(): string {
+  return doc(
+    "📁 SPSS 파일 정리법",
+    blist(
+      "맨 왼쪽에 No 변수 만들어주기.",
+      "인구통계 범주화 한 변수는 기존 인구통계 변수 바로 옆에 붙여주기.",
+      "EFA에서 삭제되는 문항, 역코딩 진행 후 원래 문항 등 분석에 사용하지 않는 문항은 맨 위로 옮겨놓기 (삭제 X)",
+      "하위요인 네이밍 한 후 같은 하위요인끼리 뭉쳐놓기.",
+      "평균 or 합계 계산할 때 '자기효능감 평균', '자기효능감합계' 등 '변수이름+평균' 형식으로 네이밍하기.",
+      "상위요인은 '전체평균', '전체합계' 붙이기",
+      "일반적 특성 각 범주 라벨링하기!"
+    )
+  );
+}
+
+function makeAnalysisCautionContent(): string {
+  return doc(
+    "⚠️ 분석 시 주의할 점",
+    blist(
+      "범주화 등 변수 수정 과정에서 원래 변수 삭제하지 않기 (AS 과정에서 필요한 경우 많음)",
+      "데이터 수정 후 이전 SPSS 파일 삭제하지 않고 히스토리 저장하기",
+      "시작 날짜에 고객님께 분석 시작한다고 언급하기",
+      "분석 시작 전 논문 주제, 자료분석방법 읽고 큰 틀 이해하기"
+    )
+  );
+}
+
+function makeAnalysisFormatContent(): string {
+  return doc(
+    "📊 모논문 없을 때 표해석 양식",
+    toggleH2("소수점 · 표기 기본 규칙",
       blist(
         "모든 분석에서 t/F, p는 #.000으로 작성",
         "기술통계·차이검정의 M(평균), SD(표준편차)는 0.00으로 작성",
         "유의확률 .000은 <.001로 바꾸기",
         "표의 세로선은 모두 없애기",
         "표와 해석 글씨는 바탕글로 통일 (AS 할 때 편함)"
+      )
+    ),
+    toggleH2("빈도분석 표 형식",
+      p("1. 어떤 분석을 진행하였고 표 몇 번에 해당하는지 서술"),
+      quote("응답자의 일반적 특성을 알아보기 위하여 빈도분석을 실시하였으며, 그 결과를 <표 1>과 같이 나타내었다."),
+      p("2. 각 변수마다 응답이 가장 많은 집단부터 가장 적은 집단 순서대로 빈도와 퍼센트를 서술해줍니다.")
+    ),
+    toggleH2("차이검정 표 형식",
+      blist(
+        "표 형식: N, M, SD, t/F, p, Scheffe 순으로",
+        "ANOVA 결과는 유의한데(p<0.05) 사후검정이 나눠지지 않으면 (n/a)로 기재.",
+        "사후검정 알파벳은 첫 집단부터 a, b, c…로 지정",
+        "ANOVA 결과는 유의하지 않으면(p>0.05) 사후검정이 나눠지더라도 기재 X."
+      )
+    ),
+    toggleH2("회귀분석 표 형식",
+      blist(
+        "표 형식 → B, SE, β, t, p, VIF, R², 수정된 R², Durbin-Watson 모두 표기 (더미변수 투입한 경우 Ref도 표기)",
       ),
-      p("각 분석별 표 형식 및 해석 틀은 하위 SPSS 페이지에서 확인하세요.")
+      quote("차이검정에서 유의한 차이를 보인 인구통계 변수를 통제변수로 투입한 후 다중회귀분석을 실시하였고 결과는 <표 >와 같다.\n\n먼저 다중공선성 검정을 위해 살펴본 분산팽창지수(VIF) 값은 모두 10 미만으로 나타나 다중공선성 문제는 없음을 확인하였다. 또한, Durbin-Watson 값은 2에 가까워 잔차의 자기상관성 문제도 없었다.")
     )
   );
 }
@@ -302,52 +338,76 @@ function makePocketContent(): string {
   return doc(
     "통계주머니",
     calloutBlue("🗨️", "자주 쓰는 자료 모음"),
-    toggleH2("한글표 제작 꿀팁",
-      toggleH3("단축키",
-        blist(
-          "드래그 후 Alt + Shift + Enter — 윗첨자 변경",
-          "표 열 추가: Ctrl + Enter",
-          "표 열 제거: Ctrl + Backspace"
-        )
-      ),
-      toggleH3("상용구 사용법",
-        blist(
-          "입력방법: 입력 > 입력 도우미 > 상용구 > 상용구 내용",
-          "사용방법: 준말 입력 후 Alt + i",
-          "'d': R²=, Adj.R²=, F=, p<.001, Durbin-Watson=",
-          "'k': Kaiser-Meyer-Olkin Measure of Sampling Adequacy"
-        )
-      ),
-      toggleH3("표 폭 줄이기",
-        p("blog.naver.com/lavieenrose77/221967385573 참고")
-      )
-    ),
-    toggleH2("엑셀(Excel) 함수",
-      p("함수 종합.xlsx 파일 참고")
-    ),
-    toggleH2("Graph",
-      p("조절효과그래프.xlsx 파일 참고")
-    ),
-    toggleH2("IPA와 Borich 요구도",
-      toggleH3("IPA 분석",
-        blist("IPA 산출.xlsx / IPA 분석 예시.hwp 파일 참고")
-      ),
-      toggleH3("Borich 요구도",
-        blist("borich 요구도 산출.xlsx / Borich 요구도 예시.hwp 파일 참고")
-      )
-    ),
-    toggleH2("분석 표 양식 주머니",
+    p("아래 하위 페이지를 클릭하면 각 항목의 세부 내용을 확인할 수 있습니다.")
+  );
+}
+
+function makePocketTableContent(): string {
+  return doc(
+    "한글표 제작 꿀팁",
+    toggleH2("단축키",
       blist(
-        "SPSS: SPSS통계표메모아카이브.zip",
-        "AMOS: AMOS.zip"
+        "드래그 후 Alt + Shift + Enter — 윗첨자 변경",
+        "표 열 추가: Ctrl + Enter",
+        "표 열 제거: Ctrl + Backspace"
       )
     ),
-    toggleH2("APA 형식",
-      p("사회과학, 교육, 심리학 등 학문 분야의 표준 논문 작성 및 인용 스타일")
+    toggleH2("상용구 사용법",
+      blist(
+        "입력방법: 입력 > 입력 도우미 > 상용구 > 상용구 내용",
+        "사용방법: 준말 입력 후 Alt + i",
+        "'d': R²=, Adj.R²=, F=, p<.001, Durbin-Watson=",
+        "'k': Kaiser-Meyer-Olkin Measure of Sampling Adequacy"
+      )
     ),
-    toggleH2("국건영 메뉴얼",
-      p("blog.naver.com/kimpubli1214/224245377569 참고")
+    toggleH2("표 폭 줄이기",
+      p("blog.naver.com/lavieenrose77/221967385573 참고")
     )
+  );
+}
+
+function makePocketExcelContent(): string {
+  return doc(
+    "Excel 함수",
+    p("함수 종합.xlsx 파일 참고")
+  );
+}
+
+function makePocketGraphContent(): string {
+  return doc(
+    "Graph 자료",
+    p("조절효과그래프.xlsx 파일 참고")
+  );
+}
+
+function makePocketIpaContent(): string {
+  return doc(
+    "IPA 분석",
+    blist("IPA 산출.xlsx / IPA 분석 예시.hwp 파일 참고")
+  );
+}
+
+function makePocketBorichContent(): string {
+  return doc(
+    "Borich 요구도",
+    blist("borich 요구도 산출.xlsx / Borich 요구도 예시.hwp 파일 참고")
+  );
+}
+
+function makePocketFormContent(): string {
+  return doc(
+    "분석 표 양식",
+    blist(
+      "SPSS: SPSS통계표메모아카이브.zip",
+      "AMOS: AMOS.zip"
+    )
+  );
+}
+
+function makePocketApaContent(): string {
+  return doc(
+    "APA 형식",
+    p("사회과학, 교육, 심리학 등 학문 분야의 표준 논문 작성 및 인용 스타일")
   );
 }
 
@@ -851,16 +911,29 @@ const initialPages: Record<string, Page> = Object.fromEntries([
     true
   ),
 
-  // 분석 시 메뉴얼 (with rich content + 4 child pages)
+  // 분석 시 메뉴얼 (with rich content + child pages)
   makePage(
     MENU_IDS.MANUAL_ANALYSIS,
     "분석 시 메뉴얼",
     "📊",
     MENU_IDS.MANUAL,
-    [MENU_IDS.MANUAL_PROCESS, MENU_IDS.MANUAL_SPSS, MENU_IDS.MANUAL_AMOS, MENU_IDS.MANUAL_POCKET],
+    [
+      MENU_IDS.MANUAL_ANALYSIS_FILES,
+      MENU_IDS.MANUAL_ANALYSIS_CAUTION,
+      MENU_IDS.MANUAL_ANALYSIS_FORMAT,
+      MENU_IDS.MANUAL_PROCESS,
+      MENU_IDS.MANUAL_SPSS,
+      MENU_IDS.MANUAL_AMOS,
+      MENU_IDS.MANUAL_POCKET,
+    ],
     makeAnalysisManualContent(),
     false
   ),
+
+  // 분석 시 메뉴얼 sub-pages
+  makePage(MENU_IDS.MANUAL_ANALYSIS_FILES, "SPSS 파일 정리법", "📁", MENU_IDS.MANUAL_ANALYSIS, [], makeAnalysisFilesContent()),
+  makePage(MENU_IDS.MANUAL_ANALYSIS_CAUTION, "분석 시 주의할 점", "⚠️", MENU_IDS.MANUAL_ANALYSIS, [], makeAnalysisCautionContent()),
+  makePage(MENU_IDS.MANUAL_ANALYSIS_FORMAT, "표해석 양식", "📊", MENU_IDS.MANUAL_ANALYSIS, [], makeAnalysisFormatContent()),
 
   // 분석과정 메뉴얼
   makePage(
@@ -949,13 +1022,13 @@ const initialPages: Record<string, Page> = Object.fromEntries([
 
   // 통계주머니 sub-pages
   makePage(MENU_IDS.MANUAL_POCKET_PPT, "연구모형 PPT", "🖥️", MENU_IDS.MANUAL_POCKET, [], makeEmptyDoc("연구모형 PPT")),
-  makePage(MENU_IDS.MANUAL_POCKET_TABLE, "한글표 제작 꿀팁", "📋", MENU_IDS.MANUAL_POCKET, [], makeEmptyDoc("한글표 제작 꿀팁")),
-  makePage(MENU_IDS.MANUAL_POCKET_EXCEL, "Excel 함수", "📊", MENU_IDS.MANUAL_POCKET, [], makeEmptyDoc("Excel 함수")),
-  makePage(MENU_IDS.MANUAL_POCKET_GRAPH, "Graph 자료", "📈", MENU_IDS.MANUAL_POCKET, [], makeEmptyDoc("Graph 자료")),
-  makePage(MENU_IDS.MANUAL_POCKET_IPA, "IPA 분석", "🎯", MENU_IDS.MANUAL_POCKET, [], makeEmptyDoc("IPA 분석")),
-  makePage(MENU_IDS.MANUAL_POCKET_BORICH, "Borich 요구도", "📌", MENU_IDS.MANUAL_POCKET, [], makeEmptyDoc("Borich 요구도")),
-  makePage(MENU_IDS.MANUAL_POCKET_FORM, "분석 표 양식", "📄", MENU_IDS.MANUAL_POCKET, [], makeEmptyDoc("분석 표 양식")),
-  makePage(MENU_IDS.MANUAL_POCKET_APA, "APA 형식", "📝", MENU_IDS.MANUAL_POCKET, [], makeEmptyDoc("APA 형식")),
+  makePage(MENU_IDS.MANUAL_POCKET_TABLE, "한글표 제작 꿀팁", "📋", MENU_IDS.MANUAL_POCKET, [], makePocketTableContent()),
+  makePage(MENU_IDS.MANUAL_POCKET_EXCEL, "Excel 함수", "📊", MENU_IDS.MANUAL_POCKET, [], makePocketExcelContent()),
+  makePage(MENU_IDS.MANUAL_POCKET_GRAPH, "Graph 자료", "📈", MENU_IDS.MANUAL_POCKET, [], makePocketGraphContent()),
+  makePage(MENU_IDS.MANUAL_POCKET_IPA, "IPA 분석", "🎯", MENU_IDS.MANUAL_POCKET, [], makePocketIpaContent()),
+  makePage(MENU_IDS.MANUAL_POCKET_BORICH, "Borich 요구도", "📌", MENU_IDS.MANUAL_POCKET, [], makePocketBorichContent()),
+  makePage(MENU_IDS.MANUAL_POCKET_FORM, "분석 표 양식", "📄", MENU_IDS.MANUAL_POCKET, [], makePocketFormContent()),
+  makePage(MENU_IDS.MANUAL_POCKET_APA, "APA 형식", "📝", MENU_IDS.MANUAL_POCKET, [], makePocketApaContent()),
 
   // 크레도/응대 체크리스트
   makePage(MENU_IDS.MANUAL_CHECKLIST, "크레도 / 응대 체크리스트", "✅", MENU_IDS.MANUAL, [], makeChecklistContent()),
@@ -1121,7 +1194,7 @@ export async function runMigrationIfNeeded(): Promise<void> {
   );
 }
 
-const FORCE_RESEED_V9_FLAG = "manual_force_reseed_v10";
+const FORCE_RESEED_V9_FLAG = "manual_force_reseed_v11";
 
 export async function forceReseedManualPages(): Promise<void> {
   if (!isSupabaseConfigured || !supabase) return;
@@ -1153,6 +1226,16 @@ export async function forceReseedManualPages(): Promise<void> {
     [MENU_IDS.MANUAL_AMOS_MED]: makeAmosMedContent(),
     [MENU_IDS.MANUAL_AMOS_MOD]: makeAmosModContent(),
     [MENU_IDS.MANUAL_POCKET]: makePocketContent(),
+    [MENU_IDS.MANUAL_POCKET_TABLE]: makePocketTableContent(),
+    [MENU_IDS.MANUAL_POCKET_EXCEL]: makePocketExcelContent(),
+    [MENU_IDS.MANUAL_POCKET_GRAPH]: makePocketGraphContent(),
+    [MENU_IDS.MANUAL_POCKET_IPA]: makePocketIpaContent(),
+    [MENU_IDS.MANUAL_POCKET_BORICH]: makePocketBorichContent(),
+    [MENU_IDS.MANUAL_POCKET_FORM]: makePocketFormContent(),
+    [MENU_IDS.MANUAL_POCKET_APA]: makePocketApaContent(),
+    [MENU_IDS.MANUAL_ANALYSIS_FILES]: makeAnalysisFilesContent(),
+    [MENU_IDS.MANUAL_ANALYSIS_CAUTION]: makeAnalysisCautionContent(),
+    [MENU_IDS.MANUAL_ANALYSIS_FORMAT]: makeAnalysisFormatContent(),
     [MENU_IDS.MANUAL_CHECKLIST]: makeChecklistContent(),
   };
 
@@ -1753,6 +1836,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           [MENU_IDS.MANUAL_AMOS_MED]: makeAmosMedContent(),
           [MENU_IDS.MANUAL_AMOS_MOD]: makeAmosModContent(),
           [MENU_IDS.MANUAL_POCKET]: makePocketContent(),
+          [MENU_IDS.MANUAL_POCKET_TABLE]: makePocketTableContent(),
+          [MENU_IDS.MANUAL_POCKET_EXCEL]: makePocketExcelContent(),
+          [MENU_IDS.MANUAL_POCKET_GRAPH]: makePocketGraphContent(),
+          [MENU_IDS.MANUAL_POCKET_IPA]: makePocketIpaContent(),
+          [MENU_IDS.MANUAL_POCKET_BORICH]: makePocketBorichContent(),
+          [MENU_IDS.MANUAL_POCKET_FORM]: makePocketFormContent(),
+          [MENU_IDS.MANUAL_POCKET_APA]: makePocketApaContent(),
+          [MENU_IDS.MANUAL_ANALYSIS_FILES]: makeAnalysisFilesContent(),
+          [MENU_IDS.MANUAL_ANALYSIS_CAUTION]: makeAnalysisCautionContent(),
+          [MENU_IDS.MANUAL_ANALYSIS_FORMAT]: makeAnalysisFormatContent(),
           [MENU_IDS.MANUAL_CHECKLIST]: makeChecklistContent(),
         };
         const reseedOps: Promise<void>[] = [];
