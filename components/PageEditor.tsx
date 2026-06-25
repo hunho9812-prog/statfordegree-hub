@@ -20,6 +20,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import EditorMenuBar from "./EditorMenuBar";
 import SlashCommandMenu, { SLASH_COMMANDS } from "./SlashCommandMenu";
 import { ToggleBlock } from "./extensions/ToggleBlock";
+import { ToggleHeading } from "./extensions/ToggleHeading";
 import { CalloutBlock } from "./extensions/CalloutBlock";
 import { VideoBlock } from "./extensions/VideoBlock";
 import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical, ImageUp, FileUp, Loader2 } from "lucide-react";
@@ -121,6 +122,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       TextStyle,
       Color,
       ToggleBlock,
+      ToggleHeading,
       CalloutBlock,
       VideoBlock,
       Table.configure({ resizable: true }),

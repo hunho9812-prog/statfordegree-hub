@@ -20,6 +20,7 @@ import {
   Undo,
   Redo,
   ChevronRight,
+  ChevronsDownUp,
   Lightbulb,
   Code2,
 } from "lucide-react";
@@ -138,6 +139,18 @@ export default function EditorMenuBar({ editor }: EditorMenuBarProps) {
       title: "코드 블록",
       action: () => editor.chain().focus().toggleCodeBlock().run(),
       isActive: editor.isActive("codeBlock"),
+    },
+    {
+      icon: <ChevronsDownUp size={15} />,
+      title: "토글 중주제 (Ctrl+Alt+2)",
+      action: () => (editor.commands as unknown as Record<string, () => boolean>).insertToggleH2?.(),
+      isActive: editor.isActive("toggleHeading", { level: 2 }),
+    },
+    {
+      icon: <ChevronRight size={15} />,
+      title: "토글 소주제 (Ctrl+Alt+3)",
+      action: () => (editor.commands as unknown as Record<string, () => boolean>).insertToggleH3?.(),
+      isActive: editor.isActive("toggleHeading", { level: 3 }),
     },
     {
       icon: <ChevronRight size={15} />,

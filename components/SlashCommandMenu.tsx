@@ -18,6 +18,7 @@ import {
   Lightbulb,
   Table2,
   Video,
+  ChevronsDownUp,
 } from "lucide-react";
 
 export interface SlashCommandItem {
@@ -97,9 +98,31 @@ export const SLASH_COMMANDS: SlashCommandItem[] = [
   },
   // Blocks
   {
+    id: "toggleH2",
+    title: "토글 중주제",
+    description: "접기 / 펼치기 H2 헤딩",
+    icon: <ChevronsDownUp size={18} />,
+    group: "블록",
+    command: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      (editor.commands as unknown as Record<string, () => boolean>).insertToggleH2?.();
+    },
+  },
+  {
+    id: "toggleH3",
+    title: "토글 소주제",
+    description: "접기 / 펼치기 H3 헤딩",
+    icon: <ChevronRight size={18} />,
+    group: "블록",
+    command: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      (editor.commands as unknown as Record<string, () => boolean>).insertToggleH3?.();
+    },
+  },
+  {
     id: "toggle",
-    title: "토글",
-    description: "접기 / 펼치기 블록",
+    title: "토글 블록",
+    description: "접기 / 펼치기 일반 블록",
     icon: <ChevronRight size={18} />,
     group: "블록",
     command: (editor, range) => {
