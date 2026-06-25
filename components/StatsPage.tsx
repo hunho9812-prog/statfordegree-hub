@@ -360,7 +360,7 @@ export default function StatsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e9e9e7" />
                 <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#9b9a97" }} />
                 <YAxis tickFormatter={(v) => fmt(v)} tick={{ fontSize: 11, fill: "#9b9a97" }} width={70} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
                 <Legend />
                 {SERIES.filter(s => activeSeries.has(s.key)).map(s => (
                   <Line
@@ -380,7 +380,7 @@ export default function StatsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e9e9e7" />
                 <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#9b9a97" }} />
                 <YAxis tickFormatter={(v) => fmt(v)} tick={{ fontSize: 11, fill: "#9b9a97" }} width={70} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
                 <Legend />
                 {SERIES.filter(s => activeSeries.has(s.key)).map(s => (
                   <Bar key={s.key} dataKey={s.key} name={s.label} fill={s.color} radius={[4,4,0,0]} />
