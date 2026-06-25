@@ -59,17 +59,4 @@ export const VideoBlock = Node.create({
   addNodeView() {
     return ReactNodeViewRenderer(VideoView);
   },
-
-  addCommands() {
-    return {
-      insertVideoBlock:
-        (attrs: { src: string; title?: string }) =>
-        ({ commands }: { commands: { insertContent: (c: unknown) => boolean } }) => {
-          return commands.insertContent({
-            type: this.name,
-            attrs,
-          });
-        },
-    };
-  },
 });

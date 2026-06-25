@@ -290,9 +290,10 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       if (isImage) {
         editor.chain().focus().insertContentAt(pos, `<img src="${json.url}" alt="${json.name}" class="tiptap-image" />`).run();
       } else if (isVideo) {
-        editor.chain().focus().run();
-        (editor.commands as unknown as Record<string, (a: { src: string; title: string }) => boolean>)
-          .insertVideoBlock?.({ src: json.url, title: json.name });
+        editor.chain().focus().insertContentAt(pos, {
+          type: "videoBlock",
+          attrs: { src: json.url, title: json.name },
+        }).run();
       } else {
         editor.chain().focus().insertContentAt(pos,
           `<a href="${json.url}" target="_blank" rel="noopener noreferrer" class="tiptap-file-link">📎 ${json.name}</a>`

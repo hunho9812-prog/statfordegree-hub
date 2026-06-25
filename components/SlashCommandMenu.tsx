@@ -175,9 +175,10 @@ export const SLASH_COMMANDS: SlashCommandItem[] = [
     command: (editor, range) => {
       const url = prompt("동영상 URL (mp4 또는 YouTube)을 입력하세요:");
       if (url) {
-        editor.chain().focus().deleteRange(range).run();
-        (editor.commands as unknown as Record<string, (a: { src: string; title: string }) => boolean>)
-          .insertVideoBlock?.({ src: url, title: "" });
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "videoBlock",
+          attrs: { src: url, title: "" },
+        }).run();
       } else {
         editor.chain().focus().deleteRange(range).run();
       }
