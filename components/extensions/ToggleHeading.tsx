@@ -68,7 +68,7 @@ function ToggleHeadingView({ node, updateAttributes, deleteNode, editor, getPos 
       } else {
         editor.chain().focus().insertContentAt(
           insertPos,
-          `<a href="${json.url}" target="_blank" rel="noopener noreferrer" class="tiptap-file-link">📎 ${json.name}</a>`
+          `<a href="/api/download?url=${encodeURIComponent(json.url)}&name=${encodeURIComponent(json.name)}" class="tiptap-file-link">📎 ${json.name}</a>`
         ).run();
       }
     } catch {
