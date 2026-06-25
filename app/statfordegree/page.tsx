@@ -7,6 +7,15 @@ import { useWorkspaceStore, MENU_IDS } from "@/lib/store";
 
 const MENU_CARDS = [
   {
+    id: "stats",
+    emoji: "📊",
+    iconBg: "from-indigo-400 to-blue-600",
+    shadow: "shadow-indigo-200 dark:shadow-indigo-900/30",
+    title: "통계",
+    description: "매출·비용·순이익 그래프",
+    href: "/stats",
+  },
+  {
     id: "transfer",
     emoji: "🔄",
     iconBg: "from-blue-400 to-indigo-500",

@@ -311,6 +311,7 @@ const freshState = {
   customers: initialCustomers,
   customerStatuses: initialCustomerStatuses,
   manualPages: {} as Record<string, ManualPageData>,
+  monthlyCosts: [],
   sidebarCollapsed: false,
   darkMode: false,
   isRefreshing: false,
@@ -837,6 +838,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           dbManualNodes.upsert(updatedPd.items[nodeId], pageId);
           dbManualPageRoots.upsert(pageId, updatedPd.rootItems);
         }
+      },
+
+      upsertMonthlyCost: (cost) => {
+        set((state) => {
+          const rest = state.monthlyCosts.filter(
+            (c) => !(c.year === cost.year && c.month === cost.month)
+          );
+          return { monthlyCosts: [...rest, cost] };
+        });
       },
 
       toggleSidebar: () => {

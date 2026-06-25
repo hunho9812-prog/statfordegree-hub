@@ -75,6 +75,15 @@ export interface ManualPageData {
   items: Record<string, ManualNode>;
 }
 
+// ─── Monthly cost entry ──────────────────────────────────────────────────────
+
+export interface MonthlyCost {
+  year: number;
+  month: number;      // 1–12
+  labor: number;      // 인건비
+  expense: number;    // 사업비용
+}
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export interface WorkspaceState {
@@ -84,6 +93,7 @@ export interface WorkspaceState {
   customers: Customer[];
   customerStatuses: StatusOption[];
   manualPages: Record<string, ManualPageData>;
+  monthlyCosts: MonthlyCost[];
   sidebarCollapsed: boolean;
   darkMode: boolean;
   createPage: (parentId?: string | null, insertAfter?: string) => string;
@@ -102,6 +112,7 @@ export interface WorkspaceState {
   updateManualNode: (pageId: string, nodeId: string, updates: Partial<Pick<ManualNode, "text" | "isExpanded" | "isPinned">>) => void;
   deleteManualNode: (pageId: string, nodeId: string) => void;
   moveManualNode: (pageId: string, nodeId: string, afterNodeId: string) => void;
+  upsertMonthlyCost: (cost: MonthlyCost) => void;
   isRefreshing: boolean;
   syncError: boolean;
   toggleSidebar: () => void;

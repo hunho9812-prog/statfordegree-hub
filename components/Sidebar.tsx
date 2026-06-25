@@ -22,6 +22,7 @@ import {
   ClipboardList,
   RefreshCw,
   BarChart2,
+  LineChart,
 } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -277,7 +278,7 @@ export default function Sidebar() {
             className={cn(
               "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-colors",
               hover,
-              (pathname === "/statfordegree" || pathname === "/tasks" || pathname === "/crm" || pathname === "/manual" || pathname === "/p/menu-manual")
+              (pathname === "/statfordegree" || pathname === "/tasks" || pathname === "/crm" || pathname === "/manual" || pathname === "/p/menu-manual" || pathname === "/stats")
                 ? "bg-[rgba(55,53,47,0.08)] dark:bg-[rgba(255,255,255,0.06)] text-[#37352f] dark:text-[#e6e6e4]"
                 : "text-[#37352f] dark:text-[#e6e6e4]"
             )}
@@ -294,6 +295,14 @@ export default function Sidebar() {
             <div className="ml-3 mt-0.5 mb-0.5 relative">
               {/* 연결선 */}
               <div className="absolute left-[7px] top-0 bottom-0 w-px bg-[#e9e9e7] dark:bg-[#3f3f3f]" />
+
+              <Link href="/stats">
+                <div className={cn(navItem(pathname === "/stats"), "pl-5 relative")}>
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[14px] h-px bg-[#e9e9e7] dark:bg-[#3f3f3f]" />
+                  <LineChart size={14} className="text-[#9b9a97]" />
+                  <span>통계</span>
+                </div>
+              </Link>
 
               <Link href="/tasks">
                 <div className={cn(navItem(pathname === "/tasks"), "pl-5 relative")}>
