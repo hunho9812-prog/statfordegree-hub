@@ -16,6 +16,8 @@ import {
   Quote,
   Image,
   Lightbulb,
+  Table2,
+  Video,
 } from "lucide-react";
 
 export interface SlashCommandItem {
@@ -162,6 +164,38 @@ export const SLASH_COMMANDS: SlashCommandItem[] = [
       } else {
         editor.chain().focus().deleteRange(range).run();
       }
+    },
+  },
+  {
+    id: "video",
+    title: "동영상",
+    description: "mp4 URL 또는 YouTube 링크",
+    icon: <Video size={18} />,
+    group: "미디어",
+    command: (editor, range) => {
+      const url = prompt("동영상 URL (mp4 또는 YouTube)을 입력하세요:");
+      if (url) {
+        editor.chain().focus().deleteRange(range).run();
+        (editor.commands as unknown as Record<string, (a: { src: string; title: string }) => boolean>)
+          .insertVideoBlock?.({ src: url, title: "" });
+      } else {
+        editor.chain().focus().deleteRange(range).run();
+      }
+    },
+  },
+  {
+    id: "table",
+    title: "표",
+    description: "3×3 표 삽입",
+    icon: <Table2 size={18} />,
+    group: "미디어",
+    command: (editor, range) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+        .run();
     },
   },
 ];

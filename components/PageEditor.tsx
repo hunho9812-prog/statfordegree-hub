@@ -11,12 +11,17 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import TextStyle from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
 import { useWorkspaceStore } from "@/lib/store";
 import { formatRelativeTime } from "@/lib/utils";
 import EditorMenuBar from "./EditorMenuBar";
 import SlashCommandMenu, { SLASH_COMMANDS } from "./SlashCommandMenu";
 import { ToggleBlock } from "./extensions/ToggleBlock";
 import { CalloutBlock } from "./extensions/CalloutBlock";
+import { VideoBlock } from "./extensions/VideoBlock";
 import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical, ImageUp, FileUp, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import MonthPageManager from "./MonthPageManager";
@@ -117,6 +122,11 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       Color,
       ToggleBlock,
       CalloutBlock,
+      VideoBlock,
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableCell,
+      TableHeader,
     ],
     content: page?.content
       ? JSON.parse(page.content)
@@ -276,8 +286,13 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       if (!res.ok) { alert(json.error || "업로드 실패"); return; }
 
       const pos = uploadPosRef.current;
+      const isVideo = /\.(mp4|webm|ogg|mov|avi)$/i.test(json.name ?? "");
       if (isImage) {
         editor.chain().focus().insertContentAt(pos, `<img src="${json.url}" alt="${json.name}" class="tiptap-image" />`).run();
+      } else if (isVideo) {
+        editor.chain().focus().run();
+        (editor.commands as unknown as Record<string, (a: { src: string; title: string }) => boolean>)
+          .insertVideoBlock?.({ src: json.url, title: json.name });
       } else {
         editor.chain().focus().insertContentAt(pos,
           `<a href="${json.url}" target="_blank" rel="noopener noreferrer" class="tiptap-file-link">📎 ${json.name}</a>`
