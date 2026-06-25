@@ -50,7 +50,7 @@ function Section({
   title: string;
   level?: 1 | 2 | 3;
   defaultOpen?: boolean;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   badge?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
