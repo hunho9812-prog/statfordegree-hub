@@ -1194,7 +1194,7 @@ export async function runMigrationIfNeeded(): Promise<void> {
   );
 }
 
-const FORCE_RESEED_V9_FLAG = "manual_force_reseed_v11";
+const FORCE_RESEED_V9_FLAG = "manual_force_reseed_v12";
 
 export async function forceReseedManualPages(): Promise<void> {
   if (!isSupabaseConfigured || !supabase) return;
@@ -1240,14 +1240,60 @@ export async function forceReseedManualPages(): Promise<void> {
   };
 
   const state = useWorkspaceStore.getState();
+  const nowTs = new Date().toISOString();
   const ops: Promise<void>[] = [];
+
+  // Upsert content for all known pages
   for (const [id, content] of Object.entries(seeds)) {
-    const page = state.pages[id];
+    const page = state.pages[id] ?? initialPages[id];
     if (page) {
-      const updated = { ...page, content, updatedAt: new Date().toISOString() };
+      const updated = { ...page, content, updatedAt: nowTs };
       ops.push(dbPages.upsert(updated));
     }
   }
+
+  // Ensure MANUAL_ANALYSIS children includes the 3 new sub-pages
+  const analysisPage = state.pages[MENU_IDS.MANUAL_ANALYSIS] ?? initialPages[MENU_IDS.MANUAL_ANALYSIS];
+  if (analysisPage) {
+    const requiredChildren = [
+      MENU_IDS.MANUAL_ANALYSIS_FILES,
+      MENU_IDS.MANUAL_ANALYSIS_CAUTION,
+      MENU_IDS.MANUAL_ANALYSIS_FORMAT,
+      MENU_IDS.MANUAL_PROCESS,
+      MENU_IDS.MANUAL_SPSS,
+      MENU_IDS.MANUAL_AMOS,
+      MENU_IDS.MANUAL_POCKET,
+    ];
+    const hasAll = requiredChildren.every((c) => (analysisPage.children as string[]).includes(c));
+    if (!hasAll) {
+      // Merge: keep any extra user-added children, ensure required ones present
+      const existing = (analysisPage.children as string[]).filter((c) => !(requiredChildren as string[]).includes(c));
+      const merged = { ...analysisPage, children: [...requiredChildren, ...existing], updatedAt: nowTs };
+      ops.push(dbPages.upsert(merged));
+    }
+  }
+
+  // Ensure MANUAL_POCKET children includes all 8 sub-pages
+  const pocketPage = state.pages[MENU_IDS.MANUAL_POCKET] ?? initialPages[MENU_IDS.MANUAL_POCKET];
+  if (pocketPage) {
+    const requiredPocketChildren = [
+      MENU_IDS.MANUAL_POCKET_PPT,
+      MENU_IDS.MANUAL_POCKET_TABLE,
+      MENU_IDS.MANUAL_POCKET_EXCEL,
+      MENU_IDS.MANUAL_POCKET_GRAPH,
+      MENU_IDS.MANUAL_POCKET_IPA,
+      MENU_IDS.MANUAL_POCKET_BORICH,
+      MENU_IDS.MANUAL_POCKET_FORM,
+      MENU_IDS.MANUAL_POCKET_APA,
+    ];
+    const hasAll = requiredPocketChildren.every((c) => (pocketPage.children as string[]).includes(c));
+    if (!hasAll) {
+      const existing = (pocketPage.children as string[]).filter((c) => !(requiredPocketChildren as string[]).includes(c));
+      const merged = { ...pocketPage, children: [...requiredPocketChildren, ...existing], updatedAt: nowTs };
+      ops.push(dbPages.upsert(merged));
+    }
+  }
+
   if (ops.length > 0) await Promise.all(ops);
 
   localStorage.setItem(FORCE_RESEED_V9_FLAG, "true");
