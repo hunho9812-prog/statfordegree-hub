@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const safeName = file.name.replace(/[^a-zA-Z0-9._\-가-힣]/g, "_");
+    const safeName = file.name.replace(/[^a-zA-Z0-9._\-]/g, "_");
     const path = `${user.id}/${Date.now()}-${safeName}`;
 
     const bytes = await file.arrayBuffer();
