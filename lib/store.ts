@@ -146,6 +146,18 @@ function taskList(...items: string[]) {
   };
 }
 
+function isEffectivelyEmpty(content: string): boolean {
+  try {
+    const parsed = JSON.parse(content) as { type: string; content?: { type: string; content?: unknown[] }[] };
+    const nodes = parsed?.content ?? [];
+    return nodes.length <= 2 && nodes.every((n) =>
+      n.type === "heading" || (n.type === "paragraph" && (!n.content || n.content.length === 0))
+    );
+  } catch {
+    return false;
+  }
+}
+
 function doc(title: string, ...nodes: object[]) {
   return JSON.stringify({
     type: "doc",
@@ -1378,9 +1390,31 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }
 
         // Supabase가 있으면 그것만 사용, 없으면 로컬 첫 마이그레이션 데이터 사용
-        const mergedPages = supabaseHasPages
-          ? pages
+        const mergedPages: Record<string, Page> = supabaseHasPages
+          ? { ...pages }
           : { ...pages, ...Object.fromEntries(localOnlyPages.map((p) => [p.id, p])) };
+
+        // 기본 메뉴얼 페이지 복원: Supabase에 없거나 비어있는 경우 seeded content 사용
+        const defaultSeeds: Record<string, string> = {
+          [MENU_IDS.MANUAL]: makeManualRootContent(),
+          [MENU_IDS.MANUAL_ANALYSIS]: makeAnalysisManualContent(),
+          [MENU_IDS.MANUAL_PROCESS]: makeProcessManualContent(),
+          [MENU_IDS.MANUAL_SPSS]: makeSpssContent(),
+          [MENU_IDS.MANUAL_AMOS]: makeAmosContent(),
+          [MENU_IDS.MANUAL_POCKET]: makePocketContent(),
+          [MENU_IDS.MANUAL_CHECKLIST]: makeChecklistContent(),
+        };
+        const reseedOps: Promise<void>[] = [];
+        for (const [id, defaultPage] of Object.entries(initialPages)) {
+          if (!mergedPages[id]) {
+            mergedPages[id] = defaultPage;
+          } else if (defaultSeeds[id] && isEffectivelyEmpty(mergedPages[id].content)) {
+            const reseeded = { ...mergedPages[id], content: defaultSeeds[id] };
+            mergedPages[id] = reseeded;
+            reseedOps.push(dbPages.upsert(reseeded));
+          }
+        }
+        if (reseedOps.length > 0) await Promise.all(reseedOps);
 
         // Supabase에 남아있는 기본 샘플 업무 항목 모두 삭제 (중복 포함)
         const defaultTasksInSupa = tasks.filter((t) => DEFAULT_TASK_TITLES.includes(t.title));
