@@ -95,6 +95,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadPosRef = useRef<number>(0);
+  const uploadFnRef = useRef<((file: File, isImage: boolean) => void) | null>(null);
   const [uploading, setUploading] = useState(false);
 
   const closeSlashMenu = useCallback(() => {
@@ -197,6 +198,34 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           }
         }
         return false;
+      },
+      // 클립보드에서 이미지 붙여넣기 (Ctrl+V / 스크린샷 붙여넣기)
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+        for (const item of Array.from(items)) {
+          if (item.type.startsWith("image/")) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (!file) continue;
+            uploadPosRef.current = view.state.selection.from;
+            uploadFnRef.current?.(file, true);
+            return true;
+          }
+        }
+        return false;
+      },
+      // 파일 드래그 앤 드롭으로 이미지 삽입
+      handleDrop: (view, event) => {
+        const files = event.dataTransfer?.files;
+        if (!files || files.length === 0) return false;
+        const file = files[0];
+        if (!file.type.startsWith("image/")) return false;
+        event.preventDefault();
+        const coords = view.posAtCoords({ left: event.clientX, top: event.clientY });
+        uploadPosRef.current = coords?.pos ?? view.state.selection.from;
+        uploadFnRef.current?.(file, true);
+        return true;
       },
     },
   });
@@ -308,6 +337,8 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       setUploading(false);
     }
   }, [editor]);
+
+  uploadFnRef.current = doUpload;
 
   const handleImageInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
