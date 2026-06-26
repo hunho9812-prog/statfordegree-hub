@@ -45,5 +45,15 @@ export function useLedger() {
     return result;
   }, []);
 
-  return { entries, loading, reload, upsert };
+  const remove = useCallback(async (year: number, month: number): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await dbLedger.delete(year, month);
+      setEntries((prev) => prev.filter((e) => !(e.year === year && e.month === month)));
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: String(e) };
+    }
+  }, []);
+
+  return { entries, loading, reload, upsert, remove };
 }

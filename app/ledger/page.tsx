@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight, Save, CheckCircle, XCircle, BarChart2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Save, CheckCircle, XCircle, BarChart2, Trash2 } from "lucide-react";
 import { useLedger } from "@/hooks/useLedger";
 import { cn } from "@/lib/utils";
 
@@ -45,11 +45,13 @@ const EMPTY: DataState = { sales: "", bizCost: "", laborTotal: "", eunhoLabor: "
 
 export default function LedgerPage() {
   const router = useRouter();
-  const { entries, upsert } = useLedger();
+  const { entries, upsert, remove } = useLedger();
   const [month, setMonth] = useState(getYM());
   const [data, setData] = useState<DataState>(EMPTY);
   const [saveStatus, setSaveStatus] = useState<"saved" | "unsaved" | "saving">("saved");
   const [toast, setToast] = useState<Toast | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ year: number; month: number } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -95,6 +97,25 @@ export default function LedgerPage() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 3000);
   }, []);
+
+  const handleDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const result = await remove(deleteTarget.year, deleteTarget.month);
+    setDeleting(false);
+    setDeleteTarget(null);
+    if (result.success) {
+      showToast({ type: "success", msg: `${deleteTarget.year}년 ${deleteTarget.month}월 데이터를 삭제했습니다.` });
+      // 현재 보고 있던 월이면 폼 초기화
+      const [yy, mm] = month.split("-").map(Number);
+      if (deleteTarget.year === yy && deleteTarget.month === mm) {
+        setData(EMPTY);
+        setSaveStatus("saved");
+      }
+    } else {
+      showToast({ type: "error", msg: result.error ?? "삭제에 실패했습니다." });
+    }
+  }, [deleteTarget, remove, showToast, month]);
 
   const g = (k: keyof DataState) => parseFloat(data[k]) || 0;
   const sales = g("sales"), bizCost = g("bizCost"), laborTotal = g("laborTotal");
@@ -223,23 +244,35 @@ export default function LedgerPage() {
                   const saved = savedMonthsInYear.has(mo);
                   const active = parseInt(m) === mo;
                   return (
-                    <button
+                    <div
                       key={mo}
-                      onClick={() => goToMonth(mo)}
                       className={cn(
-                        "w-full flex items-center justify-between px-4 py-2 text-sm transition-colors",
+                        "group flex items-center transition-colors",
                         active
-                          ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-semibold"
-                          : "text-[#37352f] dark:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f]"
+                          ? "bg-blue-50 dark:bg-blue-900/20"
+                          : "hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f]"
                       )}
                     >
-                      <span>{mo}월</span>
+                      <button
+                        onClick={() => goToMonth(mo)}
+                        className={cn(
+                          "flex-1 flex items-center justify-between px-4 py-2 text-sm",
+                          active ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-[#37352f] dark:text-[#e6e6e4]"
+                        )}
+                      >
+                        <span>{mo}월</span>
+                        {saved && <CheckCircle size={13} className="text-emerald-500" />}
+                      </button>
                       {saved && (
-                        <span className="text-emerald-500">
-                          <CheckCircle size={13} />
-                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget({ year: currentYear, month: mo }); }}
+                          className="pr-3 opacity-0 group-hover:opacity-100 transition-opacity text-[#9b9a97] hover:text-red-500"
+                          title="삭제"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -342,6 +375,40 @@ export default function LedgerPage() {
           </div>
         </div>
       </div>
+
+      {/* 삭제 확인 모달 */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#3f3f3f] shadow-xl p-6 w-80">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500">
+                <Trash2 size={16} />
+              </div>
+              <h2 className="font-bold text-[#37352f] dark:text-[#e6e6e4]">장부 삭제</h2>
+            </div>
+            <p className="text-sm text-[#9b9a97] mb-5">
+              <span className="font-semibold text-[#37352f] dark:text-[#e6e6e4]">{deleteTarget.year}년 {deleteTarget.month}월</span> 장부 데이터를 삭제할까요?<br />
+              삭제한 데이터는 복구할 수 없습니다.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="flex-1 py-2 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-sm text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 disabled:opacity-50 transition-colors"
+              >
+                {deleting ? "삭제 중…" : "삭제"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
