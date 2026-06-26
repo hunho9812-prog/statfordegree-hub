@@ -44,10 +44,10 @@ export const dbLedger = {
     return (data as LedgerRow[]).map(rowToEntry);
   },
 
-  async upsert(entry: LedgerEntry): Promise<void> {
-    if (!supabase) return;
+  async upsert(entry: LedgerEntry): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: "Supabase가 설정되지 않았습니다." };
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) return { success: false, error: "로그인이 필요합니다." };
     const { error } = await supabase.from("ledger").upsert(
       {
         user_id: user.id,
@@ -61,7 +61,11 @@ export const dbLedger = {
       },
       { onConflict: "user_id,year,month" }
     );
-    if (error) console.error("[ledger] upsert:", error);
+    if (error) {
+      console.error("[ledger] upsert:", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
   },
 
   async delete(year: number, month: number): Promise<void> {

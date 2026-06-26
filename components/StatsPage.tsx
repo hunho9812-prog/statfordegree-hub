@@ -32,6 +32,16 @@ export default function StatsPage() {
   const { entries, loading } = useLedger();
 
   const currentYear = new Date().getFullYear();
+
+  // 데이터가 있는 연도 + 현재 연도 기준 범위
+  const availableYears = useMemo(() => {
+    const years = new Set(entries.map((e) => e.year));
+    years.add(currentYear - 1);
+    years.add(currentYear);
+    return Array.from(years).sort((a, b) => a - b);
+  }, [entries, currentYear]);
+
+  const [selectedYear, setSelectedYear] = useState<number | null>(currentYear);
   const [startYear, setStartYear] = useState(currentYear);
   const [startMonth, setStartMonth] = useState(1);
   const [endYear, setEndYear] = useState(currentYear);
@@ -42,6 +52,22 @@ export default function StatsPage() {
     new Set(["revenue", "labor", "expense", "profit"])
   );
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+
+  // 연도 탭 클릭 시 해당 연도 전체 선택
+  const handleYearSelect = useCallback((yr: number | null) => {
+    setSelectedYear(yr);
+    if (yr === null) {
+      // 전체: 가용 연도 전체 범위
+      const min = availableYears[0] ?? currentYear;
+      const max = availableYears[availableYears.length - 1] ?? currentYear;
+      setStartYear(min); setStartMonth(1);
+      setEndYear(max); setEndMonth(12);
+    } else {
+      setStartYear(yr); setStartMonth(1);
+      setEndYear(yr); setEndMonth(12);
+    }
+    setSelectedMonth(null);
+  }, [availableYears, currentYear]);
 
   // 기간 범위 내 데이터 필터링
   const rawMonthly = useMemo(() => {
@@ -127,6 +153,23 @@ export default function StatsPage() {
     });
   }, []);
 
+  // 월별 현황: 데이터가 있는 월만 표시 (선택된 연도의 전체 12개월)
+  const monthlyCards = useMemo(() => {
+    const yr = selectedYear ?? startYear;
+    return Array.from({ length: 12 }, (_, i) => {
+      const mo = i + 1;
+      const entry = entries.find((e) => e.year === yr && e.month === mo);
+      return {
+        month: mo,
+        revenue: entry?.sales ?? 0,
+        labor: entry?.laborCost ?? 0,
+        expense: entry?.businessCost ?? 0,
+        profit: entry?.profit ?? 0,
+        hasDat: !!entry,
+      };
+    });
+  }, [entries, selectedYear, startYear]);
+
   const hover = "hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)]";
 
   return (
@@ -134,7 +177,7 @@ export default function StatsPage() {
       <div className="max-w-5xl mx-auto px-6 py-10">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push("/statfordegree")}
@@ -150,6 +193,36 @@ export default function StatsPage() {
           >
             장부 입력 →
           </button>
+        </div>
+
+        {/* 연도 탭 */}
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
+          <span className="text-sm text-[#9b9a97] mr-1">연도</span>
+          <button
+            onClick={() => handleYearSelect(null)}
+            className={cn(
+              "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+              selectedYear === null
+                ? "bg-blue-500 text-white"
+                : `bg-white dark:bg-[#252525] text-[#9b9a97] border border-[#e9e9e7] dark:border-[#3f3f3f] ${hover}`
+            )}
+          >
+            전체
+          </button>
+          {availableYears.map((yr) => (
+            <button
+              key={yr}
+              onClick={() => handleYearSelect(yr)}
+              className={cn(
+                "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                selectedYear === yr
+                  ? "bg-blue-500 text-white"
+                  : `bg-white dark:bg-[#252525] text-[#9b9a97] border border-[#e9e9e7] dark:border-[#3f3f3f] ${hover}`
+              )}
+            >
+              {yr}년
+            </button>
+          ))}
         </div>
 
         {/* Series toggles */}
@@ -180,14 +253,22 @@ export default function StatsPage() {
             <input
               type="month"
               value={`${startYear}-${String(startMonth).padStart(2, "0")}`}
-              onChange={(e) => { const [y, m] = e.target.value.split("-"); setStartYear(Number(y)); setStartMonth(Number(m)); }}
+              onChange={(e) => {
+                const [y, m] = e.target.value.split("-");
+                setStartYear(Number(y)); setStartMonth(Number(m));
+                setSelectedYear(null);
+              }}
               className="px-3 py-1.5 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] bg-white dark:bg-[#252525] text-[#37352f] dark:text-[#e6e6e4] text-sm outline-none"
             />
             ~
             <input
               type="month"
               value={`${endYear}-${String(endMonth).padStart(2, "0")}`}
-              onChange={(e) => { const [y, m] = e.target.value.split("-"); setEndYear(Number(y)); setEndMonth(Number(m)); }}
+              onChange={(e) => {
+                const [y, m] = e.target.value.split("-");
+                setEndYear(Number(y)); setEndMonth(Number(m));
+                setSelectedYear(null);
+              }}
               className="px-3 py-1.5 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] bg-white dark:bg-[#252525] text-[#37352f] dark:text-[#e6e6e4] text-sm outline-none"
             />
           </div>
@@ -227,6 +308,13 @@ export default function StatsPage() {
         <div className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#2f2f2f] p-5 mb-6">
           {loading ? (
             <div className="h-80 flex items-center justify-center text-sm text-[#9b9a97]">데이터 로딩 중…</div>
+          ) : chartData.every(d => !d.revenue && !d.labor && !d.expense) ? (
+            <div className="h-80 flex flex-col items-center justify-center gap-3">
+              <p className="text-sm text-[#9b9a97]">아직 장부 데이터가 없습니다.</p>
+              <button onClick={() => router.push("/ledger")} className="px-4 py-2 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors">
+                장부 입력하기 →
+              </button>
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height={320}>
               {chartType === "line" ? (
@@ -268,15 +356,64 @@ export default function StatsPage() {
             <div key={label} className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#2f2f2f] p-4">
               <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-2", bg, color)}>{icon}</div>
               <p className="text-xs text-[#9b9a97] mb-1">{label}</p>
-              <p className={cn("text-lg font-bold", color)}>{fmt(value)}</p>
+              <p className={cn("text-lg font-bold", value < 0 ? "text-red-500" : color)}>{fmt(value)}</p>
             </div>
           ))}
         </div>
 
+        {/* 월별 현황 카드 그리드 */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-bold text-[#37352f] dark:text-[#e6e6e4]">
+              {selectedYear ?? `${startYear}~${endYear}`}년 월별 현황
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {monthlyCards.map((d) => (
+              <div
+                key={d.month}
+                className={cn(
+                  "rounded-xl border p-3 transition-colors",
+                  d.hasDat
+                    ? "bg-white dark:bg-[#252525] border-[#e9e9e7] dark:border-[#2f2f2f]"
+                    : "bg-[#f7f6f3] dark:bg-[#1e1e1e] border-[#e9e9e7] dark:border-[#2a2a2a] opacity-50"
+                )}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-[#37352f] dark:text-[#e6e6e4]">{d.month}월</span>
+                  {d.hasDat && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                </div>
+                {d.hasDat ? (
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-[#9b9a97]">매출</span>
+                      <span className="text-blue-500 font-medium">{fmt(d.revenue)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-[#9b9a97]">사업비</span>
+                      <span className="text-purple-500">{fmt(d.expense)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-[#9b9a97]">인건비</span>
+                      <span className="text-orange-500">{fmt(d.labor)}</span>
+                    </div>
+                    <div className="border-t border-[#e9e9e7] dark:border-[#3f3f3f] mt-1 pt-1 flex justify-between text-xs">
+                      <span className="text-[#9b9a97] font-medium">순이익</span>
+                      <span className={cn("font-bold", d.profit >= 0 ? "text-green-500" : "text-red-500")}>{fmt(d.profit)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#9b9a97]">미입력</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Monthly table */}
         <div className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#2f2f2f] overflow-hidden">
-          <div className="px-5 py-3 border-b border-[#e9e9e7] dark:border-[#2f2f2f] flex items-center justify-between">
-            <span className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">월별 현황</span>
+          <div className="px-5 py-3 border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
+            <span className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">상세 내역</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

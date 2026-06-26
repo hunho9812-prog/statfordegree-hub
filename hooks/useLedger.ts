@@ -19,7 +19,6 @@ export function useLedger() {
 
     if (!isSupabaseConfigured || !supabase) return;
 
-    // 실시간 구독 — 장부 저장 즉시 통계에 반영
     const channel = supabase
       .channel("realtime:public:ledger")
       .on("postgres_changes", { event: "*", schema: "public", table: "ledger" }, () => {
@@ -30,18 +29,20 @@ export function useLedger() {
     return () => { supabase?.removeChannel(channel); };
   }, [reload]);
 
-  const upsert = useCallback(async (entry: LedgerEntry) => {
-    await dbLedger.upsert(entry);
-    // 로컬 상태도 즉시 갱신 (실시간 이벤트 도달 전 즉각 반영)
-    setEntries((prev) => {
-      const idx = prev.findIndex((e) => e.year === entry.year && e.month === entry.month);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = entry;
-        return next;
-      }
-      return [...prev, entry].sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
-    });
+  const upsert = useCallback(async (entry: LedgerEntry): Promise<{ success: boolean; error?: string }> => {
+    const result = await dbLedger.upsert(entry);
+    if (result.success) {
+      setEntries((prev) => {
+        const idx = prev.findIndex((e) => e.year === entry.year && e.month === entry.month);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = entry;
+          return next;
+        }
+        return [...prev, entry].sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+      });
+    }
+    return result;
   }, []);
 
   return { entries, loading, reload, upsert };
