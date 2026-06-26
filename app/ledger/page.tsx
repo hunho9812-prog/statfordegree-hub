@@ -1,19 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
-
-const LEDGER_KEY = "ledger_data";
-
-interface LedgerMonth {
-  sales: number;
-  bizCost: number;
-  laborTotal: number;
-  eunhoLabor: number;
-  hyunhoLabor: number;
-  reserve: number;
-}
+import { ArrowLeft, ChevronLeft, ChevronRight, Save } from "lucide-react";
+import { useLedger } from "@/hooks/useLedger";
 
 function fmt(v: number) {
   const abs = Math.abs(Math.round(v));
@@ -47,54 +37,38 @@ function MoneyInput({ label, value, onChange }: { label: string; value: string; 
   );
 }
 
+type DataState = { sales: string; bizCost: string; laborTotal: string; eunhoLabor: string; hyunhoLabor: string; reserve: string };
+
+const EMPTY: DataState = { sales: "", bizCost: "", laborTotal: "", eunhoLabor: "", hyunhoLabor: "", reserve: "" };
+
 export default function LedgerPage() {
   const router = useRouter();
+  const { entries, upsert } = useLedger();
   const [month, setMonth] = useState(getYM());
-  const [data, setData] = useState({ sales: "", bizCost: "", laborTotal: "", eunhoLabor: "", hyunhoLabor: "", reserve: "" });
-  const [saved, setSaved] = useState(true);
+  const [data, setData] = useState<DataState>(EMPTY);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "unsaved" | "saving">("saved");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = useCallback((ym: string) => {
-    try {
-      const all: Record<string, LedgerMonth> = JSON.parse(localStorage.getItem(LEDGER_KEY) || "{}");
-      const d = all[ym] || {} as LedgerMonth;
+  // entries가 바뀌거나 month가 바뀌면 해당 월 데이터 로드
+  useEffect(() => {
+    const [y, m] = month.split("-").map(Number);
+    const entry = entries.find((e) => e.year === y && e.month === m);
+    if (entry) {
       setData({
-        sales: d.sales ? String(d.sales) : "",
-        bizCost: d.bizCost ? String(d.bizCost) : "",
-        laborTotal: d.laborTotal ? String(d.laborTotal) : "",
-        eunhoLabor: d.eunhoLabor ? String(d.eunhoLabor) : "",
-        hyunhoLabor: d.hyunhoLabor ? String(d.hyunhoLabor) : "",
-        reserve: d.reserve ? String(d.reserve) : "",
+        sales: entry.sales ? String(entry.sales) : "",
+        bizCost: entry.businessCost ? String(entry.businessCost) : "",
+        laborTotal: entry.laborCost ? String(entry.laborCost) : "",
+        eunhoLabor: "",
+        hyunhoLabor: "",
+        reserve: "",
       });
-      setSaved(true);
-    } catch { /**/ }
-  }, []);
+    } else {
+      setData(EMPTY);
+    }
+    setSaveStatus("saved");
+  }, [month, entries]);
 
-  const save = useCallback((ym: string, d: typeof data) => {
-    try {
-      const all: Record<string, LedgerMonth> = JSON.parse(localStorage.getItem(LEDGER_KEY) || "{}");
-      all[ym] = {
-        sales: parseFloat(d.sales) || 0,
-        bizCost: parseFloat(d.bizCost) || 0,
-        laborTotal: parseFloat(d.laborTotal) || 0,
-        eunhoLabor: parseFloat(d.eunhoLabor) || 0,
-        hyunhoLabor: parseFloat(d.hyunhoLabor) || 0,
-        reserve: parseFloat(d.reserve) || 0,
-      };
-      localStorage.setItem(LEDGER_KEY, JSON.stringify(all));
-      setSaved(true);
-    } catch { /**/ }
-  }, []);
-
-  useEffect(() => { load(month); }, [month, load]);
-
-  const update = (key: keyof typeof data) => (v: string) => {
-    const next = { ...data, [key]: v };
-    setData(next);
-    setSaved(false);
-    save(month, next);
-  };
-
-  const g = (k: keyof typeof data) => parseFloat(data[k]) || 0;
+  const g = (k: keyof DataState) => parseFloat(data[k]) || 0;
   const sales = g("sales"), bizCost = g("bizCost"), laborTotal = g("laborTotal");
   const profit = sales - bizCost - laborTotal;
   const eunhoLabor = g("eunhoLabor"), hyunhoLabor = g("hyunhoLabor"), reserve = g("reserve");
@@ -102,6 +76,36 @@ export default function LedgerPage() {
   const eunhoDiv = dividend * 0.7, hyunhoDiv = dividend * 0.3;
   const eunhoTotal = eunhoLabor + eunhoDiv, hyunhoTotal = hyunhoLabor + hyunhoDiv;
   const [y, m] = month.split("-");
+
+  const update = useCallback((key: keyof DataState) => (v: string) => {
+    setData((prev) => ({ ...prev, [key]: v }));
+    setSaveStatus("unsaved");
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setSaveStatus("saving");
+    const [yr, mo] = month.split("-").map(Number);
+    const s = parseFloat(data.sales) || 0;
+    const b = parseFloat(data.bizCost) || 0;
+    const l = parseFloat(data.laborTotal) || 0;
+    await upsert({
+      year: yr,
+      month: mo,
+      sales: s,
+      businessCost: b,
+      laborCost: l,
+      profit: s - b - l,
+    });
+    setSaveStatus("saved");
+  }, [month, data, upsert]);
+
+  // 자동 저장 (3초 디바운스)
+  useEffect(() => {
+    if (saveStatus !== "unsaved") return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => { handleSave(); }, 3000);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [saveStatus, handleSave]);
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f5f5f7] dark:bg-[#191919]">
@@ -115,9 +119,22 @@ export default function LedgerPage() {
             </button>
             <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">장부</h1>
           </div>
-          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${saved ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700"}`}>
-            {saved ? "● 저장됨" : "○ 저장 중…"}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
+              saveStatus === "saved" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+              : saveStatus === "saving" ? "bg-blue-100 text-blue-600"
+              : "bg-amber-100 text-amber-700"
+            }`}>
+              {saveStatus === "saved" ? "● 저장됨" : saveStatus === "saving" ? "● 저장 중…" : "○ 미저장"}
+            </span>
+            <button
+              onClick={handleSave}
+              disabled={saveStatus === "saving"}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            >
+              <Save size={13} /> 저장
+            </button>
+          </div>
         </div>
 
         {/* Month nav */}
