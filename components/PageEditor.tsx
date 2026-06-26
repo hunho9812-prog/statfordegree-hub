@@ -11,6 +11,7 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import TextStyle from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
+import Image from "@tiptap/extension-image";
 import Table from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
@@ -123,6 +124,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       }),
       TextStyle,
       Color,
+      Image.configure({ inline: false, allowBase64: true }),
       ToggleBlock,
       ToggleHeading,
       CalloutBlock,
@@ -320,7 +322,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       const pos = uploadPosRef.current;
       const isVideo = /\.(mp4|webm|ogg|mov|avi)$/i.test(json.name ?? "");
       if (isImage) {
-        editor.chain().focus().insertContentAt(pos, `<img src="${json.url}" alt="${json.name}" class="tiptap-image" />`).run();
+        editor.chain().focus().setTextSelection(pos).setImage({ src: json.url, alt: json.name }).run();
       } else if (isVideo) {
         editor.chain().focus().insertContentAt(pos, {
           type: "videoBlock",

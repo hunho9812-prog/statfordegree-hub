@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.98.0",
     "@tiptap/extension-color": "^2.4.0",
     "@tiptap/extension-highlight": "^2.4.0",
+    "@tiptap/extension-image": "^3.27.1",
     "@tiptap/extension-link": "^2.4.0",
     "@tiptap/extension-placeholder": "^2.4.0",
     "@tiptap/extension-table": "^2.27.2",
