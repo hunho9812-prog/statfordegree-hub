@@ -23,8 +23,8 @@ import { ToggleBlock } from "./extensions/ToggleBlock";
 import { ToggleHeading } from "./extensions/ToggleHeading";
 import { CalloutBlock } from "./extensions/CalloutBlock";
 import { VideoBlock } from "./extensions/VideoBlock";
-import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical, ImageUp, FileUp, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical, ImageUp, FileUp, Loader2, MoreHorizontal, Pencil, AlertTriangle } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
 import MonthPageManager from "./MonthPageManager";
 import CRMPage from "./CRMPage";
 import YearRevenueDashboard from "./YearRevenueDashboard";
@@ -59,7 +59,8 @@ interface DragState {
 
 export default function PageEditor({ pageId }: { pageId: string }) {
   const router = useRouter();
-  const { pages, updatePage, createPage } = useWorkspaceStore();
+  const pathname = usePathname();
+  const { pages, updatePage, createPage, deletePage } = useWorkspaceStore();
   const page = pages[pageId];
 
   const [title, setTitle] = useState(page?.title || "");
@@ -657,21 +658,16 @@ export default function PageEditor({ pageId }: { pageId: string }) {
                   const child = pages[childId];
                   if (!child) return null;
                   return (
-                    <button
+                    <ChildPageCard
                       key={childId}
-                      onClick={() => router.push(`/p/${childId}`)}
-                      className="flex flex-col items-start px-4 py-4 rounded-xl border border-[#e9e9e7] dark:border-[#3f3f3f] hover:shadow-md hover:-translate-y-0.5 text-left transition-all duration-150 group bg-white dark:bg-[#1e1e1c]"
-                    >
-                      <span className="text-3xl leading-none mb-3">{child.emoji || "📄"}</span>
-                      <p className="text-sm font-medium text-[#37352f] dark:text-[#e6e6e4] line-clamp-2 group-hover:text-black dark:group-hover:text-white transition-colors">
-                        {child.title || "제목 없음"}
-                      </p>
-                      {child.children.length > 0 && (
-                        <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] mt-1">
-                          하위 페이지 {child.children.length}개
-                        </p>
-                      )}
-                    </button>
+                      child={child}
+                      onOpen={() => router.push(`/p/${childId}`)}
+                      onRename={(title) => updatePage(childId, { title })}
+                      onDelete={() => {
+                        deletePage(childId);
+                        if (pathname === `/p/${childId}`) router.push(`/p/${pageId}`);
+                      }}
+                    />
                   );
                 })}
               </div>
@@ -871,5 +867,156 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+// ── Child page card with rename / delete ──────────────────────────────────────
+
+function ChildPageCard({
+  child,
+  onOpen,
+  onRename,
+  onDelete,
+}: {
+  child: { id: string; title: string; emoji: string; children: string[] };
+  onOpen: () => void;
+  onRename: (title: string) => void;
+  onDelete: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameVal, setRenameVal] = useState(child.title);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const renameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
+    if (isRenaming && renameRef.current) {
+      renameRef.current.focus();
+      renameRef.current.select();
+    }
+  }, [isRenaming]);
+
+  const commitRename = () => {
+    const t = renameVal.trim();
+    if (t && t !== child.title) onRename(t);
+    setIsRenaming(false);
+  };
+
+  return (
+    <>
+      <div className="relative group">
+        <button
+          onClick={onOpen}
+          className="w-full flex flex-col items-start px-4 py-4 rounded-xl border border-[#e9e9e7] dark:border-[#3f3f3f] hover:shadow-md hover:-translate-y-0.5 text-left transition-all duration-150 bg-white dark:bg-[#1e1e1c]"
+        >
+          <span className="text-3xl leading-none mb-3">{child.emoji || "📄"}</span>
+          <p className="text-sm font-medium text-[#37352f] dark:text-[#e6e6e4] line-clamp-2 group-hover:text-black dark:group-hover:text-white transition-colors">
+            {child.title || "제목 없음"}
+          </p>
+          {child.children.length > 0 && (
+            <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] mt-1">
+              하위 페이지 {child.children.length}개
+            </p>
+          )}
+        </button>
+
+        {/* 컨텍스트 메뉴 버튼 */}
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" ref={menuRef}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+            className="w-6 h-6 flex items-center justify-center rounded-md bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] shadow-sm"
+          >
+            <MoreHorizontal size={12} />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-7 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-xl py-1 w-40 text-sm">
+              <button
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#37352f] dark:text-[#e6e6e4] hover:bg-[rgba(55,53,47,0.06)] dark:hover:bg-[rgba(255,255,255,0.06)]"
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setRenameVal(child.title); setIsRenaming(true); }}
+              >
+                <Pencil size={12} className="text-[#9b9a97]" /> 이름 변경
+              </button>
+              <button
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#37352f] dark:text-[#e6e6e4] hover:bg-[rgba(55,53,47,0.06)] dark:hover:bg-[rgba(255,255,255,0.06)]"
+                onClick={(e) => { e.stopPropagation(); onOpen(); }}
+              >
+                <ChevronRight size={12} className="text-[#9b9a97]" /> 열기
+              </button>
+              <div className="my-1 border-t border-[#e9e9e7] dark:border-[#3f3f3f]" />
+              <button
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setShowDeleteConfirm(true); }}
+              >
+                <Trash2 size={12} /> 삭제
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 인라인 이름 변경 오버레이 */}
+        {isRenaming && (
+          <div className="absolute inset-0 z-40 flex items-end px-4 pb-4 rounded-xl bg-white/95 dark:bg-[#1e1e1c]/95 border border-blue-400">
+            <div className="w-full">
+              <p className="text-xs text-[#9b9a97] mb-1">새 이름 입력</p>
+              <input
+                ref={renameRef}
+                value={renameVal}
+                onChange={(e) => setRenameVal(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitRename();
+                  if (e.key === "Escape") setIsRenaming(false);
+                }}
+                className="w-full px-2 py-1 text-sm border border-blue-400 rounded-lg bg-white dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] outline-none"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 삭제 확인 모달 */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#3f3f3f] shadow-xl p-6 w-80 mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500 flex-shrink-0">
+                <AlertTriangle size={16} />
+              </div>
+              <div>
+                <h2 className="font-bold text-[#37352f] dark:text-[#e6e6e4] text-sm">페이지 삭제</h2>
+                <p className="text-xs text-[#9b9a97] mt-0.5">{child.emoji} {child.title || "제목 없음"}</p>
+              </div>
+            </div>
+            <p className="text-sm text-[#9b9a97] mb-1">
+              이 페이지{child.children.length > 0 ? `와 하위 페이지 ${child.children.length}개` : ""}를 삭제할까요?
+            </p>
+            <p className="text-xs text-red-400 mb-5">삭제한 페이지는 복구할 수 없습니다.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-sm text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => { onDelete(); setShowDeleteConfirm(false); }}
+                className="flex-1 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
