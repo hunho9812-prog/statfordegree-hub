@@ -84,10 +84,9 @@ export default function PayrollPage() {
     setSaving(true);
     const { error } = await supabase.from("labor_items").insert(item);
     setSaving(false);
-    if (!error) {
-      setForm(f => ({ ...f, name: "", ssn: "", account: "", pay: "" }));
-      setCalc({ tax33: 0, tax3: 0, local: 0, net: 0 });
-    }
+    if (error) { alert("추가 실패: " + error.message); return; }
+    setForm(f => ({ ...f, name: "", ssn: "", account: "", pay: "" }));
+    setCalc({ tax33: 0, tax3: 0, local: 0, net: 0 });
   };
 
   const handleDelete = async (id: string) => {

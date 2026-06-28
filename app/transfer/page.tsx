@@ -73,7 +73,8 @@ export default function TransferPage() {
     setSaving(true);
     const { error } = await supabase.from("debit_items").insert(item);
     setSaving(false);
-    if (!error) { setVendor(""); setDay(""); setAmount(""); setCurrency("KRW"); }
+    if (error) { alert("추가 실패: " + error.message); return; }
+    setVendor(""); setDay(""); setAmount(""); setCurrency("KRW");
   };
 
   const handleDelete = async (id: string) => {
