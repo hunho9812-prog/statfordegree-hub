@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
-
-const DEBIT_KEY = "debit_data";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 interface DebitItem {
   id: string;
@@ -21,6 +20,8 @@ function fmtUSD(v: number) { return "$" + v.toFixed(2); }
 export default function TransferPage() {
   const router = useRouter();
   const [items, setItems] = useState<DebitItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [vendor, setVendor] = useState("");
   const [day, setDay] = useState("");
   const [amount, setAmount] = useState("");
@@ -29,9 +30,28 @@ export default function TransferPage() {
   const [rateLoading, setRateLoading] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  useEffect(() => {
-    try { setItems(JSON.parse(localStorage.getItem(DEBIT_KEY) || "[]")); } catch { /**/ }
+  const loadItems = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) return;
+    setLoading(true);
+    const { data } = await supabase
+      .from("debit_items")
+      .select("*")
+      .order("day", { ascending: true });
+    if (data) setItems(data as DebitItem[]);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { loadItems(); }, [loadItems]);
+
+  // Realtime 구독
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+    const ch = supabase!
+      .channel("debit_items")
+      .on("postgres_changes", { event: "*", schema: "public", table: "debit_items" }, loadItems)
+      .subscribe();
+    return () => { supabase?.removeChannel(ch); };
+  }, [loadItems]);
 
   useEffect(() => {
     setRateLoading(true);
@@ -42,25 +62,29 @@ export default function TransferPage() {
       .finally(() => setRateLoading(false));
   }, []);
 
-  const persist = (list: DebitItem[]) => {
-    setItems(list);
-    localStorage.setItem(DEBIT_KEY, JSON.stringify(list));
-  };
-
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const d = parseInt(day);
     const a = parseFloat(amount);
     if (!vendor.trim() || !d || d < 1 || d > 31 || !a || a <= 0) return;
+    if (!isSupabaseConfigured || !supabase) return;
+
     const item: DebitItem = { id: uuidv4(), vendor: vendor.trim(), day: d, amount: a, currency };
-    const next = [...items, item].sort((a, b) => a.day - b.day);
-    persist(next);
-    setVendor(""); setDay(""); setAmount(""); setCurrency("KRW");
+    setSaving(true);
+    const { error } = await supabase.from("debit_items").insert(item);
+    setSaving(false);
+    if (!error) { setVendor(""); setDay(""); setAmount(""); setCurrency("KRW"); }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirmId === id) { persist(items.filter(i => i.id !== id)); setConfirmId(null); }
-    else { setConfirmId(id); setTimeout(() => setConfirmId(null), 3000); }
+  const handleDelete = async (id: string) => {
+    if (confirmId !== id) {
+      setConfirmId(id);
+      setTimeout(() => setConfirmId(null), 3000);
+      return;
+    }
+    if (!isSupabaseConfigured || !supabase) return;
+    await supabase.from("debit_items").delete().eq("id", id);
+    setConfirmId(null);
   };
 
   const krwItems = items.filter(i => i.currency === "KRW");
@@ -110,9 +134,9 @@ export default function TransferPage() {
                   </select>
                 </div>
               </div>
-              <button type="submit"
-                className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition-colors whitespace-nowrap">
-                <Plus size={15} /> 추가
+              <button type="submit" disabled={saving}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 disabled:opacity-60 transition-colors whitespace-nowrap">
+                {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} 추가
               </button>
             </div>
           </form>
@@ -148,7 +172,9 @@ export default function TransferPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.length === 0 ? (
+                {loading ? (
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-[#9b9a97]"><Loader2 size={18} className="animate-spin inline-block mr-2" />불러오는 중...</td></tr>
+                ) : items.length === 0 ? (
                   <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-[#9b9a97]">등록된 자동이체가 없습니다.</td></tr>
                 ) : items.map(item => (
                   <tr key={item.id} className="border-t border-[#e9e9e7] dark:border-[#2f2f2f] hover:bg-[#f7f6f3] dark:hover:bg-[#1f1f1f]">

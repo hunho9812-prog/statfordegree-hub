@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, RotateCcw } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, RotateCcw, Loader2 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
-
-const LABOR_KEY = "labor_data";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 interface LaborItem {
   id: string;
@@ -39,22 +38,35 @@ function calcTax(pay: number) {
 export default function PayrollPage() {
   const router = useRouter();
   const [items, setItems] = useState<LaborItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [filterMonth, setFilterMonth] = useState(getYM());
 
   const [form, setForm] = useState({ month: getYM(), name: "", ssn: "", account: "", pay: "" });
   const [calc, setCalc] = useState({ tax33: 0, tax3: 0, local: 0, net: 0 });
 
-  useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(LABOR_KEY) || "[]");
-      setItems(stored);
-    } catch { /**/ }
+  const loadItems = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) return;
+    setLoading(true);
+    const { data } = await supabase
+      .from("labor_items")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (data) setItems(data as LaborItem[]);
+    setLoading(false);
   }, []);
 
-  const persist = (list: LaborItem[]) => {
-    setItems(list);
-    localStorage.setItem(LABOR_KEY, JSON.stringify(list));
-  };
+  useEffect(() => { loadItems(); }, [loadItems]);
+
+  // Realtime 구독
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+    const ch = supabase!
+      .channel("labor_items")
+      .on("postgres_changes", { event: "*", schema: "public", table: "labor_items" }, loadItems)
+      .subscribe();
+    return () => { supabase?.removeChannel(ch); };
+  }, [loadItems]);
 
   const updatePay = (val: string) => {
     setForm(f => ({ ...f, pay: val }));
@@ -62,17 +74,26 @@ export default function PayrollPage() {
     setCalc(calcTax(n));
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const pay = parseFloat(form.pay) || 0;
     if (!form.name.trim() || pay <= 0) return;
+    if (!isSupabaseConfigured || !supabase) return;
+
     const taxes = calcTax(pay);
     const item: LaborItem = { id: uuidv4(), month: form.month, name: form.name.trim(), ssn: form.ssn, account: form.account, pay, ...taxes };
-    persist([item, ...items]);
-    setForm(f => ({ ...f, name: "", ssn: "", account: "", pay: "" }));
-    setCalc({ tax33: 0, tax3: 0, local: 0, net: 0 });
+    setSaving(true);
+    const { error } = await supabase.from("labor_items").insert(item);
+    setSaving(false);
+    if (!error) {
+      setForm(f => ({ ...f, name: "", ssn: "", account: "", pay: "" }));
+      setCalc({ tax33: 0, tax3: 0, local: 0, net: 0 });
+    }
   };
 
-  const handleDelete = (id: string) => persist(items.filter(i => i.id !== id));
+  const handleDelete = async (id: string) => {
+    if (!isSupabaseConfigured || !supabase) return;
+    await supabase.from("labor_items").delete().eq("id", id);
+  };
 
   const handleRefill = (item: LaborItem) => {
     setForm({ month: item.month, name: item.name, ssn: item.ssn, account: item.account, pay: String(item.pay) });
@@ -140,9 +161,9 @@ export default function PayrollPage() {
               </div>
             )}
 
-            <button onClick={handleAdd} disabled={!form.name.trim() || !form.pay}
+            <button onClick={handleAdd} disabled={!form.name.trim() || !form.pay || saving}
               className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-              <Plus size={15} /> 추가
+              {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} 추가
             </button>
           </div>
         </div>
@@ -167,7 +188,9 @@ export default function PayrollPage() {
                 </tr>
               </thead>
               <tbody>
-                {visible.length === 0 ? (
+                {loading ? (
+                  <tr><td colSpan={11} className="px-3 py-8 text-center text-sm text-[#9b9a97]"><Loader2 size={18} className="animate-spin inline-block mr-2" />불러오는 중...</td></tr>
+                ) : visible.length === 0 ? (
                   <tr><td colSpan={11} className="px-3 py-8 text-center text-sm text-[#9b9a97]">해당 월의 인건비 내역이 없습니다.</td></tr>
                 ) : (
                   <>
