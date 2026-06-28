@@ -56,13 +56,13 @@ export async function middleware(request: NextRequest) {
   if (user && pathname.startsWith("/accounting")) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (serviceRoleKey) {
-      // service role 클라이언트로 team_members 조회
+      // service role 클라이언트로 users 조회
       const adminSupabase = createServerClient(supabaseUrl, serviceRoleKey, {
         cookies: { getAll: () => [], setAll: () => {} },
       });
 
       const { data: profile } = await adminSupabase
-        .from("team_members")
+        .from("users")
         .select("role, accounting_access")
         .eq("id", user.id)
         .maybeSingle();

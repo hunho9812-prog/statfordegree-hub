@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
     // 호출자 권한 확인
     const { data: callerProfile } = await admin
-      .from("team_members")
+      .from("users")
       .select("role")
       .eq("id", user.id)
       .maybeSingle();
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { data: members, error } = await admin
-      .from("team_members")
+      .from("users")
       .select("*")
       .order("joined_at");
 
