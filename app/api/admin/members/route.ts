@@ -29,19 +29,19 @@ export async function GET(req: NextRequest) {
 
     const { data: members, error } = await admin
       .from("users")
-      .select("*")
-      .order("joined_at");
+      .select("id, name, email, role, status, created_at, accounting_access")
+      .eq("status", "approved")
+      .order("created_at");
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // joined_at → created_at 매핑 (프론트엔드 호환성)
     const result = (members ?? []).map((m: Record<string, unknown>) => ({
       id: m.id,
       name: (m.name as string) ?? "",
       email: (m.email as string) ?? "",
       role: ((m.role as string) ?? "member") as "admin" | "member",
-      status: "approved" as const,
-      created_at: m.joined_at,
+      status: (m.status as string) ?? "approved",
+      created_at: m.created_at,
       accounting_access: m.accounting_access ?? false,
     }));
 
