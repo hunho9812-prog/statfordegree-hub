@@ -87,11 +87,13 @@ export default function PayrollPage() {
     if (error) { alert("추가 실패: " + error.message); return; }
     setForm(f => ({ ...f, name: "", ssn: "", account: "", pay: "" }));
     setCalc({ tax33: 0, tax3: 0, local: 0, net: 0 });
+    loadItems();
   };
 
   const handleDelete = async (id: string) => {
     if (!isSupabaseConfigured || !supabase) return;
     await supabase.from("labor_items").delete().eq("id", id);
+    loadItems();
   };
 
   const handleRefill = (item: LaborItem) => {

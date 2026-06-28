@@ -75,6 +75,7 @@ export default function TransferPage() {
     setSaving(false);
     if (error) { alert("추가 실패: " + error.message); return; }
     setVendor(""); setDay(""); setAmount(""); setCurrency("KRW");
+    loadItems();
   };
 
   const handleDelete = async (id: string) => {
@@ -86,6 +87,7 @@ export default function TransferPage() {
     if (!isSupabaseConfigured || !supabase) return;
     await supabase.from("debit_items").delete().eq("id", id);
     setConfirmId(null);
+    loadItems();
   };
 
   const krwItems = items.filter(i => i.currency === "KRW");
