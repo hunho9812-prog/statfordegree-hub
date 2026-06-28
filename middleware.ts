@@ -62,7 +62,7 @@ export async function middleware(request: NextRequest) {
       });
 
       const { data: profile } = await adminSupabase
-        .from("users")
+        .from("team_members")
         .select("role, accounting_access")
         .eq("id", user.id)
         .maybeSingle();

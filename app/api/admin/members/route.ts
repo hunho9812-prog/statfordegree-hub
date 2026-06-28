@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
     // 호출자 권한 확인
     const { data: callerProfile } = await admin
-      .from("users")
+      .from("team_members")
       .select("role")
       .eq("id", user.id)
       .maybeSingle();
@@ -28,10 +28,9 @@ export async function GET(req: NextRequest) {
     }
 
     const { data: members, error } = await admin
-      .from("users")
-      .select("id, name, email, role, status, created_at, accounting_access")
-      .eq("status", "approved")
-      .order("created_at");
+      .from("team_members")
+      .select("id, name, email, role, joined_at, accounting_access")
+      .order("joined_at");
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -40,8 +39,8 @@ export async function GET(req: NextRequest) {
       name: (m.name as string) ?? "",
       email: (m.email as string) ?? "",
       role: ((m.role as string) ?? "member") as "admin" | "member",
-      status: (m.status as string) ?? "approved",
-      created_at: m.created_at,
+      status: "approved" as const,
+      created_at: m.joined_at,
       accounting_access: m.accounting_access ?? false,
     }));
 

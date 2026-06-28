@@ -13,7 +13,7 @@ async function getCallerProfile(req: NextRequest) {
 
   const admin = createAdminClient();
   const { data: profile } = await admin
-    .from("users")
+    .from("team_members")
     .select("id, role")
     .eq("id", user.id)
     .maybeSingle();
@@ -60,7 +60,7 @@ export async function PATCH(
   }
 
   const admin = createAdminClient();
-  const { error } = await admin.from("users").update(update).eq("id", id);
+  const { error } = await admin.from("team_members").update(update).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ success: true });
@@ -85,7 +85,7 @@ export async function DELETE(
   try {
     const admin = createAdminClient();
     // team_members에서 먼저 삭제
-    await admin.from("users").delete().eq("id", id);
+    await admin.from("team_members").delete().eq("id", id);
     // auth.users에서 삭제
     const { error } = await admin.auth.admin.deleteUser(id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
