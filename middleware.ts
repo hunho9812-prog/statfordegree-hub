@@ -52,6 +52,33 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // /accounting/* 접근 제어
+  if (user && pathname.startsWith("/accounting")) {
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (serviceRoleKey) {
+      // service role 클라이언트로 team_members 조회
+      const adminSupabase = createServerClient(supabaseUrl, serviceRoleKey, {
+        cookies: { getAll: () => [], setAll: () => {} },
+      });
+
+      const { data: profile } = await adminSupabase
+        .from("team_members")
+        .select("role, accounting_access")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const isAdmin = profile?.role === "admin" || user.email === process.env.ADMIN_EMAIL;
+      const hasAccess = isAdmin || profile?.accounting_access === true;
+
+      if (!hasAccess) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/";
+        url.search = "?denied=accounting";
+        return NextResponse.redirect(url);
+      }
+    }
+  }
+
   return response;
 }
 

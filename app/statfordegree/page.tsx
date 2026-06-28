@@ -20,10 +20,10 @@ export interface DashCard {
 }
 
 const DEFAULT_CARDS: DashCard[] = [
-  { id: "stats",    emoji: "📊", iconBg: "from-indigo-400 to-blue-600",   title: "통계",    href: "/stats" },
-  { id: "transfer", emoji: "🔄", iconBg: "from-blue-400 to-indigo-500",   title: "자동이체", href: "/transfer" },
-  { id: "payroll",  emoji: "👷", iconBg: "from-cyan-400 to-sky-500",      title: "인건비",  href: "/payroll" },
-  { id: "ledger",   emoji: "📒", iconBg: "from-green-400 to-emerald-500", title: "장부",    href: "/ledger" },
+  { id: "stats",    emoji: "📊", iconBg: "from-indigo-400 to-blue-600",   title: "통계",    href: "/accounting/stats" },
+  { id: "transfer", emoji: "🔄", iconBg: "from-blue-400 to-indigo-500",   title: "자동이체", href: "/accounting/transfer" },
+  { id: "payroll",  emoji: "👷", iconBg: "from-cyan-400 to-sky-500",      title: "인건비",  href: "/accounting/payroll" },
+  { id: "ledger",   emoji: "📒", iconBg: "from-green-400 to-emerald-500", title: "장부",    href: "/accounting/ledger" },
   { id: "manual",   emoji: "📋", iconBg: "from-sky-500 to-blue-600",      title: "메뉴얼",  href: `/p/${MENU_IDS.MANUAL}` },
   { id: "crm",      emoji: "👥", iconBg: "from-violet-400 to-purple-600", title: "고객관리", href: "/crm" },
 ];

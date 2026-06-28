@@ -11,6 +11,7 @@ interface Member {
   role: "admin" | "member";
   status: "pending" | "approved" | "rejected";
   created_at: string;
+  accounting_access?: boolean;
 }
 
 export default function AdminPage() {
@@ -42,6 +43,15 @@ export default function AdminPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: newRole }),
+    });
+    if (res.ok) fetchMembers();
+  }
+
+  async function handleAccountingAccessToggle(memberId: string, currentAccess: boolean) {
+    const res = await fetch(`/api/admin/users/${memberId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accounting_access: !currentAccess }),
     });
     if (res.ok) fetchMembers();
   }
@@ -88,23 +98,25 @@ export default function AdminPage() {
           </div>
 
           <div className="border border-[#e9e9e7] dark:border-[#2f2f2f] rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[2fr_3fr_1.5fr_1fr] gap-4 px-4 py-2.5 bg-[#fafaf9] dark:bg-[#1f1f1f] border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
+            <div className="grid grid-cols-[2fr_3fr_1.5fr_1.2fr_1fr] gap-4 px-4 py-2.5 bg-[#fafaf9] dark:bg-[#1f1f1f] border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
               <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">이름</span>
               <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">이메일</span>
               <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">역할</span>
+              <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">회계접근</span>
               <span className="text-xs font-medium text-[#9b9a97] uppercase tracking-wide">관리</span>
             </div>
 
             {membersLoading ? (
               <div className="divide-y divide-[#e9e9e7] dark:divide-[#2f2f2f]">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="grid grid-cols-[2fr_3fr_1.5fr_1fr] gap-4 items-center px-4 py-3">
+                  <div key={i} className="grid grid-cols-[2fr_3fr_1.5fr_1.2fr_1fr] gap-4 items-center px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
                       <div className="h-3 w-20 rounded bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
                     </div>
                     <div className="h-3 w-36 rounded bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
                     <div className="h-5 w-14 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
+                    <div className="h-5 w-10 rounded-full bg-[#f0efed] dark:bg-[#2f2f2f] animate-pulse" />
                     <div />
                   </div>
                 ))}
@@ -116,7 +128,7 @@ export default function AdminPage() {
             ) : (
               <div className="divide-y divide-[#e9e9e7] dark:divide-[#2f2f2f]">
                 {approvedMembers.map((m) => (
-                  <div key={m.id} className="grid grid-cols-[2fr_3fr_1.5fr_1fr] gap-4 items-center px-4 py-3 hover:bg-[#fafaf9] dark:hover:bg-[#1f1f1f] transition-colors">
+                  <div key={m.id} className="grid grid-cols-[2fr_3fr_1.5fr_1.2fr_1fr] gap-4 items-center px-4 py-3 hover:bg-[#fafaf9] dark:hover:bg-[#1f1f1f] transition-colors">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center flex-shrink-0">
                         {m.role === "admin"
@@ -146,6 +158,25 @@ export default function AdminPage() {
                         }`}>
                           {m.role === "admin" ? "관리자" : "팀원"}
                         </span>
+                      )}
+                    </div>
+                    <div>
+                      {isAdmin && profile && m.id !== profile.id ? (
+                        <button
+                          onClick={() => handleAccountingAccessToggle(m.id, m.accounting_access ?? false)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                            m.accounting_access
+                              ? "bg-blue-500"
+                              : "bg-[#d9d9d7] dark:bg-[#3f3f3f]"
+                          }`}
+                          title={m.accounting_access ? "회계 접근 허용됨 (클릭하여 해제)" : "회계 접근 미허용 (클릭하여 허용)"}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            m.accounting_access ? "translate-x-4" : "translate-x-0.5"
+                          }`} />
+                        </button>
+                      ) : (
+                        <span className="text-xs text-[#9b9a97]">{m.role === "admin" ? "자동" : "-"}</span>
                       )}
                     </div>
                     <div>

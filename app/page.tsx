@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 const SERVICES = [
   {
@@ -35,6 +36,26 @@ const SERVICES = [
   },
 ];
 
+function DeniedBanner() {
+  const searchParams = useSearchParams();
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("denied") === "accounting") {
+      setShow(true);
+    }
+  }, [searchParams]);
+
+  if (!show) return null;
+
+  return (
+    <div className="mb-6 px-4 py-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400 flex items-center justify-between gap-3">
+      <span>회계 페이지에 접근 권한이 없습니다. 관리자에게 문의하세요.</span>
+      <button onClick={() => setShow(false)} className="text-red-400 hover:text-red-600 flex-shrink-0">✕</button>
+    </div>
+  );
+}
+
 export default function PortalPage() {
   const router = useRouter();
 
@@ -51,6 +72,10 @@ export default function PortalPage() {
             운영 중인 서비스들을 한 곳에서 관리하는 통합 포털
           </p>
         </div>
+
+        <Suspense fallback={null}>
+          <DeniedBanner />
+        </Suspense>
 
         {/* Service cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-16">

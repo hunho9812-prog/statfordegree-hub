@@ -37,17 +37,30 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const { role } = await req.json();
-  if (!["admin", "member"].includes(role)) {
-    return NextResponse.json({ error: "잘못된 role 값" }, { status: 400 });
-  }
+  const body = await req.json();
 
   if (id === caller.id) {
     return NextResponse.json({ error: "자신의 권한은 변경할 수 없습니다." }, { status: 400 });
   }
 
+  // Build update object from allowed fields
+  const update: Record<string, unknown> = {};
+  if ("role" in body) {
+    if (!["admin", "member"].includes(body.role)) {
+      return NextResponse.json({ error: "잘못된 role 값" }, { status: 400 });
+    }
+    update.role = body.role;
+  }
+  if ("accounting_access" in body) {
+    update.accounting_access = Boolean(body.accounting_access);
+  }
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: "변경할 필드가 없습니다." }, { status: 400 });
+  }
+
   const admin = createAdminClient();
-  const { error } = await admin.from("team_members").update({ role }).eq("id", id);
+  const { error } = await admin.from("team_members").update(update).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ success: true });

@@ -35,13 +35,14 @@ export async function GET(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     // joined_at → created_at 매핑 (프론트엔드 호환성)
-    const result = (members ?? []).map((m: Record<string, string>) => ({
+    const result = (members ?? []).map((m: Record<string, unknown>) => ({
       id: m.id,
-      name: m.name ?? "",
-      email: m.email ?? "",
-      role: (m.role ?? "member") as "admin" | "member",
+      name: (m.name as string) ?? "",
+      email: (m.email as string) ?? "",
+      role: ((m.role as string) ?? "member") as "admin" | "member",
       status: "approved" as const,
       created_at: m.joined_at,
+      accounting_access: m.accounting_access ?? false,
     }));
 
     return NextResponse.json({ members: result });
