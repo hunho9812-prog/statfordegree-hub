@@ -124,7 +124,7 @@ export default function RequestsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-white dark:bg-[#191919]">
-      <div className="max-w-4xl mx-auto px-8 pt-12 pb-12 space-y-8">
+      <div className="px-8 pt-6 pb-6 space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between">

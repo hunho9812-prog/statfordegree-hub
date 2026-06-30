@@ -15,7 +15,7 @@ export default function AccountingPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f5f5f7] dark:bg-[#191919]">
-      <div className="max-w-3xl mx-auto px-8 py-12">
+      <div className="px-8 py-6">
         <div className="flex items-center gap-4 mb-12">
           <button
             onClick={() => router.push("/statfordegree")}

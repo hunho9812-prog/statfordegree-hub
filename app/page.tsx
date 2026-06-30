@@ -63,7 +63,7 @@ export default function PortalPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-white dark:bg-[#1a1a1a]">
-      <div className="max-w-[920px] mx-auto px-10 py-8">
+      <div className="px-8 py-6">
 
         {/* Date + Greeting */}
         <p className="text-[12px] font-semibold text-[#9aa39b] tracking-[0.02em]">
