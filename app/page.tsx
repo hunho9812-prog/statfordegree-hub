@@ -31,8 +31,8 @@ const SERVICES = [
     shadow: "shadow-yellow-200 dark:shadow-yellow-900/30",
     title: "스탯지니",
     description: "AI 기반 통계 및 연구 지원 시스템",
-    href: null,
-    ready: false,
+    href: "/statgenie",
+    ready: true,
   },
 ];
 
