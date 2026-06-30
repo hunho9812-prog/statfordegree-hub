@@ -141,10 +141,10 @@ export default function StatfordegreePage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f5f5f7] dark:bg-[#191919]">
-      <div className="max-w-3xl mx-auto px-8 py-12">
+      <div className="px-8 py-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-12">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push("/")}
@@ -191,7 +191,7 @@ export default function StatfordegreePage() {
         </div>
 
         {/* Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {cards.map((card, idx) => (
             <DashCardItem
               key={card.id}
