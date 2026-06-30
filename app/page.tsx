@@ -63,26 +63,26 @@ export default function PortalPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-white dark:bg-[#1a1a1a]">
-      <div className="max-w-[920px] mx-auto px-14 py-[52px]">
+      <div className="max-w-[920px] mx-auto px-10 py-8">
 
         {/* Date + Greeting */}
         <p className="text-[12px] font-semibold text-[#9aa39b] tracking-[0.02em]">
           {dateStr}
         </p>
-        <h1 className="mt-[11px] text-[34px] font-extrabold tracking-[-0.03em] text-[#22271f] dark:text-[#e8ebe8] leading-tight">
+        <h1 className="mt-2 text-[28px] font-extrabold tracking-[-0.03em] text-[#22271f] dark:text-[#e8ebe8] leading-tight">
           {greeting}
         </h1>
-        <p className="mt-3 mb-[34px] text-[15px] text-[#6b736b] leading-relaxed">
+        <p className="mt-2 mb-6 text-[14px] text-[#6b736b] leading-relaxed">
           킴퍼블리가 운영하는 서비스와 고객 관리를 한 곳에서 모아봅니다.
         </p>
 
         {/* Services label */}
-        <p className="text-[12px] font-bold text-[#6b736b] tracking-[0.04em] uppercase mb-4">
+        <p className="text-[11px] font-bold text-[#6b736b] tracking-[0.04em] uppercase mb-3">
           Services
         </p>
 
         {/* Service cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           {SERVICES.map((svc) => (
             <button
               key={svc.id}
@@ -90,26 +90,26 @@ export default function PortalPage() {
                 if (svc.href) router.push(svc.href);
                 else alert(`${svc.title}: 준비 중입니다.`);
               }}
-              className="group border border-[#e9ece9] dark:border-[#2f2f2f] rounded-[14px] p-5 bg-white dark:bg-[#222] text-left transition-all duration-150 hover:shadow-md hover:-translate-y-px"
+              className="group border border-[#e9ece9] dark:border-[#2f2f2f] rounded-[12px] p-4 bg-white dark:bg-[#222] text-left transition-all duration-150 hover:shadow-md hover:-translate-y-px"
               style={{ opacity: svc.ready ? 1 : 0.7 }}
             >
               <div className="flex justify-between items-start">
                 <div
-                  className="w-[46px] h-[46px] rounded-[12px] flex items-center justify-center text-[22px]"
+                  className="w-[40px] h-[40px] rounded-[10px] flex items-center justify-center text-[20px]"
                   style={{ background: svc.bg }}
                 >
                   {svc.emoji}
                 </div>
                 {svc.ready ? (
-                  <span className="w-[7px] h-[7px] rounded-full bg-[#5e7c64] mt-[7px] inline-block" />
+                  <span className="w-[7px] h-[7px] rounded-full bg-[#5e7c64] mt-1 inline-block" />
                 ) : (
-                  <span className="text-[10.5px] text-[#9aa39b] mt-[5px]">준비 중</span>
+                  <span className="text-[10px] text-[#9aa39b] mt-1">준비 중</span>
                 )}
               </div>
-              <p className="mt-4 text-[14.5px] font-bold text-[#22271f] dark:text-[#e8ebe8]">
+              <p className="mt-3 text-[13.5px] font-bold text-[#22271f] dark:text-[#e8ebe8]">
                 {svc.title}
               </p>
-              <p className="mt-[5px] text-[12px] text-[#8b938b] leading-relaxed">
+              <p className="mt-1 text-[12px] text-[#8b938b] leading-relaxed">
                 {svc.desc}
               </p>
             </button>
