@@ -76,28 +76,6 @@ export default function PortalPage() {
           킴퍼블리가 운영하는 서비스와 고객 관리를 한 곳에서 모아봅니다.
         </p>
 
-        {/* Stats row */}
-        <div className="flex mb-10 border border-[#e9ece9] dark:border-[#2f2f2f] rounded-[14px] overflow-hidden">
-          <div className="flex-1 px-5 py-[18px] border-r border-[#e9ece9] dark:border-[#2f2f2f]">
-            <p className="text-[12px] text-[#9aa39b]">이번 달 신규 고객</p>
-            <p className="mt-[7px] text-[26px] font-extrabold tracking-[-0.02em] text-[#22271f] dark:text-[#e8ebe8]">
-              —
-            </p>
-          </div>
-          <div className="flex-1 px-5 py-[18px] border-r border-[#e9ece9] dark:border-[#2f2f2f]">
-            <p className="text-[12px] text-[#9aa39b]">진행 중 의뢰</p>
-            <p className="mt-[7px] text-[26px] font-extrabold tracking-[-0.02em] text-[#22271f] dark:text-[#e8ebe8]">
-              —
-            </p>
-          </div>
-          <div className="flex-1 px-5 py-[18px]">
-            <p className="text-[12px] text-[#9aa39b]">이번 달 매출</p>
-            <p className="mt-[7px] text-[26px] font-extrabold tracking-[-0.02em] text-[#22271f] dark:text-[#e8ebe8]">
-              —
-            </p>
-          </div>
-        </div>
-
         {/* Services label */}
         <p className="text-[12px] font-bold text-[#6b736b] tracking-[0.04em] uppercase mb-4">
           Services
