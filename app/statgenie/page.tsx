@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, Pencil, Loader2, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Pencil, Loader2, X, BookOpen } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { useLedger } from "@/hooks/useLedger";
+import { useGenieLedger } from "@/hooks/useGenieLedger";
 
 interface CostEntry {
   id: string;
@@ -25,7 +25,7 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 export default function StatGeniePage() {
   const router = useRouter();
-  const { entries: ledgerEntries } = useLedger();
+  const { entries: ledgerEntries } = useGenieLedger();
 
   const [entries, setEntries] = useState<CostEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,9 +141,13 @@ export default function StatGeniePage() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-white dark:hover:bg-[#252525] border border-[#e9e9e7] dark:border-[#2f2f2f] transition-colors">
             <ArrowLeft size={14} /> 홈
           </button>
-          <h1 className="text-xl font-bold">
+          <h1 className="text-xl font-bold flex-1">
             🤖 <span className="bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">스탯지니</span>
           </h1>
+          <button onClick={() => router.push("/statgenie/ledger")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-amber-200 dark:border-amber-800 transition-colors font-medium">
+            <BookOpen size={14} /> 장부
+          </button>
         </div>
 
         {/* 요약 카드 */}
@@ -154,7 +158,7 @@ export default function StatGeniePage() {
             <p className="text-xs text-[#9b9a97] mt-1">{entries.length}건</p>
           </div>
           <div className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#2f2f2f] shadow-sm p-5 border-l-4 border-l-blue-400">
-            <p className="text-xs font-bold text-[#9b9a97] uppercase tracking-wide mb-1">누적 수익 (장부 연동)</p>
+            <p className="text-xs font-bold text-[#9b9a97] uppercase tracking-wide mb-1">누적 수익 (스탯지니 장부)</p>
             <p className="text-2xl font-extrabold text-blue-500">{fmt(totalRevenue)}</p>
             <p className="text-xs text-[#9b9a97] mt-1">{ledgerEntries.length > 0 ? `${ledgerEntries.length}개월 합산` : "장부 데이터 없음"}</p>
           </div>
