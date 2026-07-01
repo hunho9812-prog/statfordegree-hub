@@ -77,11 +77,11 @@ export default function PortalPage() {
       </div>
 
       {/* Service cards */}
-      <div className="w-full max-w-2xl">
+      <div className="w-full max-w-3xl">
         <p className="text-[10px] font-bold text-[#9aa39b] tracking-[0.06em] uppercase mb-3">
           Services
         </p>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-4">
           {SERVICES.map((svc) => (
             <button
               key={svc.id}
@@ -89,12 +89,12 @@ export default function PortalPage() {
                 if (svc.href) router.push(svc.href);
                 else alert(`${svc.title}: 준비 중입니다.`);
               }}
-              className="border border-[#e9ece9] dark:border-[#2f2f2f] rounded-2xl p-5 bg-white dark:bg-[#222] text-left transition-all duration-150 hover:shadow-md hover:-translate-y-px"
+              className="border border-[#e9ece9] dark:border-[#2f2f2f] rounded-2xl p-7 bg-white dark:bg-[#222] text-left transition-all duration-150 hover:shadow-md hover:-translate-y-px"
               style={{ opacity: svc.ready ? 1 : 0.65 }}
             >
-              <div className="flex justify-between items-start mb-4">
+              <div className="flex justify-between items-start mb-6">
                 <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl"
+                  className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl"
                   style={{ background: svc.bg }}
                 >
                   {svc.emoji}
@@ -105,10 +105,10 @@ export default function PortalPage() {
                   <span className="text-[10px] text-[#9aa39b]">준비 중</span>
                 )}
               </div>
-              <p className="text-[14px] font-bold text-[#22271f] dark:text-[#e8ebe8]">
+              <p className="text-[15px] font-bold text-[#22271f] dark:text-[#e8ebe8]">
                 {svc.title}
               </p>
-              <p className="mt-1 text-[12px] text-[#8b938b] leading-relaxed">
+              <p className="mt-1.5 text-[13px] text-[#8b938b] leading-relaxed">
                 {svc.desc}
               </p>
             </button>
