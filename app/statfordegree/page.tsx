@@ -141,9 +141,8 @@ export default function StatfordegreePage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f5f5f7] dark:bg-[#191919]">
-      <div className="px-8 py-6">
-
-        {/* Header */}
+      {/* Header — always at top */}
+      <div className="px-8 pt-6 pb-0">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
@@ -189,9 +188,12 @@ export default function StatfordegreePage() {
             )}
           </div>
         </div>
+      </div>
 
-        {/* Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      {/* Cards — centered */}
+      <div className="flex flex-col items-center justify-center px-8 py-8">
+        <div className="w-full max-w-2xl">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {cards.map((card, idx) => (
             <DashCardItem
               key={card.id}
@@ -225,6 +227,7 @@ export default function StatfordegreePage() {
             카드를 드래그하여 순서를 변경하거나, 이모지·색상·이름을 수정할 수 있습니다.
           </p>
         )}
+        </div>
       </div>
 
       {/* Add card modal */}
