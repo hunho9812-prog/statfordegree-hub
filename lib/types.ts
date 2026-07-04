@@ -51,6 +51,7 @@ export interface Customer {
   balance_received: boolean;
   kmong_review: boolean;
   kakao_review: boolean;
+  cash_receipt: boolean;
   submit_date: string;
   status: string;                 // references a StatusOption id or label
   memo: string;

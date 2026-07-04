@@ -439,6 +439,7 @@ const EMPTY_FORM = {
   balance_received: false,
   kmong_review: false,
   kakao_review: false,
+  cash_receipt: false,
   submit_date: "",
   status: "",
   memo: "",
@@ -556,13 +557,19 @@ function AddCustomerRow({
           onChange={(e) => set("kakao_review", e.target.checked)}
           className="w-4 h-4 accent-blue-500 cursor-pointer" />
       </td>
+      {/* 현금영수증 */}
+      <td className="px-3 py-2 text-center">
+        <input type="checkbox" checked={form.cash_receipt}
+          onChange={(e) => set("cash_receipt", e.target.checked)}
+          className="w-4 h-4 accent-blue-500 cursor-pointer" />
+      </td>
       {/* 제출날짜 */}
       <td className="px-3 py-2">
         <input
+          type="date"
           value={form.submit_date}
           onChange={(e) => set("submit_date", e.target.value)}
-          placeholder="날짜"
-          className="w-full bg-transparent outline-none text-sm"
+          className="w-full bg-transparent outline-none text-sm cursor-pointer"
         />
       </td>
       {/* Status */}
@@ -605,7 +612,7 @@ function AddCustomerRow({
 function AddTriggerRow({ onAdd }: { onAdd: () => void }) {
   return (
     <tr className="border-t border-[#e9e9e7] dark:border-[#2f2f2f]">
-      <td colSpan={15} className="px-3 py-2">
+      <td colSpan={16} className="px-3 py-2">
         <button
           onClick={onAdd}
           className="flex items-center gap-1.5 text-sm text-[#9b9a97] dark:text-[#6b6b6b] hover:text-[#37352f] dark:hover:text-[#e6e6e4] transition-colors"
@@ -782,8 +789,16 @@ function DataRow({
       <td className="px-3 py-2 text-center">
         <BoolCell value={customer.kakao_review} onChange={(v) => onUpdate({ kakao_review: v })} />
       </td>
-      <td className="px-3 py-2 min-w-[110px]">
-        <TextCell value={customer.submit_date} onChange={(v) => onUpdate({ submit_date: v })} placeholder="날짜" />
+      <td className="px-3 py-2 text-center">
+        <BoolCell value={customer.cash_receipt ?? false} onChange={(v) => onUpdate({ cash_receipt: v })} />
+      </td>
+      <td className="px-3 py-2 min-w-[130px]">
+        <input
+          type="date"
+          value={customer.submit_date ?? ""}
+          onChange={(e) => onUpdate({ submit_date: e.target.value })}
+          className="w-full bg-transparent outline-none text-sm cursor-pointer dark:text-[#e6e6e4] dark:color-scheme-dark"
+        />
       </td>
       <td className="px-3 py-2 min-w-[130px]">
         <StatusCell value={customer.status} statuses={statuses} onChange={(v) => onUpdate({ status: v })} />
@@ -854,7 +869,7 @@ export default function CRMPage({
 
   const HEADERS = [
     "이름", "담당자", "Tags", "알바", "정산금액",
-    "전체금액", "잔금", "후기제안", "잔금받음?", "크몽후기", "카톡후기",
+    "전체금액", "잔금", "후기제안", "잔금받음?", "크몽후기", "카톡후기", "현금영수증",
     "제출날짜", "Status", "메모", "",
   ];
 
