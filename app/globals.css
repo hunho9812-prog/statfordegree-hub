@@ -367,6 +367,15 @@ select:focus {
   border-radius: 8px;
   margin: 0.75rem 0;
   display: block;
+  /* Ensure pointer events work for hover even inside toggles */
+  pointer-events: auto;
+  position: relative;
+}
+
+/* Image wrapper: allow hover controls to appear on top */
+.tiptap-editor-content p:has(img),
+.tiptap-editor-content .toggle-content p:has(img) {
+  position: relative;
 }
 
 /* ─── Toggle Block ────────────────────────────────────────────────── */
@@ -377,15 +386,26 @@ select:focus {
 /* ─── Callout Block ───────────────────────────────────────────────── */
 .tiptap-editor-content .callout-block p { margin: 0; }
 
-/* Placeholder for toggle/callout inner paragraphs */
-.tiptap-editor-content .is-empty::before {
+/* Placeholder: only show for the focused node (showOnlyCurrent: true is set in code) */
+.tiptap-editor-content .is-empty.is-node-empty::before {
   content: attr(data-placeholder);
   color: #c4c3bf;
   pointer-events: none;
   float: left;
   height: 0;
 }
-.dark .tiptap-editor-content .is-empty::before { color: #4f4f4f; }
+/* Fallback for nested empty nodes */
+.tiptap-editor-content .toggle-content .is-empty::before,
+.tiptap-editor-content .toggle-heading-body .is-empty::before {
+  content: attr(data-placeholder);
+  color: #c4c3bf;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+.dark .tiptap-editor-content .is-empty.is-node-empty::before { color: #4f4f4f; }
+.dark .tiptap-editor-content .toggle-content .is-empty::before,
+.dark .tiptap-editor-content .toggle-heading-body .is-empty::before { color: #4f4f4f; }
 
 /* ─── Legacy tiptap-editor class compatibility ────────────────────── */
 .tiptap-editor .ProseMirror { outline: none; }

@@ -21,10 +21,11 @@ import { formatRelativeTime } from "@/lib/utils";
 import EditorMenuBar from "./EditorMenuBar";
 import SlashCommandMenu, { SLASH_COMMANDS } from "./SlashCommandMenu";
 import { ToggleBlock } from "./extensions/ToggleBlock";
+import { FontSize } from "./extensions/FontSize";
 import { ToggleHeading } from "./extensions/ToggleHeading";
 import { CalloutBlock } from "./extensions/CalloutBlock";
 import { VideoBlock } from "./extensions/VideoBlock";
-import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical, ImageUp, FileUp, Loader2, MoreHorizontal, Pencil, AlertTriangle } from "lucide-react";
+import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical, ImageUp, FileUp, Loader2, MoreHorizontal, Pencil, AlertTriangle, ChevronDown as ChevronDownIcon } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import MonthPageManager from "./MonthPageManager";
 import CRMPage from "./CRMPage";
@@ -75,6 +76,8 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   });
 
   const [blockButtons, setBlockButtons] = useState<BlockButton[]>([]);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [customColor, setCustomColor] = useState("");
   const [blockMenuOpen, setBlockMenuOpen] = useState(false);
   const [blockMenuCoords, setBlockMenuCoords] = useState({ x: 0, y: 0 });
   const [dropBtnIdx, setDropBtnIdx] = useState<number | null>(null);
@@ -112,6 +115,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           return "'/' 를 입력하여 블록을 추가하세요";
         },
         emptyEditorClass: "is-editor-empty",
+        showOnlyCurrent: true,
         includeChildren: true,
       }),
       TaskList,
@@ -124,6 +128,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       }),
       TextStyle,
       Color,
+      FontSize,
       Image.configure({ inline: false, allowBase64: true }),
       ToggleBlock,
       ToggleHeading,
@@ -541,40 +546,45 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       {editor && (
         <BubbleMenu
           editor={editor}
-          tippyOptions={{ duration: 100, placement: "top" }}
+          tippyOptions={{ duration: 100, placement: "top", onHide: () => setShowColorPicker(false) }}
           className="flex items-center gap-0.5 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg shadow-lg px-1.5 py-1"
         >
+          {/* Bold */}
           <button
             onClick={() => editor.chain().focus().toggleBold().run()}
             className={`w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${editor.isActive("bold") ? "bg-gray-200 dark:bg-gray-600 text-blue-600" : "text-[#37352f] dark:text-[#e6e6e4]"}`}
           >
             <Bold size={13} />
           </button>
+          {/* Italic */}
           <button
             onClick={() => editor.chain().focus().toggleItalic().run()}
             className={`w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${editor.isActive("italic") ? "bg-gray-200 dark:bg-gray-600 text-blue-600" : "text-[#37352f] dark:text-[#e6e6e4]"}`}
           >
             <Italic size={13} />
           </button>
+          {/* Underline */}
           <button
             onClick={() => editor.chain().focus().toggleUnderline().run()}
             className={`w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${editor.isActive("underline") ? "bg-gray-200 dark:bg-gray-600 text-blue-600" : "text-[#37352f] dark:text-[#e6e6e4]"}`}
           >
             <UnderlineIcon size={13} />
           </button>
+          {/* Code */}
           <button
             onClick={() => editor.chain().focus().toggleCode().run()}
             className={`w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${editor.isActive("code") ? "bg-gray-200 dark:bg-gray-600 text-blue-600" : "text-[#37352f] dark:text-[#e6e6e4]"}`}
           >
             <Code size={13} />
           </button>
-          <div className="w-px h-4 bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-0.5" />
+          {/* Highlight */}
           <button
             onClick={() => editor.chain().focus().toggleHighlight().run()}
             className={`w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${editor.isActive("highlight") ? "bg-yellow-200 text-yellow-800" : "text-[#37352f] dark:text-[#e6e6e4]"}`}
           >
             H
           </button>
+          {/* Link */}
           <button
             onClick={() => {
               const url = prompt("링크 URL:");
@@ -584,6 +594,115 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           >
             🔗
           </button>
+
+          <div className="w-px h-4 bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-0.5" />
+
+          {/* Font size dropdown */}
+          <div className="relative flex items-center">
+            <select
+              value={(() => {
+                const attrs = editor.getAttributes("textStyle");
+                return attrs.fontSize ?? "";
+              })()}
+              onChange={(e) => {
+                const val = e.target.value;
+                const cmds = editor.chain().focus() as unknown as {
+                  setFontSize: (s: string) => { run: () => void };
+                  unsetFontSize: () => { run: () => void };
+                };
+                if (!val) cmds.unsetFontSize().run();
+                else cmds.setFontSize(val).run();
+              }}
+              className="appearance-none h-6 pl-1.5 pr-4 rounded text-[11px] text-[#37352f] dark:text-[#e6e6e4] bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 border-none outline-none cursor-pointer"
+              title="글씨 크기"
+            >
+              <option value="">기본</option>
+              <option value="12px">Small</option>
+              <option value="18px">Large</option>
+              <option value="24px">XL</option>
+            </select>
+            <ChevronDownIcon size={9} className="absolute right-0.5 pointer-events-none text-gray-400" />
+          </div>
+
+          {/* Text color */}
+          <div className="relative">
+            <button
+              onClick={() => setShowColorPicker((v) => !v)}
+              className="w-7 h-7 flex flex-col items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors gap-0.5"
+              title="글씨 색상"
+            >
+              <span className="text-[11px] font-bold text-[#37352f] dark:text-[#e6e6e4] leading-none">A</span>
+              <span
+                className="w-4 h-1 rounded-sm"
+                style={{ background: editor.getAttributes("textStyle").color ?? "#37352f" }}
+              />
+            </button>
+
+            {showColorPicker && (
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-xl p-3 w-52"
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">글씨 색상</p>
+                <div className="grid grid-cols-5 gap-1.5 mb-2">
+                  {[
+                    { label: "기본", color: null },
+                    { label: "회색", color: "#9b9a97" },
+                    { label: "갈색", color: "#64473a" },
+                    { label: "주황", color: "#d9730d" },
+                    { label: "노랑", color: "#cb912f" },
+                    { label: "초록", color: "#448361" },
+                    { label: "파랑", color: "#337ea9" },
+                    { label: "보라", color: "#9065b0" },
+                    { label: "분홍", color: "#c14c8a" },
+                    { label: "빨강", color: "#d44c47" },
+                  ].map(({ label, color }) => (
+                    <button
+                      key={label}
+                      title={label}
+                      onClick={() => {
+                        if (color) {
+                          editor.chain().focus().setColor(color).run();
+                        } else {
+                          editor.chain().focus().unsetColor().run();
+                        }
+                        setShowColorPicker(false);
+                      }}
+                      className="w-7 h-7 rounded-lg border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-500 transition-colors flex items-center justify-center"
+                      style={{ background: color ?? "#f0f0f0" }}
+                    >
+                      {!color && (
+                        <span className="text-[9px] text-gray-500 font-bold leading-none">기</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={customColor}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    placeholder="#hex"
+                    maxLength={7}
+                    className="flex-1 h-6 px-2 rounded border border-[#e9e9e7] dark:border-[#3f3f3f] text-[11px] bg-transparent text-[#37352f] dark:text-[#e6e6e4] outline-none focus:border-blue-400"
+                  />
+                  <button
+                    onClick={() => {
+                      const c = customColor.trim();
+                      if (/^#[0-9a-fA-F]{3,6}$/.test(c)) {
+                        editor.chain().focus().setColor(c).run();
+                        setShowColorPicker(false);
+                        setCustomColor("");
+                      }
+                    }}
+                    className="h-6 px-2 rounded bg-[#37352f] dark:bg-[#e6e6e4] text-white dark:text-[#37352f] text-[10px] font-semibold"
+                  >
+                    적용
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </BubbleMenu>
       )}
 
