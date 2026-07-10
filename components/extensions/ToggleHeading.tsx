@@ -168,12 +168,8 @@ function ToggleHeadingView({ node, updateAttributes, deleteNode, editor, getPos 
           </div>
         </div>
 
-        {/* Body content */}
-        {isOpen && (
-          <div className={`toggle-heading-body mt-0.5 ${level === 2 ? "pl-5 ml-[9px] border-l-2 border-[#e9e9e7] dark:border-[#3a3a3a]" : "pl-4 ml-[9px] border-l border-[#e9e9e7] dark:border-[#3a3a3a]"}`}>
-            <NodeViewContent />
-          </div>
-        )}
+        {/* Body content — always in DOM so contentDOM stays attached to ProseMirror */}
+        <NodeViewContent className={`toggle-heading-body mt-0.5${!isOpen ? " hidden" : ""} ${level === 2 ? "pl-5 ml-[9px] border-l-2 border-[#e9e9e7] dark:border-[#3a3a3a]" : "pl-4 ml-[9px] border-l border-[#e9e9e7] dark:border-[#3a3a3a]"}`} />
 
         {/* Hidden file inputs */}
         <input

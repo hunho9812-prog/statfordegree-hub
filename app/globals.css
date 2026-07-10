@@ -395,25 +395,6 @@ select:focus {
   user-select: text;
   -webkit-user-select: text;
 }
-/* Ensure ProseMirror-injected content inside toggles is always editable */
-.tiptap-editor-content .toggle-content [data-node-view-content-react],
-.tiptap-editor-content .toggle-content [data-node-view-content] {
-  pointer-events: auto !important;
-  user-select: text !important;
-  -webkit-user-select: text !important;
-  cursor: text;
-}
-.tiptap-editor-content .toggle-content p,
-.tiptap-editor-content .toggle-content h1,
-.tiptap-editor-content .toggle-content h2,
-.tiptap-editor-content .toggle-content h3,
-.tiptap-editor-content .toggle-content li,
-.tiptap-editor-content .toggle-content blockquote {
-  pointer-events: auto;
-  user-select: text;
-  -webkit-user-select: text;
-  cursor: text;
-}
 .dark .tiptap-editor-content .toggle-content { border-left-color: #2f2f2f; }
 
 /* Image selected state */
@@ -435,18 +416,7 @@ select:focus {
   float: left;
   height: 0;
 }
-/* Fallback for nested empty nodes */
-.tiptap-editor-content .toggle-content .is-empty::before,
-.tiptap-editor-content .toggle-heading-body .is-empty::before {
-  content: attr(data-placeholder);
-  color: #c4c3bf;
-  pointer-events: none;
-  float: left;
-  height: 0;
-}
 .dark .tiptap-editor-content .is-empty.is-node-empty::before { color: #4f4f4f; }
-.dark .tiptap-editor-content .toggle-content .is-empty::before,
-.dark .tiptap-editor-content .toggle-heading-body .is-empty::before { color: #4f4f4f; }
 
 /* ─── Legacy tiptap-editor class compatibility ────────────────────── */
 .tiptap-editor .ProseMirror { outline: none; }

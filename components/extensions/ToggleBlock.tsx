@@ -127,10 +127,9 @@ function ToggleView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
           />
         </div>
 
-        {/* Body — NodeViewContent = ProseMirror contentDOM, fully editable */}
-        <div className={`toggle-content pl-6 mt-1 ${!isOpen ? "hidden" : ""}`}>
-          <NodeViewContent />
-        </div>
+        {/* Body — NodeViewContent = ProseMirror contentDOM, fully editable.
+            Always in DOM (display:none when closed) so contentDOM stays attached. */}
+        <NodeViewContent className={`toggle-content pl-6 mt-1${!isOpen ? " hidden" : ""}`} />
       </div>
     </NodeViewWrapper>
   );
