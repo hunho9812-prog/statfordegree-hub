@@ -21,13 +21,19 @@ function ToggleView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
     if (!editing) setDraft(title);
   }, [title, editing]);
 
+  // Focus input whenever editing becomes true (covers both manual click and autoFocus)
+  useEffect(() => {
+    if (editing) {
+      setTimeout(() => inputRef.current?.focus(), 10);
+    }
+  }, [editing]);
+
   // Auto-focus new toggles created via Enter key
   useEffect(() => {
     if (autoFocus) {
       setDraft("");
       setEditing(true);
       updateAttributes({ autoFocus: false });
-      setTimeout(() => inputRef.current?.focus(), 20);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFocus]);
@@ -159,12 +165,18 @@ function ToggleView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={commitTitle}
                 onKeyDown={handleTitleKeyDown}
+                onClick={(e) => e.stopPropagation()}
                 placeholder="토글 제목 입력..."
                 className="w-full bg-transparent outline-none text-base font-medium text-[#37352f] dark:text-[#e6e6e4] leading-6"
               />
             ) : (
               <span
-                onClick={() => { setDraft(title); setEditing(true); }}
+                onMouseDown={(e) => {
+                  e.preventDefault(); // prevent ProseMirror from stealing focus before input mounts
+                  e.stopPropagation();
+                  setDraft(title);
+                  setEditing(true);
+                }}
                 className="cursor-text text-base font-medium text-[#37352f] dark:text-[#e6e6e4] leading-6 min-h-[24px] block"
               >
                 {title || (
