@@ -165,7 +165,15 @@ export const ToggleBlock = Node.create({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(ToggleView);
+    return ReactNodeViewRenderer(ToggleView, {
+      // Default stopEvent uses this.contentDOM.contains(target) which can fail
+      // when contentDOMElement isn't mounted yet. Use CSS-selector approach instead:
+      // events inside [data-node-view-content] go to ProseMirror; everything else is stopped.
+      stopEvent: ({ event }) => {
+        const target = event.target as HTMLElement;
+        return !target.closest("[data-node-view-content]");
+      },
+    });
   },
 
   addKeyboardShortcuts() {

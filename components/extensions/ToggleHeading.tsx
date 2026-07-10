@@ -225,7 +225,12 @@ export const ToggleHeading = Node.create({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(ToggleHeadingView);
+    return ReactNodeViewRenderer(ToggleHeadingView, {
+      stopEvent: ({ event }) => {
+        const target = event.target as HTMLElement;
+        return !target.closest("[data-node-view-content]");
+      },
+    });
   },
 
   addCommands() {
