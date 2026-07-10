@@ -848,19 +848,21 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         )}
 
         {/* Per-block control group: ⋮⋮ drag · ➕ add · 🗑️ delete
-            key=docStart for stable identity across re-renders. */}
+            pointer-events-none on the wrapper so the transparent area
+            between buttons never absorbs editor clicks. Each button
+            re-enables pointer-events individually. */}
         {!blockMenuOpen && blockButtons.map((btn, idx) => (
           <div
             key={btn.docStart}
             style={{ position: "absolute", top: btn.top, left: btn.left, zIndex: 30 }}
-            className="flex items-center gap-0.5"
+            className="flex items-center gap-0.5 pointer-events-none"
           >
             {/* ⋮⋮ Drag handle */}
             <button
               draggable
               onDragStart={(e) => handleDragStart(e, btn.docStart, btn.docEnd, idx)}
               onDragEnd={handleDragEnd}
-              className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-500 dark:hover:text-gray-300 cursor-grab active:cursor-grabbing transition-colors"
+              className="pointer-events-auto w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-500 dark:hover:text-gray-300 cursor-grab active:cursor-grabbing transition-colors"
               title="드래그하여 이동"
             >
               <GripVertical size={11} />
@@ -870,7 +872,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleInsertBlock(btn.docEnd)}
-              className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              className="pointer-events-auto w-[18px] h-[18px] flex items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               title="블록 추가"
             >
               <Plus size={12} />
@@ -880,7 +882,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleDeleteBlock(btn.docStart, btn.docEnd)}
-              className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+              className="pointer-events-auto w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 dark:hover:text-red-400 transition-colors"
               title="블록 삭제"
             >
               <Trash2 size={11} />
