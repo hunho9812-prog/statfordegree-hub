@@ -161,28 +161,29 @@ function isEffectivelyEmpty(content: string): boolean {
   }
 }
 
-function toggleH2(title: string, ...bodyNodes: object[]) {
-  return {
-    type: "toggleHeading",
-    attrs: { level: 2, isOpen: true, title },
-    content: bodyNodes.length > 0 ? bodyNodes : [{ type: "paragraph", content: [] }],
-  };
+// toggleH2/toggleH3: previously produced toggleHeading nodes.
+// Now flattened to regular heading + body so all text is directly editable.
+function toggleH2(title: string, ...bodyNodes: object[]): object[] {
+  return [
+    h2(title),
+    ...(bodyNodes.length > 0 ? bodyNodes : [{ type: "paragraph", content: [] }]),
+  ];
 }
 
-function toggleH3(title: string, ...bodyNodes: object[]) {
-  return {
-    type: "toggleHeading",
-    attrs: { level: 3, isOpen: true, title },
-    content: bodyNodes.length > 0 ? bodyNodes : [{ type: "paragraph", content: [] }],
-  };
+function toggleH3(title: string, ...bodyNodes: object[]): object[] {
+  return [
+    h3(title),
+    ...(bodyNodes.length > 0 ? bodyNodes : [{ type: "paragraph", content: [] }]),
+  ];
 }
 
-function doc(title: string, ...nodes: object[]) {
+function doc(title: string, ...nodes: (object | object[])[]) {
+  const flat = nodes.flatMap((n) => (Array.isArray(n) ? n : [n]));
   return JSON.stringify({
     type: "doc",
     content: [
       { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: title }] },
-      ...nodes,
+      ...flat,
       { type: "paragraph", content: [] },
     ],
   });
@@ -1416,7 +1417,7 @@ export async function runMigrationIfNeeded(): Promise<void> {
   );
 }
 
-const FORCE_RESEED_V9_FLAG = "manual_force_reseed_v13";
+const FORCE_RESEED_V9_FLAG = "manual_force_reseed_v14";
 
 export async function forceReseedManualPages(): Promise<void> {
   if (!isSupabaseConfigured || !supabase) return;
