@@ -82,6 +82,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   const [blockMenuCoords, setBlockMenuCoords] = useState({ x: 0, y: 0 });
   const [dropBtnIdx, setDropBtnIdx] = useState<number | null>(null);
   const [hoveredBtnIdx, setHoveredBtnIdx] = useState<number | null>(null);
+  const hoveredBtnIdxRef = useRef<number | null>(null);
 
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const titleSaveTimer = useRef<NodeJS.Timeout | null>(null);
@@ -434,7 +435,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
     setDropBtnIdx(null);
   }, []);
 
-  // Track which block the mouse is hovering over (scroll-space Y)
+  // Track which block the mouse is hovering over — only re-render when the index changes
   const handleContainerMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const containerEl = scrollContainerRef.current;
     if (!containerEl || blockButtons.length === 0) return;
@@ -447,7 +448,10 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         if (dist < minDist) { minDist = dist; closest = idx; }
       }
     });
-    setHoveredBtnIdx(closest);
+    if (closest !== hoveredBtnIdxRef.current) {
+      hoveredBtnIdxRef.current = closest;
+      setHoveredBtnIdx(closest);
+    }
   }, [blockButtons]);
 
   // Drop-indicator position (blue line shown while dragging)
@@ -730,7 +734,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         onDragOver={handleContainerDragOver}
         onDrop={handleContainerDrop}
         onMouseMove={handleContainerMouseMove}
-        onMouseLeave={() => setHoveredBtnIdx(null)}
+        onMouseLeave={() => { hoveredBtnIdxRef.current = null; setHoveredBtnIdx(null); }}
         onDragLeave={(e) => {
           // Only clear when leaving the scroll container entirely
           if (!scrollContainerRef.current?.contains(e.relatedTarget as Node)) {
