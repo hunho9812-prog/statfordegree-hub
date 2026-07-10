@@ -81,6 +81,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   const [blockMenuOpen, setBlockMenuOpen] = useState(false);
   const [blockMenuCoords, setBlockMenuCoords] = useState({ x: 0, y: 0 });
   const [dropBtnIdx, setDropBtnIdx] = useState<number | null>(null);
+  const [hoveredBtnIdx, setHoveredBtnIdx] = useState<number | null>(null);
 
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const titleSaveTimer = useRef<NodeJS.Timeout | null>(null);
@@ -433,6 +434,22 @@ export default function PageEditor({ pageId }: { pageId: string }) {
     setDropBtnIdx(null);
   }, []);
 
+  // Track which block the mouse is hovering over (scroll-space Y)
+  const handleContainerMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const containerEl = scrollContainerRef.current;
+    if (!containerEl || blockButtons.length === 0) return;
+    const mouseY = e.clientY - containerEl.getBoundingClientRect().top + containerEl.scrollTop;
+    let closest: number | null = null;
+    let minDist = Infinity;
+    blockButtons.forEach((btn, idx) => {
+      if (mouseY >= btn.blockTop - 4 && mouseY <= btn.blockBottom + 4) {
+        const dist = Math.abs((btn.blockTop + btn.blockBottom) / 2 - mouseY);
+        if (dist < minDist) { minDist = dist; closest = idx; }
+      }
+    });
+    setHoveredBtnIdx(closest);
+  }, [blockButtons]);
+
   // Drop-indicator position (blue line shown while dragging)
   const dropIndicator = useMemo(() => {
     if (dropBtnIdx === null || !dragStateRef.current) return null;
@@ -712,6 +729,8 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         className="flex-1 overflow-y-auto relative"
         onDragOver={handleContainerDragOver}
         onDrop={handleContainerDrop}
+        onMouseMove={handleContainerMouseMove}
+        onMouseLeave={() => setHoveredBtnIdx(null)}
         onDragLeave={(e) => {
           // Only clear when leaving the scroll container entirely
           if (!scrollContainerRef.current?.contains(e.relatedTarget as Node)) {
@@ -847,48 +866,49 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           </div>
         )}
 
-        {/* Per-block control group: ⋮⋮ drag · ➕ add · 🗑️ delete
-            pointer-events-none on the wrapper so the transparent area
-            between buttons never absorbs editor clicks. Each button
-            re-enables pointer-events individually. */}
-        {!blockMenuOpen && blockButtons.map((btn, idx) => (
-          <div
-            key={btn.docStart}
-            style={{ position: "absolute", top: btn.top, left: btn.left, zIndex: 30 }}
-            className="flex items-center gap-0.5 pointer-events-none"
-          >
-            {/* ⋮⋮ Drag handle */}
-            <button
-              draggable
-              onDragStart={(e) => handleDragStart(e, btn.docStart, btn.docEnd, idx)}
-              onDragEnd={handleDragEnd}
-              className="pointer-events-auto w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-500 dark:hover:text-gray-300 cursor-grab active:cursor-grabbing transition-colors"
-              title="드래그하여 이동"
+        {/* Per-block control group — only rendered for the hovered block.
+            This avoids permanent overlays that interfere with editor clicks. */}
+        {!blockMenuOpen && hoveredBtnIdx !== null && blockButtons[hoveredBtnIdx] && (() => {
+          const btn = blockButtons[hoveredBtnIdx];
+          return (
+            <div
+              key={btn.docStart}
+              style={{ position: "absolute", top: btn.top, left: btn.left, zIndex: 30 }}
+              className="flex items-center gap-0.5"
             >
-              <GripVertical size={11} />
-            </button>
+              {/* ⋮⋮ Drag handle */}
+              <button
+                draggable
+                onDragStart={(e) => handleDragStart(e, btn.docStart, btn.docEnd, hoveredBtnIdx)}
+                onDragEnd={handleDragEnd}
+                className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-500 dark:hover:text-gray-300 cursor-grab active:cursor-grabbing transition-colors"
+                title="드래그하여 이동"
+              >
+                <GripVertical size={11} />
+              </button>
 
-            {/* ➕ Add block */}
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleInsertBlock(btn.docEnd)}
-              className="pointer-events-auto w-[18px] h-[18px] flex items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              title="블록 추가"
-            >
-              <Plus size={12} />
-            </button>
+              {/* ➕ Add block */}
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleInsertBlock(btn.docEnd)}
+                className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                title="블록 추가"
+              >
+                <Plus size={12} />
+              </button>
 
-            {/* 🗑️ Delete block */}
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleDeleteBlock(btn.docStart, btn.docEnd)}
-              className="pointer-events-auto w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-              title="블록 삭제"
-            >
-              <Trash2 size={11} />
-            </button>
-          </div>
-        ))}
+              {/* 🗑️ Delete block */}
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleDeleteBlock(btn.docStart, btn.docEnd)}
+                className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                title="블록 삭제"
+              >
+                <Trash2 size={11} />
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Blue drop-target indicator line shown while dragging */}
         {dropIndicator && (
