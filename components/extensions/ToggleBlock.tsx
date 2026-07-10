@@ -3,7 +3,7 @@
 import { Node, mergeAttributes, type CommandProps } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, type NodeViewProps } from "@tiptap/react";
 import { TextSelection } from "@tiptap/pm/state";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 
 // ─── React NodeView ───────────────────────────────────────────────────────────
@@ -12,56 +12,49 @@ function ToggleView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
   const isOpen = node.attrs.isOpen as boolean;
   const title = node.attrs.title as string;
   const autoFocus = node.attrs.autoFocus as boolean;
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(title);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLDivElement>(null);
 
-  // Sync draft when title changes externally
+  // Sync title div content when it changes externally (skip when focused)
   useEffect(() => {
-    if (!editing) setDraft(title);
-  }, [title, editing]);
-
-  // Focus input whenever editing becomes true (covers both manual click and autoFocus)
-  useEffect(() => {
-    if (editing) {
-      setTimeout(() => inputRef.current?.focus(), 10);
+    const el = titleRef.current;
+    if (!el || document.activeElement === el) return;
+    if (el.innerText !== title) {
+      el.innerText = title;
     }
-  }, [editing]);
+  }, [title]);
 
-  // Auto-focus new toggles created via Enter key
+  // Auto-focus new toggles created via Enter
   useEffect(() => {
-    if (autoFocus) {
-      setDraft("");
-      setEditing(true);
-      updateAttributes({ autoFocus: false });
-    }
+    if (!autoFocus) return;
+    updateAttributes({ autoFocus: false });
+    setTimeout(() => {
+      const el = titleRef.current;
+      if (!el) return;
+      el.focus();
+      const range = document.createRange();
+      const sel = window.getSelection();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }, 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFocus]);
 
   const commitTitle = useCallback(() => {
-    updateAttributes({ title: draft });
-    setEditing(false);
-  }, [draft, updateAttributes]);
+    updateAttributes({ title: titleRef.current?.innerText ?? "" });
+  }, [updateAttributes]);
 
-  const handleTitleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Escape → commit and stop editing
-    if (e.key === "Escape") {
-      e.preventDefault();
-      commitTitle();
-      return;
-    }
-
-    // Enter → commit title and insert sibling toggleBlock after this one
+  const handleTitleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Prevent Enter from inserting a newline in the contenteditable
     if (e.key === "Enter") {
       e.preventDefault();
-      updateAttributes({ title: draft });
-      setEditing(false);
+      commitTitle();
 
       if (typeof getPos !== "function") return;
       const ourPos = getPos();
       const insertPos = ourPos + node.nodeSize;
 
-      // Small delay so updateAttributes flushes first
       setTimeout(() => {
         editor.chain().focus().insertContentAt(insertPos, {
           type: "toggleBlock",
@@ -72,9 +65,18 @@ function ToggleView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
       return;
     }
 
+    // Escape → blur title
+    if (e.key === "Escape") {
+      e.preventDefault();
+      commitTitle();
+      titleRef.current?.blur();
+      return;
+    }
+
     // Tab → indent: move this toggle inside the previous sibling toggle
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
+      commitTitle();
       if (typeof getPos !== "function") return;
 
       const ourPos = getPos();
@@ -94,7 +96,6 @@ function ToggleView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
           prevToggleStart = offset;
           prevToggleNodeSize = child.nodeSize;
         } else {
-          // Non-toggle resets the candidate
           prevToggleStart = -1;
         }
         offset += child.nodeSize;
@@ -118,6 +119,7 @@ function ToggleView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
     // Shift+Tab → outdent: lift this toggle out of its parent toggle
     if (e.key === "Tab" && e.shiftKey) {
       e.preventDefault();
+      commitTitle();
       if (typeof getPos !== "function") return;
 
       const ourPos = getPos();
@@ -125,7 +127,6 @@ function ToggleView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
       const $pos = doc.resolve(ourPos);
       const depth = $pos.depth;
 
-      // Must be directly inside another toggleBlock's content (depth ≥ 1)
       if (depth < 1) return;
       const parentNode = $pos.node(depth - 1);
       if (parentNode.type.name !== "toggleBlock") return;
@@ -141,52 +142,30 @@ function ToggleView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
         return true;
       }).run();
     }
-  }, [commitTitle, draft, editor, getPos, node, updateAttributes]);
+  }, [commitTitle, editor, getPos, node, updateAttributes]);
 
   return (
     <NodeViewWrapper>
       <div className="toggle-block my-1" data-type="toggleBlock">
-        {/* Header row */}
-        <div className="flex items-start gap-1 group">
+        {/* Header row — fully non-editable by ProseMirror */}
+        <div className="flex items-start gap-1" contentEditable={false}>
           <button
-            contentEditable={false}
             onClick={() => updateAttributes({ isOpen: !isOpen })}
             className="flex-shrink-0 mt-0.5 w-5 h-5 flex items-center justify-center rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
 
-          {/* Editable title */}
-          <div className="flex-1 min-w-0" contentEditable={false}>
-            {editing ? (
-              <input
-                ref={inputRef}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={commitTitle}
-                onKeyDown={handleTitleKeyDown}
-                onClick={(e) => e.stopPropagation()}
-                placeholder="토글 제목 입력..."
-                className="w-full bg-transparent outline-none text-base font-medium text-[#37352f] dark:text-[#e6e6e4] leading-6"
-              />
-            ) : (
-              <span
-                onMouseDown={(e) => {
-                  e.preventDefault(); // prevent ProseMirror from stealing focus before input mounts
-                  e.stopPropagation();
-                  setDraft(title);
-                  setEditing(true);
-                }}
-                className="cursor-text text-base font-medium text-[#37352f] dark:text-[#e6e6e4] leading-6 min-h-[24px] block"
-              >
-                {title || (
-                  <span className="text-gray-300 dark:text-gray-600 font-normal text-sm">
-                    토글 제목 입력...
-                  </span>
-                )}
-              </span>
-            )}
-          </div>
+          {/* Title — its own contentEditable, independent of ProseMirror */}
+          <div
+            ref={titleRef}
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={commitTitle}
+            onKeyDown={handleTitleKeyDown}
+            data-placeholder="토글 제목 입력..."
+            className="flex-1 min-w-0 outline-none text-base font-medium text-[#37352f] dark:text-[#e6e6e4] leading-6 cursor-text toggle-title"
+          />
         </div>
 
         {/* Body content */}
@@ -233,7 +212,7 @@ export const ToggleBlock = Node.create({
 
   addKeyboardShortcuts() {
     return {
-      // Enter on empty last paragraph inside a toggle → exit toggle (move cursor after it)
+      // Enter on empty last paragraph inside a toggle → exit toggle
       Enter: () => {
         const { state } = this.editor;
         const { selection } = state;
@@ -241,7 +220,6 @@ export const ToggleBlock = Node.create({
 
         if (!empty || $from.parent.type.name !== "paragraph") return false;
 
-        // Walk up to find the closest toggleBlock ancestor
         let toggleDepth = $from.depth - 1;
         while (toggleDepth > 0 && $from.node(toggleDepth).type.name !== "toggleBlock") {
           toggleDepth--;
@@ -255,11 +233,9 @@ export const ToggleBlock = Node.create({
         const paragraphIsEmpty = $from.parent.textContent === "";
         const isLastChild = $from.indexAfter(toggleDepth) === toggleNode.childCount;
 
-        // Only act on the last paragraph in the toggle
         if (!isLastChild) return false;
 
         if (paragraphIsEmpty) {
-          // Exit the toggle: remove empty paragraph (if not the only child) and place cursor after
           this.editor.chain().focus().command(({ tr, dispatch, state: s }) => {
             if (toggleNode.childCount > 1) {
               const paraStart = $from.before($from.depth);
@@ -284,31 +260,27 @@ export const ToggleBlock = Node.create({
         const { state } = this.editor;
         const { $from } = state.selection;
 
-        // Find closest toggleBlock ancestor
         let toggleDepth = $from.depth - 1;
         while (toggleDepth > 0 && $from.node(toggleDepth).type.name !== "toggleBlock") {
           toggleDepth--;
         }
         if (toggleDepth === 0 || $from.node(toggleDepth).type.name !== "toggleBlock") return false;
 
-        // The direct child block of the toggle that we're currently in
         const blockDepth = toggleDepth + 1;
         if (blockDepth > $from.depth) return false;
         const blockNode = $from.node(blockDepth);
 
-        // Don't wrap another toggleBlock in itself
         if (blockNode.type.name === "toggleBlock") return false;
 
         const blockStart = $from.before(blockDepth);
         const blockEnd = $from.after(blockDepth);
 
-        this.editor.chain().focus().command(({ tr, dispatch, state: s }) => {
+        this.editor.chain().focus().command(({ tr, dispatch }) => {
           const newToggle = this.type.create(
             { isOpen: true, title: "", autoFocus: false },
             blockNode,
           );
           tr.replaceWith(blockStart, blockEnd, newToggle);
-          // Move cursor inside the wrapped paragraph
           try {
             const sel = TextSelection.near(tr.doc.resolve(blockStart + 2));
             tr.setSelection(sel);
@@ -324,7 +296,6 @@ export const ToggleBlock = Node.create({
         const { state } = this.editor;
         const { $from } = state.selection;
 
-        // Find the innermost toggleBlock
         let toggleDepth = $from.depth - 1;
         while (toggleDepth > 0 && $from.node(toggleDepth).type.name !== "toggleBlock") {
           toggleDepth--;
@@ -335,7 +306,6 @@ export const ToggleBlock = Node.create({
         const toggleStart = $from.before(toggleDepth);
         const toggleEnd = toggleStart + toggleNode.nodeSize;
 
-        // The direct child block we're in
         const blockDepth = toggleDepth + 1;
         if (blockDepth > $from.depth) return false;
         const blockNode = $from.node(blockDepth);
