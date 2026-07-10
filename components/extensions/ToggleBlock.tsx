@@ -5,7 +5,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, type NodeViewP
 import { TextSelection } from "@tiptap/pm/state";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { ChevronRight, ChevronDown, Pencil } from "lucide-react";
+import { ChevronRight, ChevronDown } from "lucide-react";
 
 // ─── Portal input overlay rendered outside ProseMirror DOM ───────────────────
 
@@ -18,23 +18,9 @@ interface TitleEditorPortalProps {
 
 function TitleEditorPortal({ anchorRef, value, onCommit, onCancel }: TitleEditorPortalProps) {
   const [draft, setDraft] = useState(value);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, []);
 
   const rect = anchorRef.current?.getBoundingClientRect();
   if (!rect) return null;
-
-  const style: React.CSSProperties = {
-    position: "fixed",
-    top: rect.top,
-    left: rect.left,
-    width: Math.max(rect.width, 200),
-    zIndex: 9999,
-  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") { e.preventDefault(); onCommit(draft); }
@@ -43,13 +29,20 @@ function TitleEditorPortal({ anchorRef, value, onCommit, onCancel }: TitleEditor
 
   return createPortal(
     <input
-      ref={inputRef}
+      // eslint-disable-next-line jsx-a11y/no-autofocus
+      autoFocus
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => onCommit(draft)}
       onKeyDown={handleKeyDown}
       placeholder="토글 제목 입력..."
-      style={style}
+      style={{
+        position: "fixed",
+        top: rect.top,
+        left: rect.left,
+        width: Math.max(rect.width, 200),
+        zIndex: 9999,
+      }}
       className="bg-white dark:bg-[#252525] border border-blue-400 rounded px-1 py-0.5 text-base font-medium text-[#37352f] dark:text-[#e6e6e4] outline-none shadow-md"
     />,
     document.body,
@@ -94,28 +87,22 @@ function ToggleView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
             {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
 
-          {/* Title display + edit button */}
-          <div className="flex-1 min-w-0 flex items-center gap-1">
-            <span
-              ref={titleSpanRef}
-              className="text-base font-medium text-[#37352f] dark:text-[#e6e6e4] leading-6 min-h-[24px] flex-1"
-            >
-              {title || (
-                <span className="text-gray-300 dark:text-gray-600 font-normal text-sm">
-                  토글 제목 입력...
-                </span>
-              )}
-            </span>
-
-            {/* Edit button — always visible on hover */}
-            <button
-              onClick={() => setEditing(true)}
-              title="제목 수정"
-              className="opacity-0 group-hover:opacity-100 flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
-            >
-              <Pencil size={11} />
-            </button>
-          </div>
+          {/* Title — click to edit */}
+          <span
+            ref={titleSpanRef}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setEditing(true);
+            }}
+            className="flex-1 min-w-0 text-base font-medium text-[#37352f] dark:text-[#e6e6e4] leading-6 min-h-[24px] cursor-text select-none block"
+          >
+            {title || (
+              <span className="text-gray-300 dark:text-gray-600 font-normal text-sm">
+                토글 제목 입력...
+              </span>
+            )}
+          </span>
         </div>
 
         {/* Body content */}

@@ -3,6 +3,7 @@
 import { Node, mergeAttributes, type CommandProps } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, type NodeViewProps } from "@tiptap/react";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ChevronRight, ChevronDown, GripVertical, Plus, Trash2, ImageUp, FileUp, Loader2 } from "lucide-react";
 
 // ─── React NodeView ────────────────────────────────────────────────────────────
@@ -14,7 +15,7 @@ function ToggleHeadingView({ node, updateAttributes, deleteNode, editor, getPos 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const [uploading, setUploading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const titleSpanRef = useRef<HTMLSpanElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -22,15 +23,17 @@ function ToggleHeadingView({ node, updateAttributes, deleteNode, editor, getPos 
     if (!editing) setDraft(title);
   }, [title, editing]);
 
-  const commitTitle = useCallback(() => {
-    updateAttributes({ title: draft });
+  const commitTitle = useCallback((val?: string) => {
+    updateAttributes({ title: val ?? draft });
     setEditing(false);
   }, [draft, updateAttributes]);
 
-  const startEditing = useCallback(() => {
+  const startEditing = useCallback((e: React.MouseEvent) => {
+    // preventDefault stops ProseMirror from processing this mousedown first
+    e.preventDefault();
+    e.stopPropagation();
     setDraft(title);
     setEditing(true);
-    setTimeout(() => inputRef.current?.focus(), 0);
   }, [title]);
 
   const addChildBlock = useCallback(() => {
@@ -126,30 +129,17 @@ function ToggleHeadingView({ node, updateAttributes, deleteNode, editor, getPos 
 
           {/* Editable title */}
           <div className={`flex-1 min-w-0 ${headingClass}`} contentEditable={false}>
-            {editing ? (
-              <input
-                ref={inputRef}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={commitTitle}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === "Escape") {
-                    e.preventDefault();
-                    commitTitle();
-                  }
-                }}
-                className={`w-full bg-transparent outline-none ${headingClass} border-b border-blue-300 dark:border-blue-600 pb-0.5`}
-                placeholder={level === 2 ? "중주제 입력..." : "소주제 입력..."}
-              />
-            ) : (
-              <span onClick={startEditing} className="cursor-text min-h-[1em] block">
-                {title || (
-                  <span className="text-gray-300 dark:text-gray-600 font-normal text-sm">
-                    {level === 2 ? "중주제 입력..." : "소주제 입력..."}
-                  </span>
-                )}
-              </span>
-            )}
+            <span
+              ref={titleSpanRef}
+              onMouseDown={startEditing}
+              className="cursor-text min-h-[1em] block select-none"
+            >
+              {title || (
+                <span className="text-gray-300 dark:text-gray-600 font-normal text-sm">
+                  {level === 2 ? "중주제 입력..." : "소주제 입력..."}
+                </span>
+              )}
+            </span>
           </div>
 
           {/* Action buttons — visible on hover */}
@@ -215,6 +205,36 @@ function ToggleHeadingView({ node, updateAttributes, deleteNode, editor, getPos 
           onChange={handleFileChange}
         />
       </div>
+
+      {/* Portal input — rendered in document.body, completely outside ProseMirror */}
+      {editing && titleSpanRef.current && (() => {
+        const rect = titleSpanRef.current!.getBoundingClientRect();
+        return createPortal(
+          <input
+            // eslint-disable-next-line jsx-a11y/no-autofocus
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => commitTitle()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") {
+                e.preventDefault();
+                commitTitle();
+              }
+            }}
+            placeholder={level === 2 ? "중주제 입력..." : "소주제 입력..."}
+            style={{
+              position: "fixed",
+              top: rect.top,
+              left: rect.left,
+              width: Math.max(rect.width, 200),
+              zIndex: 9999,
+            }}
+            className={`bg-white dark:bg-[#252525] border border-blue-400 rounded px-1 outline-none shadow-md ${headingClass}`}
+          />,
+          document.body,
+        );
+      })()}
     </NodeViewWrapper>
   );
 }
