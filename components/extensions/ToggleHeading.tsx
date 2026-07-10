@@ -2,9 +2,8 @@
 
 import { Node, mergeAttributes, type CommandProps } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, type NodeViewProps } from "@tiptap/react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { ChevronRight, ChevronDown, GripVertical, Plus, Trash2, ImageUp, FileUp, Loader2 } from "lucide-react";
-import { useRef } from "react";
 
 // ─── React NodeView ────────────────────────────────────────────────────────────
 // Title = first child paragraph styled as h2/h3 via CSS (no native input).
@@ -16,6 +15,21 @@ function ToggleHeadingView({ node, updateAttributes, deleteNode, editor, getPos 
   const [uploading, setUploading] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+
+  useEffect(() => {
+    const legacyTitle = node.attrs.title as string;
+    if (!legacyTitle || typeof getPos !== "function") return;
+    const firstChild = node.firstChild;
+    if (!firstChild || firstChild.textContent !== "") return;
+    const insertPos = getPos() + 2;
+    setTimeout(() => {
+      editorRef.current.chain().insertContentAt(insertPos, legacyTitle).run();
+      updateAttributes({ title: "" });
+    }, 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const addChildBlock = useCallback(() => {
     if (typeof getPos !== "function") return;
@@ -151,6 +165,7 @@ export const ToggleHeading = Node.create({
     return {
       level: { default: 2 },
       isOpen: { default: true },
+      title: { default: "" },
     };
   },
 

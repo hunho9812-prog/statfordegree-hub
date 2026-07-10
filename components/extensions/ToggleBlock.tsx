@@ -4,13 +4,30 @@ import { Node, mergeAttributes, type CommandProps } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, type NodeViewProps } from "@tiptap/react";
 import { TextSelection } from "@tiptap/pm/state";
 import { ChevronRight, ChevronDown } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 // ─── React NodeView ───────────────────────────────────────────────────────────
 // Title = first child paragraph (fully ProseMirror-managed, no native input).
 // Body = remaining children, hidden via CSS when closed.
 
-function ToggleView({ node, updateAttributes }: NodeViewProps) {
+function ToggleView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
   const isOpen = node.attrs.isOpen as boolean;
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+
+  // Migrate legacy title attribute into first paragraph on first render
+  useEffect(() => {
+    const legacyTitle = node.attrs.title as string;
+    if (!legacyTitle || typeof getPos !== "function") return;
+    const firstChild = node.firstChild;
+    if (!firstChild || firstChild.textContent !== "") return;
+    const insertPos = getPos() + 2; // inside first paragraph
+    setTimeout(() => {
+      editorRef.current.chain().insertContentAt(insertPos, legacyTitle).run();
+      updateAttributes({ title: "" });
+    }, 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <NodeViewWrapper>
@@ -43,6 +60,7 @@ export const ToggleBlock = Node.create({
   addAttributes() {
     return {
       isOpen: { default: true },
+      title: { default: "" },
     };
   },
 
