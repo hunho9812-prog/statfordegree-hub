@@ -381,21 +381,60 @@ select:focus {
 /* ─── Toggle Block ────────────────────────────────────────────────── */
 .tiptap-editor-content .toggle-block { margin: 0.25rem 0; }
 
-/* Toggle title placeholder */
-.tiptap-editor-content .toggle-title:empty::before {
-  content: attr(data-placeholder);
-  color: #c4c3bf;
-  pointer-events: none;
+/* toggle-body: first child = title (bold), rest = indented body */
+.tiptap-editor-content .toggle-body > [data-node-view-content-react] > *:first-child {
+  font-weight: 600;
+  margin: 0;
 }
-.dark .tiptap-editor-content .toggle-title:empty::before { color: #4f4f4f; }
-.tiptap-editor-content .toggle-content {
+.tiptap-editor-content .toggle-body > [data-node-view-content-react] > *:not(:first-child) {
+  padding-left: 1rem;
   border-left: 2px solid #e9e9e7;
-  pointer-events: auto;
-  cursor: text;
-  user-select: text;
-  -webkit-user-select: text;
+  margin-top: 0.125rem;
 }
-.dark .tiptap-editor-content .toggle-content { border-left-color: #2f2f2f; }
+.dark .tiptap-editor-content .toggle-body > [data-node-view-content-react] > *:not(:first-child) {
+  border-left-color: #3a3a3a;
+}
+/* Hide body when closed */
+.tiptap-editor-content .toggle-body.toggle-closed > [data-node-view-content-react] > *:not(:first-child) {
+  display: none;
+}
+
+/* ─── Toggle Heading ──────────────────────────────────────────────── */
+/* level-2: title styled as mid-heading */
+.tiptap-editor-content .toggle-heading-body.level-2 > [data-node-view-content-react] > *:first-child {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #37352f;
+  margin: 0;
+  line-height: 1.4;
+}
+.dark .tiptap-editor-content .toggle-heading-body.level-2 > [data-node-view-content-react] > *:first-child {
+  color: #e6e6e4;
+}
+/* level-3: title styled as sub-heading */
+.tiptap-editor-content .toggle-heading-body.level-3 > [data-node-view-content-react] > *:first-child {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #37352f;
+  margin: 0;
+  line-height: 1.4;
+}
+.dark .tiptap-editor-content .toggle-heading-body.level-3 > [data-node-view-content-react] > *:first-child {
+  color: #e6e6e4;
+}
+/* body for toggle headings */
+.tiptap-editor-content .toggle-heading-body > [data-node-view-content-react] > *:not(:first-child) {
+  padding-left: 1rem;
+  border-left: 2px solid #e9e9e7;
+  margin-top: 0.125rem;
+}
+.dark .tiptap-editor-content .toggle-heading-body > [data-node-view-content-react] > *:not(:first-child) {
+  border-left-color: #3a3a3a;
+}
+/* Hide body when closed */
+.tiptap-editor-content .toggle-heading-body.toggle-closed > [data-node-view-content-react] > *:not(:first-child) {
+  display: none;
+}
 
 /* Image selected state */
 .tiptap-editor-content img.ProseMirror-selectednode,
