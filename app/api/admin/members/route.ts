@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 
     const { data: members, error } = await admin
       .from("team_members")
-      .select("id, name, email, role, joined_at, accounting_access")
+      .select("id, name, email, role, joined_at, accounting_access, manual_access, crm_access")
       .order("joined_at");
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -42,6 +42,8 @@ export async function GET(req: NextRequest) {
       status: "approved" as const,
       created_at: m.joined_at,
       accounting_access: m.accounting_access ?? false,
+      manual_access: m.manual_access ?? false,
+      crm_access: m.crm_access ?? false,
     }));
 
     return NextResponse.json({ members: result });

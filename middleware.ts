@@ -52,28 +52,41 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // /accounting/* 접근 제어
-  if (user && pathname.startsWith("/accounting")) {
+  const isAccounting = pathname.startsWith("/accounting");
+  const isManual = pathname.startsWith("/p/");
+  const isCrm = pathname.startsWith("/crm");
+
+  if (user && (isAccounting || isManual || isCrm)) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (serviceRoleKey) {
-      // service role 클라이언트로 users 조회
       const adminSupabase = createServerClient(supabaseUrl, serviceRoleKey, {
         cookies: { getAll: () => [], setAll: () => {} },
       });
 
       const { data: profile } = await adminSupabase
         .from("team_members")
-        .select("role, accounting_access")
+        .select("role, accounting_access, manual_access, crm_access")
         .eq("id", user.id)
         .maybeSingle();
 
       const isAdmin = profile?.role === "admin" || user.email === process.env.ADMIN_EMAIL;
-      const hasAccess = isAdmin || profile?.accounting_access === true;
 
-      if (!hasAccess) {
+      if (isAccounting && !isAdmin && profile?.accounting_access !== true) {
         const url = request.nextUrl.clone();
         url.pathname = "/";
         url.search = "?denied=accounting";
+        return NextResponse.redirect(url);
+      }
+      if (isManual && !isAdmin && profile?.manual_access !== true) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/";
+        url.search = "?denied=manual";
+        return NextResponse.redirect(url);
+      }
+      if (isCrm && !isAdmin && profile?.crm_access !== true) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/";
+        url.search = "?denied=crm";
         return NextResponse.redirect(url);
       }
     }

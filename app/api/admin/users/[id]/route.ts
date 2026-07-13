@@ -54,6 +54,12 @@ export async function PATCH(
   if ("accounting_access" in body) {
     update.accounting_access = Boolean(body.accounting_access);
   }
+  if ("manual_access" in body) {
+    update.manual_access = Boolean(body.manual_access);
+  }
+  if ("crm_access" in body) {
+    update.crm_access = Boolean(body.crm_access);
+  }
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "변경할 필드가 없습니다." }, { status: 400 });
