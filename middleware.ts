@@ -63,27 +63,39 @@ export async function middleware(request: NextRequest) {
         cookies: { getAll: () => [], setAll: () => {} },
       });
 
-      const { data: profile } = await adminSupabase
+      // 새 컬럼이 아직 없을 수 있으므로 폴백 처리
+      let profile: Record<string, unknown> | null = null;
+      const fullFetch = await adminSupabase
         .from("team_members")
         .select("role, accounting_access, manual_access, crm_access")
         .eq("id", user.id)
         .maybeSingle();
+      if (fullFetch.error) {
+        const fallback = await adminSupabase
+          .from("team_members")
+          .select("role, accounting_access")
+          .eq("id", user.id)
+          .maybeSingle();
+        profile = (fallback.data as Record<string, unknown>) ?? null;
+      } else {
+        profile = (fullFetch.data as Record<string, unknown>) ?? null;
+      }
 
       const isAdmin = profile?.role === "admin" || user.email === process.env.ADMIN_EMAIL;
 
-      if (isAccounting && !isAdmin && profile?.accounting_access !== true) {
+      if (isAccounting && !isAdmin && (profile?.accounting_access as boolean) !== true) {
         const url = request.nextUrl.clone();
         url.pathname = "/";
         url.search = "?denied=accounting";
         return NextResponse.redirect(url);
       }
-      if (isManual && !isAdmin && profile?.manual_access !== true) {
+      if (isManual && !isAdmin && (profile?.manual_access as boolean) !== true) {
         const url = request.nextUrl.clone();
         url.pathname = "/";
         url.search = "?denied=manual";
         return NextResponse.redirect(url);
       }
-      if (isCrm && !isAdmin && profile?.crm_access !== true) {
+      if (isCrm && !isAdmin && (profile?.crm_access as boolean) !== true) {
         const url = request.nextUrl.clone();
         url.pathname = "/";
         url.search = "?denied=crm";
