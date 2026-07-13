@@ -2059,9 +2059,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             );
 
         const supaCustomerIds = new Set(customers.map((c) => c.id));
-        const localOnlyCustomers = supabaseHasCustomers
-          ? []
-          : current.customers.filter((c) => !supaCustomerIds.has(c.id));
+        // 항상 로컬에만 있는 고객을 추적 (Supabase upsert가 아직 완료되지 않은 신규 고객 포함)
+        const localOnlyCustomers = current.customers.filter((c) => !supaCustomerIds.has(c.id));
 
         const uploadOps: Promise<void>[] = [];
         if (localOnlyPages.length > 0) uploadOps.push(dbPages.upsertMany(localOnlyPages));
@@ -2139,9 +2138,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const mergedTasks = supabaseHasTasks
           ? cleanedTasks
           : [...cleanedTasks, ...localOnlyTasks];
-        const mergedCustomers = supabaseHasCustomers
-          ? customers
-          : [...customers, ...localOnlyCustomers];
+        // Supabase 목록 + 아직 Supabase에 없는 로컬 신규 고객 병합
+        const mergedCustomers = [...customers, ...localOnlyCustomers];
 
         // rootPageIds 결정: workspace_config > Supabase pages에서 도출 > 로컬 유지
         const derivedRootPageIds = (rootPageIdsConfig as string[] | null) ??
