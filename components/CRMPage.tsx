@@ -2,9 +2,12 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useWorkspaceStore } from "@/lib/store";
-import type { Customer, CustomerRoute, StatusOption, StatusCategory } from "@/lib/types";
+import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColumnDef } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
-import { Plus, Trash2, Settings, X, Check, GripVertical, ArrowRightLeft } from "lucide-react";
+import {
+  Plus, Trash2, Settings, X, Check, GripVertical, ArrowRightLeft,
+  Filter, ChevronUp, ChevronDown, Columns3,
+} from "lucide-react";
 
 const ASSIGNEES = ["김은호", "김세윤", "김현호", "오승준"];
 const ROUTES: CustomerRoute[] = ["크몽", "메일", ""];
@@ -197,7 +200,7 @@ function StatusCell({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg shadow-lg w-44 py-1">
+        <div className="absolute left-0 bottom-full mb-1 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg shadow-lg w-44 py-1 max-h-72 overflow-y-auto">
           <button
             onClick={() => { onChange(""); setOpen(false); }}
             className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]"
@@ -319,6 +322,110 @@ function StatusOptionRow({
 
 // ─── Status editor modal ──────────────────────────────────────────────────────
 
+// ─── Assignee column header: filter (multi-select checkbox) + 3-state sort ──
+
+type SortDir = "asc" | "desc" | null;
+
+function AssigneeHeader({
+  assignees,
+  activeFilter,
+  onFilterChange,
+  sortDir,
+  onSortChange,
+}: {
+  assignees: string[];
+  activeFilter: Set<string> | null;
+  onFilterChange: (next: Set<string> | null) => void;
+  sortDir: SortDir;
+  onSortChange: (next: SortDir) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
+
+  const isFiltered = activeFilter !== null && activeFilter.size < assignees.length;
+
+  const toggle = (a: string) => {
+    const base = activeFilter ?? new Set(assignees);
+    const next = new Set(base);
+    if (next.has(a)) next.delete(a);
+    else next.add(a);
+    onFilterChange(next);
+  };
+
+  const cycleSort = () => {
+    onSortChange(sortDir === null ? "asc" : sortDir === "asc" ? "desc" : null);
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={cycleSort}
+        className="flex items-center gap-0.5 hover:text-[#37352f] dark:hover:text-[#e6e6e4] transition-colors"
+        title="클릭하여 가나다순 정렬"
+      >
+        담당자
+        {sortDir === "asc" && <ChevronUp size={12} />}
+        {sortDir === "desc" && <ChevronDown size={12} />}
+      </button>
+      <div ref={ref} className="relative">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className={`p-0.5 rounded transition-colors ${isFiltered ? "text-blue-500" : "text-[#c4c3bf] hover:text-[#9b9a97]"}`}
+          title="담당자 필터"
+        >
+          <Filter size={11} fill={isFiltered ? "currentColor" : "none"} />
+        </button>
+        {open && (
+          <div className="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg shadow-lg w-40 py-1 max-h-64 overflow-y-auto">
+            <div className="flex items-center justify-between px-2 pb-1.5 mb-1 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
+              <button
+                onClick={() => onFilterChange(null)}
+                className="text-[10px] text-blue-500 hover:underline"
+              >
+                전체 선택
+              </button>
+              <button
+                onClick={() => onFilterChange(new Set())}
+                className="text-[10px] text-gray-400 hover:underline"
+              >
+                선택 해제
+              </button>
+            </div>
+            {assignees.length === 0 && (
+              <p className="px-3 py-1 text-xs text-gray-300 dark:text-gray-600">담당자 없음</p>
+            )}
+            {assignees.map((a) => {
+              const checked = activeFilter === null ? true : activeFilter.has(a);
+              return (
+                <label
+                  key={a}
+                  className="flex items-center gap-2 px-2 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] font-normal"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggle(a)}
+                    className="w-3.5 h-3.5 accent-blue-500 cursor-pointer"
+                  />
+                  <span className="text-[#37352f] dark:text-[#e6e6e4]">{a}</span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function StatusEditor({ onClose }: { onClose: () => void }) {
   const { customerStatuses, upsertCustomerStatus, deleteCustomerStatus } = useWorkspaceStore();
   const [newLabel, setNewLabel] = useState("");
@@ -425,6 +532,183 @@ function StatusEditor({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Dynamic checkbox column manager ─────────────────────────────────────────
+
+function ColumnManagerRow({
+  column,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onRename,
+  onDelete,
+}: {
+  column: CustomColumnDef;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: () => void;
+  onRename: (label: string) => void;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [label, setLabel] = useState(column.label);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const save = () => {
+    const trimmed = label.trim();
+    if (trimmed) onRename(trimmed);
+    else setLabel(column.label);
+    setEditing(false);
+  };
+
+  return (
+    <>
+      <div
+        draggable
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-50 dark:hover:bg-[#2a2a2a] group mb-1"
+      >
+        <GripVertical size={12} className="text-gray-300 cursor-grab flex-shrink-0" />
+        {editing ? (
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onBlur={save}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") save();
+              if (e.key === "Escape") { setLabel(column.label); setEditing(false); }
+            }}
+            autoFocus
+            className="input-style flex-1 py-0.5 text-xs"
+          />
+        ) : (
+          <span
+            onClick={() => setEditing(true)}
+            className="flex-1 text-sm cursor-text text-[#37352f] dark:text-[#e6e6e4]"
+          >
+            {column.label}
+          </span>
+        )}
+        <button
+          onClick={() => setEditing(true)}
+          className="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+        >
+          편집
+        </button>
+        <button
+          onClick={() => setConfirmingDelete(true)}
+          className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+
+      {confirmingDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-xs mx-4 bg-white dark:bg-[#252525] rounded-xl border border-[#e9e9e7] dark:border-[#3f3f3f] shadow-2xl p-5">
+            <h4 className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4] mb-2">열 삭제</h4>
+            <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] mb-4">
+              &quot;{column.label}&quot; 열을 삭제하면 모든 고객의 체크 데이터가 화면에서 사라집니다. 계속하시겠습니까?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                className="flex-1 py-1.5 text-xs rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f] transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => { onDelete(); setConfirmingDelete(false); }}
+                className="flex-1 py-1.5 text-xs rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ColumnManager({ onClose }: { onClose: () => void }) {
+  const { customColumns, upsertCustomColumn, deleteCustomColumn, reorderCustomColumns } = useWorkspaceStore();
+  const sorted = [...customColumns].sort((a, b) => a.order - b.order);
+  const [newLabel, setNewLabel] = useState("");
+  const dragId = useRef<string | null>(null);
+
+  const addColumn = () => {
+    const trimmed = newLabel.trim();
+    if (!trimmed) return;
+    upsertCustomColumn({ id: uuidv4(), label: trimmed, type: "checkbox", order: sorted.length });
+    setNewLabel("");
+  };
+
+  const handleDrop = (targetId: string) => {
+    const from = dragId.current;
+    dragId.current = null;
+    if (!from || from === targetId) return;
+    const ids = sorted.map((c) => c.id);
+    const fromIdx = ids.indexOf(from);
+    const toIdx = ids.indexOf(targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    ids.splice(fromIdx, 1);
+    ids.splice(toIdx, 0, from);
+    reorderCustomColumns(ids);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white dark:bg-[#252525] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-2xl w-[420px] max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
+          <h3 className="font-semibold text-[#37352f] dark:text-[#e6e6e4]">열 관리 (체크박스 열)</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {sorted.length === 0 && (
+            <p className="text-xs text-gray-300 dark:text-gray-600 px-2">체크박스 열이 없습니다.</p>
+          )}
+          {sorted.map((col) => (
+            <ColumnManagerRow
+              key={col.id}
+              column={col}
+              onDragStart={() => { dragId.current = col.id; }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => handleDrop(col.id)}
+              onRename={(label) => upsertCustomColumn({ ...col, label })}
+              onDelete={() => deleteCustomColumn(col.id)}
+            />
+          ))}
+        </div>
+
+        <div className="border-t border-[#e9e9e7] dark:border-[#3f3f3f] p-4 space-y-2">
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">새 체크박스 열 추가</p>
+          <div className="flex gap-2">
+            <input
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addColumn()}
+              placeholder="열 이름"
+              className="input-style flex-1"
+            />
+            <button
+              onClick={addColumn}
+              disabled={!newLabel.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-40 transition-colors"
+            >
+              <Plus size={14} /> 추가
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Add customer inline form (full row) ─────────────────────────────────────
 
 const EMPTY_FORM = {
@@ -435,11 +719,7 @@ const EMPTY_FORM = {
   alba: "",
   total_amount: null as number | null,
   balance: null as number | null,
-  review_proposed: false,
-  balance_received: false,
-  kmong_review: false,
-  kakao_review: false,
-  cash_receipt: false,
+  custom_fields: {} as Record<string, boolean>,
   submit_date: "",
   status: "",
   memo: "",
@@ -448,10 +728,12 @@ const EMPTY_FORM = {
 
 function AddCustomerRow({
   statuses,
+  columns,
   onSave,
   onCancel,
 }: {
   statuses: StatusOption[];
+  columns: CustomColumnDef[];
   onSave: (c: Omit<Customer, "id" | "created_at" | "updated_at">) => void;
   onCancel: () => void;
 }) {
@@ -533,36 +815,19 @@ function AddCustomerRow({
       <td className="px-3 py-2">{numInput("total_amount")}</td>
       {/* 잔금 */}
       <td className="px-3 py-2">{numInput("balance")}</td>
-      {/* 후기제안 */}
-      <td className="px-3 py-2 text-center">
-        <input type="checkbox" checked={form.review_proposed}
-          onChange={(e) => set("review_proposed", e.target.checked)}
-          className="w-4 h-4 accent-blue-500 cursor-pointer" />
-      </td>
-      {/* 잔금받음? */}
-      <td className="px-3 py-2 text-center">
-        <input type="checkbox" checked={form.balance_received}
-          onChange={(e) => set("balance_received", e.target.checked)}
-          className="w-4 h-4 accent-blue-500 cursor-pointer" />
-      </td>
-      {/* 크몽후기 */}
-      <td className="px-3 py-2 text-center">
-        <input type="checkbox" checked={form.kmong_review}
-          onChange={(e) => set("kmong_review", e.target.checked)}
-          className="w-4 h-4 accent-blue-500 cursor-pointer" />
-      </td>
-      {/* 카톡후기 */}
-      <td className="px-3 py-2 text-center">
-        <input type="checkbox" checked={form.kakao_review}
-          onChange={(e) => set("kakao_review", e.target.checked)}
-          className="w-4 h-4 accent-blue-500 cursor-pointer" />
-      </td>
-      {/* 현금영수증 */}
-      <td className="px-3 py-2 text-center">
-        <input type="checkbox" checked={form.cash_receipt}
-          onChange={(e) => set("cash_receipt", e.target.checked)}
-          className="w-4 h-4 accent-blue-500 cursor-pointer" />
-      </td>
+      {/* 동적 체크박스 열 */}
+      {columns.map((col) => (
+        <td key={col.id} className="px-3 py-2 text-center">
+          <input
+            type="checkbox"
+            checked={form.custom_fields[col.id] ?? false}
+            onChange={(e) =>
+              set("custom_fields", { ...form.custom_fields, [col.id]: e.target.checked })
+            }
+            className="w-4 h-4 accent-blue-500 cursor-pointer"
+          />
+        </td>
+      ))}
       {/* 제출날짜 */}
       <td className="px-3 py-2">
         <input
@@ -609,10 +874,10 @@ function AddCustomerRow({
 
 // ─── Add trigger row ──────────────────────────────────────────────────────────
 
-function AddTriggerRow({ onAdd }: { onAdd: () => void }) {
+function AddTriggerRow({ onAdd, colSpan }: { onAdd: () => void; colSpan: number }) {
   return (
     <tr className="border-t border-[#e9e9e7] dark:border-[#2f2f2f]">
-      <td colSpan={16} className="px-3 py-2">
+      <td colSpan={colSpan} className="px-3 py-2">
         <button
           onClick={onAdd}
           className="flex items-center gap-1.5 text-sm text-[#9b9a97] dark:text-[#6b6b6b] hover:text-[#37352f] dark:hover:text-[#e6e6e4] transition-colors"
@@ -727,12 +992,14 @@ function MoveModal({
 function DataRow({
   customer,
   statuses,
+  columns,
   onUpdate,
   onDelete,
   onMove,
 }: {
   customer: Customer;
   statuses: StatusOption[];
+  columns: CustomColumnDef[];
   onUpdate: (updates: Partial<Omit<Customer, "id" | "created_at">>) => void;
   onDelete: () => void;
   onMove: (targetMonthPageId: string | null) => void;
@@ -777,21 +1044,14 @@ function DataRow({
       <td className="px-3 py-2 min-w-[90px]">
         <NumberCell value={customer.balance} onChange={(v) => onUpdate({ balance: v })} placeholder="0" />
       </td>
-      <td className="px-3 py-2 text-center">
-        <BoolCell value={customer.review_proposed} onChange={(v) => onUpdate({ review_proposed: v })} />
-      </td>
-      <td className="px-3 py-2 text-center">
-        <BoolCell value={customer.balance_received} onChange={(v) => onUpdate({ balance_received: v })} />
-      </td>
-      <td className="px-3 py-2 text-center">
-        <BoolCell value={customer.kmong_review} onChange={(v) => onUpdate({ kmong_review: v })} />
-      </td>
-      <td className="px-3 py-2 text-center">
-        <BoolCell value={customer.kakao_review} onChange={(v) => onUpdate({ kakao_review: v })} />
-      </td>
-      <td className="px-3 py-2 text-center">
-        <BoolCell value={customer.cash_receipt ?? false} onChange={(v) => onUpdate({ cash_receipt: v })} />
-      </td>
+      {columns.map((col) => (
+        <td key={col.id} className="px-3 py-2 text-center">
+          <BoolCell
+            value={customer.custom_fields?.[col.id] ?? false}
+            onChange={(v) => onUpdate({ custom_fields: { ...customer.custom_fields, [col.id]: v } })}
+          />
+        </td>
+      ))}
       <td className="px-3 py-2 min-w-[130px]">
         <input
           type="date"
@@ -847,6 +1107,10 @@ function DataRow({
  * embedded    — when true, renders without the full-page flex wrapper (for use
  *               inside PageEditor's scroll area).
  */
+function formatWon(n: number): string {
+  return `₩${Math.round(n).toLocaleString()}`;
+}
+
 export default function CRMPage({
   monthPageId = null,
   embedded = false,
@@ -854,24 +1118,45 @@ export default function CRMPage({
   monthPageId?: string | null;
   embedded?: boolean;
 }) {
-  const { customers, customerStatuses, createCustomer, updateCustomer, deleteCustomer } =
+  const { customers, customerStatuses, customColumns, createCustomer, updateCustomer, deleteCustomer } =
     useWorkspaceStore();
   const [showStatusEditor, setShowStatusEditor] = useState(false);
+  const [showColumnManager, setShowColumnManager] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [assigneeFilter, setAssigneeFilter] = useState<Set<string> | null>(null);
+  const [assigneeSort, setAssigneeSort] = useState<SortDir>(null);
+
+  const sortedColumns = [...customColumns].sort((a, b) => a.order - b.order);
 
   // Filter customers by month page when monthPageId is provided
-  const visibleCustomers = monthPageId
+  const monthScoped = monthPageId
     ? customers.filter((c) => c.monthPageId === monthPageId)
     : customers;
 
-  // Monthly / total revenue (전체금액 기준)
-  const totalRevenue = visibleCustomers.reduce((sum, c) => sum + (c.total_amount ?? 0), 0);
+  // 담당자 필터 드롭다운에 쓰일, 현재(월 범위 내) 존재하는 담당자 목록 (가나다순)
+  const distinctAssignees = Array.from(
+    new Set(monthScoped.map((c) => c.assignee).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b, "ko"));
 
-  const HEADERS = [
-    "이름", "담당자", "Tags", "알바", "정산금액",
-    "전체금액", "잔금", "후기제안", "잔금받음?", "크몽후기", "카톡후기", "현금영수증",
-    "제출날짜", "Status", "메모", "",
-  ];
+  // 담당자 필터 적용 (다른 필터와 AND 조건으로 조합 가능하도록 순차 filter)
+  let visibleCustomers = monthScoped;
+  if (assigneeFilter !== null) {
+    visibleCustomers = visibleCustomers.filter((c) => assigneeFilter.has(c.assignee));
+  }
+
+  // 담당자 가나다순 정렬 (3단계 토글: 오름차순 → 내림차순 → 정렬 해제)
+  if (assigneeSort) {
+    visibleCustomers = [...visibleCustomers].sort((a, b) => a.assignee.localeCompare(b.assignee, "ko"));
+    if (assigneeSort === "desc") visibleCustomers.reverse();
+  }
+
+  // Monthly / total revenue (전체금액 기준) — 필터링된 결과 기준으로 재계산
+  const totalRevenue = visibleCustomers.reduce((sum, c) => sum + (c.total_amount ?? 0), 0);
+  const settlementTotal = visibleCustomers.reduce((sum, c) => sum + (c.settlement_amount ?? 0), 0);
+  const balanceTotal = visibleCustomers.reduce((sum, c) => sum + (c.balance ?? 0), 0);
+
+  // 열 개수: 이름·담당자·Tags·알바(4) + 정산금액·전체금액·잔금(3) + 동적 체크박스 열 + 제출날짜·Status·메모·""(4)
+  const totalColSpan = 11 + sortedColumns.length;
 
   const handleSave = (data: Omit<Customer, "id" | "created_at" | "updated_at">) => {
     createCustomer({ ...data, monthPageId: monthPageId ?? null });
@@ -890,7 +1175,7 @@ export default function CRMPage({
             <>
               <span>·</span>
               <span className="font-semibold text-blue-500">
-                매출 ₩{totalRevenue.toLocaleString()}
+                매출 {formatWon(totalRevenue)}
               </span>
             </>
           )}
@@ -902,6 +1187,12 @@ export default function CRMPage({
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
         >
           <Plus size={15} /> 고객 추가
+        </button>
+        <button
+          onClick={() => setShowColumnManager(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#9b9a97] dark:text-[#6b6b6b] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] rounded-lg transition-colors"
+        >
+          <Columns3 size={15} /> 열 관리
         </button>
         <button
           onClick={() => setShowStatusEditor(true)}
@@ -918,9 +1209,40 @@ export default function CRMPage({
       <table className="w-full border-collapse text-[#37352f] dark:text-[#e6e6e4] text-sm">
         <thead className="sticky top-0 bg-[#f7f6f3] dark:bg-[#252525] z-10">
           <tr>
-            {HEADERS.map((h, i) => (
+            {["이름", null, "Tags", "알바", "정산금액", "전체금액", "잔금"].map((h, i) =>
+              h === null ? (
+                <th
+                  key="assignee"
+                  className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap"
+                >
+                  <AssigneeHeader
+                    assignees={distinctAssignees}
+                    activeFilter={assigneeFilter}
+                    onFilterChange={setAssigneeFilter}
+                    sortDir={assigneeSort}
+                    onSortChange={setAssigneeSort}
+                  />
+                </th>
+              ) : (
+                <th
+                  key={i}
+                  className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap"
+                >
+                  {h}
+                </th>
+              )
+            )}
+            {sortedColumns.map((col) => (
               <th
-                key={i}
+                key={col.id}
+                className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap"
+              >
+                {col.label}
+              </th>
+            ))}
+            {["제출날짜", "Status", "메모", ""].map((h, i) => (
+              <th
+                key={`r-${i}`}
                 className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap"
               >
                 {h}
@@ -934,6 +1256,7 @@ export default function CRMPage({
               key={c.id}
               customer={c}
               statuses={customerStatuses}
+              columns={sortedColumns}
               onUpdate={(updates) => updateCustomer(c.id, updates)}
               onDelete={() => deleteCustomer(c.id)}
               onMove={(targetMonthPageId) => updateCustomer(c.id, { monthPageId: targetMonthPageId })}
@@ -942,13 +1265,31 @@ export default function CRMPage({
           {showAddForm ? (
             <AddCustomerRow
               statuses={customerStatuses}
+              columns={sortedColumns}
               onSave={handleSave}
               onCancel={() => setShowAddForm(false)}
             />
           ) : (
-            <AddTriggerRow onAdd={() => setShowAddForm(true)} />
+            <AddTriggerRow onAdd={() => setShowAddForm(true)} colSpan={totalColSpan} />
           )}
         </tbody>
+        <tfoot>
+          <tr className="border-t-2 border-[#e9e9e7] dark:border-[#3f3f3f] bg-[#f7f6f3] dark:bg-[#232323] font-semibold sticky bottom-0">
+            <td colSpan={4} className="px-3 py-2 text-xs text-[#9b9a97] dark:text-[#6b6b6b]">
+              합계
+            </td>
+            <td className="px-3 py-2 text-sm text-right text-[#37352f] dark:text-[#e6e6e4]">
+              {formatWon(settlementTotal)}
+            </td>
+            <td className="px-3 py-2 text-sm text-right text-[#37352f] dark:text-[#e6e6e4]">
+              {formatWon(totalRevenue)}
+            </td>
+            <td className="px-3 py-2 text-sm text-right text-[#37352f] dark:text-[#e6e6e4]">
+              {formatWon(balanceTotal)}
+            </td>
+            <td colSpan={sortedColumns.length + 4}></td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   );
@@ -967,6 +1308,7 @@ export default function CRMPage({
         </div>
       )}
       {showStatusEditor && <StatusEditor onClose={() => setShowStatusEditor(false)} />}
+      {showColumnManager && <ColumnManager onClose={() => setShowColumnManager(false)} />}
     </>
   );
 }

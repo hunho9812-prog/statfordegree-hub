@@ -11,6 +11,7 @@ const REALTIME_TABLES = [
   "tasks",
   "customers",
   "customer_statuses",
+  "table_columns",
   "manual_nodes",
   "manual_page_roots",
   "workspace_config",

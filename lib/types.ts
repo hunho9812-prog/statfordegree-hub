@@ -38,6 +38,19 @@ export interface StatusOption {
   category: StatusCategory;
 }
 
+// ─── Dynamic (user-managed) checkbox columns ─────────────────────────────────
+// Replaces the old hardcoded 후기제안/잔금받음?/크몽후기/카톡후기/현금영수증 boolean columns.
+// Values live in Customer.custom_fields, keyed by CustomColumnDef.id.
+
+export type CustomColumnType = "checkbox";
+
+export interface CustomColumnDef {
+  id: string;
+  label: string;
+  type: CustomColumnType;
+  order: number;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -47,11 +60,7 @@ export interface Customer {
   alba: string;                   // 알바 (자유 입력)
   total_amount: number | null;    // 전체금액
   balance: number | null;         // 잔금
-  review_proposed: boolean;
-  balance_received: boolean;
-  kmong_review: boolean;
-  kakao_review: boolean;
-  cash_receipt: boolean;
+  custom_fields: Record<string, boolean>; // dynamic checkbox columns, keyed by CustomColumnDef.id
   submit_date: string;
   status: string;                 // references a StatusOption id or label
   memo: string;
@@ -93,6 +102,7 @@ export interface WorkspaceState {
   tasks: Task[];
   customers: Customer[];
   customerStatuses: StatusOption[];
+  customColumns: CustomColumnDef[];
   manualPages: Record<string, ManualPageData>;
   monthlyCosts: MonthlyCost[];
   sidebarCollapsed: boolean;
@@ -109,6 +119,9 @@ export interface WorkspaceState {
   deleteCustomer: (id: string) => void;
   upsertCustomerStatus: (status: StatusOption) => void;
   deleteCustomerStatus: (id: string) => void;
+  upsertCustomColumn: (column: CustomColumnDef) => void;
+  deleteCustomColumn: (id: string) => void;
+  reorderCustomColumns: (orderedIds: string[]) => void;
   addManualNode: (pageId: string, parentId: string | null, afterId?: string) => string;
   updateManualNode: (pageId: string, nodeId: string, updates: Partial<Pick<ManualNode, "text" | "isExpanded" | "isPinned">>) => void;
   deleteManualNode: (pageId: string, nodeId: string) => void;

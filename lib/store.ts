@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuidv4 } from "uuid";
-import type { WorkspaceState, Page, Task, Customer, StatusOption, ManualNode, ManualPageData } from "./types";
+import type { WorkspaceState, Page, Task, Customer, StatusOption, CustomColumnDef, ManualNode, ManualPageData } from "./types";
 import {
   dbPages,
   dbTasks,
   dbCustomers,
   dbCustomerStatuses,
+  dbTableColumns,
   dbManualNodes,
   dbManualPageRoots,
   dbWorkspaceConfig,
@@ -1275,12 +1276,22 @@ const initialCustomerStatuses: StatusOption[] = [
   { id: "status-5", label: "제출완료", color: "#f0fdf4", textColor: "#166534", category: "완료" },
 ];
 
+// 기존에 하드코딩되어 있던 체크박스 컬럼들 (customers.custom_fields 마이그레이션과 키를 맞춤)
+const initialCustomColumns: CustomColumnDef[] = [
+  { id: "review_proposed", label: "후기제안", type: "checkbox", order: 0 },
+  { id: "balance_received", label: "잔금받음?", type: "checkbox", order: 1 },
+  { id: "kmong_review", label: "크몽후기", type: "checkbox", order: 2 },
+  { id: "kakao_review", label: "카톡후기", type: "checkbox", order: 3 },
+  { id: "cash_receipt", label: "현금영수증", type: "checkbox", order: 4 },
+];
+
 // Default fields for Customer (handles migration from old schema)
 const customerDefaults: Partial<Customer> = {
   route: "",
   settlement_amount: null,
   alba: "",
   monthPageId: null,
+  custom_fields: {},
 };
 
 const freshState = {
@@ -1289,6 +1300,7 @@ const freshState = {
   tasks: initialTasks,
   customers: initialCustomers,
   customerStatuses: initialCustomerStatuses,
+  customColumns: initialCustomColumns,
   manualPages: {} as Record<string, ManualPageData>,
   monthlyCosts: [],
   sidebarCollapsed: false,
@@ -1762,6 +1774,39 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         dbCustomerStatuses.delete(id);
       },
 
+      upsertCustomColumn: (column) => {
+        set((state) => {
+          const exists = state.customColumns.find((c) => c.id === column.id);
+          if (exists) {
+            return {
+              customColumns: state.customColumns.map((c) =>
+                c.id === column.id ? column : c
+              ),
+            };
+          }
+          return { customColumns: [...state.customColumns, column] };
+        });
+        dbTableColumns.upsert(column);
+      },
+
+      deleteCustomColumn: (id) => {
+        set((state) => ({
+          customColumns: state.customColumns.filter((c) => c.id !== id),
+        }));
+        dbTableColumns.delete(id);
+      },
+
+      reorderCustomColumns: (orderedIds) => {
+        set((state) => {
+          const byId = Object.fromEntries(state.customColumns.map((c) => [c.id, c]));
+          const reordered = orderedIds
+            .map((id, i) => (byId[id] ? { ...byId[id], order: i } : null))
+            .filter((c): c is CustomColumnDef => c !== null);
+          return { customColumns: reordered };
+        });
+        dbTableColumns.upsertMany(get().customColumns);
+      },
+
       // ── Manual tree actions ────────────────────────────────────────────────
 
       addManualNode: (pageId, parentId, afterId) => {
@@ -2011,12 +2056,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set({ isRefreshing: true, syncError: false });
         try {
 
-        const [pages, tasks, customers, statuses, manualNodesData, manualRoots, rootPageIdsConfig] =
+        const [pages, tasks, customers, statuses, columns, manualNodesData, manualRoots, rootPageIdsConfig] =
           await Promise.all([
             dbPages.fetchAll(),
             dbTasks.fetchAll(),
             dbCustomers.fetchAll(),
             dbCustomerStatuses.fetchAll(),
+            dbTableColumns.fetchAll(),
             dbManualNodes.fetchAll(),
             dbManualPageRoots.fetchAll(),
             dbWorkspaceConfig.get("rootPageIds"),
@@ -2074,6 +2120,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             dbCustomerStatuses.upsertMany(current.customerStatuses),
             dbWorkspaceConfig.set("rootPageIds", current.rootPageIds),
           ]);
+        }
+        if (columns.length === 0 && current.customColumns.length > 0) {
+          dbTableColumns.upsertMany(current.customColumns);
         }
 
         // Supabase가 있으면 그것만 사용, 없으면 로컬 첫 마이그레이션 데이터 사용
@@ -2161,6 +2210,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           tasks: mergedTasks,
           customers: mergedCustomers,
           customerStatuses: statuses.length > 0 ? statuses : current.customerStatuses,
+          customColumns: columns.length > 0 ? columns : current.customColumns,
           // manualPages: Supabase에 데이터가 있으면 사용, 비어있으면 로컬 유지
           // (인증 실패로 fetch가 빈 배열을 반환해도 로컬 데이터 보호)
           manualPages: Object.keys(manualPages).length > 0 ? manualPages : current.manualPages,
@@ -2174,12 +2224,17 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
       name: "statfordegree-hub-storage",
-      version: 8,
+      version: 9,
       migrate: (persistedState: unknown, version: number) => {
         const s = persistedState as Record<string, unknown>;
         const DEFAULT_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
 
-        if (version === 7) {
+        let migrated: Record<string, unknown>;
+
+        if (version === 8) {
+          // v8 → v9: no shape change besides the custom_fields conversion below
+          migrated = { ...s };
+        } else if (version === 7) {
           // v7 → v8: populate manual page content (was empty stubs)
           const pages = (s.pages as Record<string, Page>) ?? {};
           const updatedPages = { ...pages };
@@ -2197,44 +2252,68 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               updatedPages[id] = { ...updatedPages[id], content };
             }
           }
-          return { ...s, pages: updatedPages };
-        }
-
-        if (version === 6) {
-          // v6 → v7: 기본 업무 항목 완전 제거 (중복 누적된 경우도 모두 삭제)
-          return {
+          migrated = { ...s, pages: updatedPages };
+        } else if (version === 6) {
+          // v6 → v9: 기본 업무 항목 완전 제거 (중복 누적된 경우도 모두 삭제)
+          migrated = {
             ...s,
             tasks: ((s.tasks as Task[]) ?? []).filter(
               (t) => !DEFAULT_TITLES.includes(t.title)
             ),
           };
-        }
-        if (version === 5) {
-          // v5 → v8: same as v6 migration
-          return {
+        } else if (version === 5) {
+          migrated = {
             ...s,
             tasks: ((s.tasks as Task[]) ?? []).filter(
               (t) => !DEFAULT_TITLES.includes(t.title)
             ),
           };
-        }
-        if (version === 4) {
-          // v4 → v7
-          return {
+        } else if (version === 4) {
+          migrated = {
             ...freshState,
             tasks: [],
             customers: ((s.customers as Customer[]) ?? []).map((c) => ({
               ...customerDefaults,
               ...c,
-              monthPageId: (c as Customer).monthPageId ?? null,
             })),
             customerStatuses: (s.customerStatuses as StatusOption[]) ?? freshState.customerStatuses,
             sidebarCollapsed: (s.sidebarCollapsed as boolean) ?? false,
             darkMode: (s.darkMode as boolean) ?? false,
           };
+        } else {
+          // 구버전: 전체 초기화
+          return freshState;
         }
-        // 구버전: 전체 초기화
-        return freshState;
+
+        // v4~v8 → v9: 하드코딩된 체크박스 컬럼(후기제안/잔금받음?/크몽후기/카톡후기/현금영수증)을
+        // custom_fields(동적 컬럼 값 맵)으로 이전. 기존 값 손실 없이 매핑.
+        const LEGACY_BOOL_KEYS = [
+          "review_proposed",
+          "balance_received",
+          "kmong_review",
+          "kakao_review",
+          "cash_receipt",
+        ] as const;
+
+        const migratedCustomers = ((migrated.customers as Record<string, unknown>[]) ?? []).map((c) => {
+          const custom_fields: Record<string, boolean> = {
+            ...((c.custom_fields as Record<string, boolean>) ?? {}),
+          };
+          for (const key of LEGACY_BOOL_KEYS) {
+            if (key in c && !(key in custom_fields)) {
+              custom_fields[key] = Boolean(c[key]);
+            }
+          }
+          const rest = { ...c };
+          for (const key of LEGACY_BOOL_KEYS) delete rest[key];
+          return { ...rest, monthPageId: (c.monthPageId as string | null | undefined) ?? null, custom_fields };
+        });
+
+        return {
+          ...migrated,
+          customers: migratedCustomers,
+          customColumns: (migrated.customColumns as CustomColumnDef[]) ?? freshState.customColumns,
+        };
       },
     }
   )
