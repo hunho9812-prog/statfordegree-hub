@@ -145,10 +145,7 @@ create table if not exists public.customers (
   alba              text    not null default '',
   total_amount      numeric,
   balance           numeric,
-  review_proposed   boolean not null default false,
-  balance_received  boolean not null default false,
-  kmong_review      boolean not null default false,
-  kakao_review      boolean not null default false,
+  custom_fields     jsonb   not null default '{}'::jsonb, -- dynamic checkbox columns, keyed by table_columns.id
   submit_date       text,
   status            text    not null default '',
   memo              text    not null default '',
@@ -164,6 +161,34 @@ create policy "customers_approved" on public.customers
   for all using (public.is_approved());
 
 alter publication supabase_realtime add table public.customers;
+
+
+-- ================================================================
+-- [4b] table_columns — 동적 체크박스 컬럼 메타데이터 (이름/순서/타입)
+-- ================================================================
+create table if not exists public.table_columns (
+  id         text primary key,
+  label      text not null default '',
+  type       text not null default 'checkbox' check (type in ('checkbox')),
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+alter table public.table_columns enable row level security;
+
+drop policy if exists "table_columns_approved" on public.table_columns;
+create policy "table_columns_approved" on public.table_columns
+  for all using (public.is_approved());
+
+alter publication supabase_realtime add table public.table_columns;
+
+insert into public.table_columns (id, label, type, sort_order) values
+  ('review_proposed', '후기제안', 'checkbox', 0),
+  ('balance_received', '잔금받음?', 'checkbox', 1),
+  ('kmong_review', '크몽후기', 'checkbox', 2),
+  ('kakao_review', '카톡후기', 'checkbox', 3),
+  ('cash_receipt', '현금영수증', 'checkbox', 4)
+on conflict (id) do nothing;
 
 
 -- ================================================================
