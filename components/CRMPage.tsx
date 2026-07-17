@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { useWorkspaceStore } from "@/lib/store";
 import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColumnDef } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
@@ -10,7 +11,175 @@ import {
 } from "lucide-react";
 
 const ASSIGNEES = ["김은호", "김세윤", "김현호", "오승준"];
-const ROUTES: CustomerRoute[] = ["크몽", "메일", ""];
+
+// ─── Notion-스러운 색상 프리셋: 담당자 아바타 / Tags 배지 ──────────────────────
+const ASSIGNEE_STYLES: Record<string, { bg: string; text: string }> = {
+  "김은호": { bg: "#fde68a", text: "#78350f" },
+  "김세윤": { bg: "#ddd6fe", text: "#5b21b6" },
+  "김현호": { bg: "#a7f3d0", text: "#065f46" },
+  "오승준": { bg: "#fecaca", text: "#991b1b" },
+};
+
+const ROUTE_STYLES: Record<string, { bg: string; text: string }> = {
+  "크몽": { bg: "#eef2ff", text: "#4338ca" },
+  "메일": { bg: "#eff6ff", text: "#1d4ed8" },
+};
+
+// ─── 스크롤 컨테이너에 잘리지 않도록 document.body에 포털로 띄우는 드롭다운 ──
+// 트리거 버튼 기준으로 위/아래 중 공간이 넉넉한 쪽에 고정 위치로 렌더링한다.
+function AnchoredDropdown({
+  open,
+  anchorRef,
+  onClose,
+  width = 176,
+  children,
+}: {
+  open: boolean;
+  anchorRef: React.RefObject<HTMLElement | null>;
+  onClose: () => void;
+  width?: number;
+  children: React.ReactNode;
+}) {
+  const [style, setStyle] = useState<React.CSSProperties>({});
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !anchorRef.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    const viewportH = window.innerHeight;
+    const viewportW = window.innerWidth;
+    const spaceBelow = viewportH - rect.bottom;
+    const spaceAbove = rect.top;
+    const desiredMaxH = 288; // max-h-72 상당
+    const openUp = spaceBelow < desiredMaxH && spaceAbove > spaceBelow;
+
+    let left = rect.left;
+    if (left + width > viewportW - 8) left = Math.max(8, viewportW - width - 8);
+
+    setStyle({
+      position: "fixed",
+      left,
+      width,
+      ...(openUp
+        ? { bottom: viewportH - rect.top + 4, maxHeight: Math.max(80, spaceAbove - 12) }
+        : { top: rect.bottom + 4, maxHeight: Math.max(80, spaceBelow - 12) }),
+    });
+  }, [open, anchorRef, width]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handle(e: MouseEvent) {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target as Node) &&
+        anchorRef.current && !anchorRef.current.contains(e.target as Node)
+      ) {
+        onClose();
+      }
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open, onClose, anchorRef]);
+
+  if (!open) return null;
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      style={style}
+      className="z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg shadow-lg py-1 overflow-y-auto"
+    >
+      {children}
+    </div>,
+    document.body
+  );
+}
+
+// ─── 담당자 아바타 뱃지 + 드롭다운 ────────────────────────────────────────────
+
+function AssigneeAvatar({ name, size = 18 }: { name: string; size?: number }) {
+  const style = ASSIGNEE_STYLES[name] ?? { bg: "#e5e7eb", text: "#374151" };
+  return (
+    <span
+      className="rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-semibold"
+      style={{ width: size, height: size, backgroundColor: style.bg, color: style.text }}
+    >
+      {name ? name[0] : "?"}
+    </span>
+  );
+}
+
+function AssigneeCell({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  return (
+    <>
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 text-left w-full">
+        <AssigneeAvatar name={value} />
+        <span className="text-xs text-[#37352f] dark:text-[#e6e6e4] truncate">{value || "—"}</span>
+      </button>
+      <AnchoredDropdown open={open} anchorRef={btnRef} onClose={() => setOpen(false)} width={140}>
+        {ASSIGNEES.map((a) => (
+          <button
+            key={a}
+            onClick={() => { onChange(a); setOpen(false); }}
+            className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-[#3a3a3a]"
+          >
+            <AssigneeAvatar name={a} />
+            <span className="text-[#37352f] dark:text-[#e6e6e4]">{a}</span>
+          </button>
+        ))}
+      </AnchoredDropdown>
+    </>
+  );
+}
+
+// ─── Tags(크몽/메일) 배지 + 드롭다운 ──────────────────────────────────────────
+
+function TagsCell({ value, onChange }: { value: CustomerRoute; onChange: (v: CustomerRoute) => void }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const style = value ? ROUTE_STYLES[value] : null;
+
+  return (
+    <>
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)} className="text-left">
+        {style ? (
+          <span
+            className="inline-block px-2 py-0.5 rounded text-xs font-medium"
+            style={{ backgroundColor: style.bg, color: style.text }}
+          >
+            {value}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
+        )}
+      </button>
+      <AnchoredDropdown open={open} anchorRef={btnRef} onClose={() => setOpen(false)} width={120}>
+        <button
+          onClick={() => { onChange(""); setOpen(false); }}
+          className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]"
+        >
+          —
+        </button>
+        {(["크몽", "메일"] as CustomerRoute[]).map((r) => (
+          <button
+            key={r}
+            onClick={() => { onChange(r); setOpen(false); }}
+            className="w-full text-left px-3 py-1 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]"
+          >
+            <span
+              className="inline-block px-2 py-0.5 rounded text-xs font-medium"
+              style={{ backgroundColor: ROUTE_STYLES[r].bg, color: ROUTE_STYLES[r].text }}
+            >
+              {r}
+            </span>
+          </button>
+        ))}
+      </AnchoredDropdown>
+    </>
+  );
+}
 
 // ─── Preset color palette for status options ─────────────────────────────────
 const COLOR_PRESETS = [
@@ -123,30 +292,6 @@ function NumberCell({
   );
 }
 
-function SelectCell({
-  value,
-  options,
-  onChange,
-}: {
-  value: string;
-  options: string[];
-  onChange: (v: string) => void;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-transparent text-sm outline-none cursor-pointer dark:text-[#e6e6e4]"
-    >
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {o || "—"}
-        </option>
-      ))}
-    </select>
-  );
-}
-
 function BoolCell({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
     <div className="flex justify-center">
@@ -172,69 +317,52 @@ function StatusCell({
   onChange: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, []);
-
+  const btnRef = useRef<HTMLButtonElement>(null);
   const current = statuses.find((s) => s.label === value);
 
   return (
-    <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} className="w-full text-left">
+    <>
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-1.5 text-left">
         {current ? (
-          <span
-            className="inline-block px-2 py-0.5 rounded text-xs font-medium"
-            style={{ backgroundColor: current.color, color: current.textColor }}
-          >
-            {current.label}
-          </span>
+          <>
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: current.textColor }} />
+            <span className="text-xs text-[#37352f] dark:text-[#e6e6e4] truncate">{current.label}</span>
+          </>
         ) : (
           <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
         )}
       </button>
 
-      {open && (
-        <div className="absolute left-0 bottom-full mb-1 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg shadow-lg w-44 py-1 max-h-72 overflow-y-auto">
-          <button
-            onClick={() => { onChange(""); setOpen(false); }}
-            className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]"
-          >
-            —
-          </button>
-          {CATEGORIES.map((cat) => {
-            const items = statuses.filter((s) => s.category === cat);
-            if (!items.length) return null;
-            return (
-              <div key={cat}>
-                <p className="px-3 pt-2 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-                  {cat}
-                </p>
-                {items.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => { onChange(s.label); setOpen(false); }}
-                    className="w-full text-left px-3 py-1 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]"
-                  >
-                    <span
-                      className="inline-block px-2 py-0.5 rounded text-xs font-medium"
-                      style={{ backgroundColor: s.color, color: s.textColor }}
-                    >
-                      {s.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+      <AnchoredDropdown open={open} anchorRef={btnRef} onClose={() => setOpen(false)} width={176}>
+        <button
+          onClick={() => { onChange(""); setOpen(false); }}
+          className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]"
+        >
+          —
+        </button>
+        {CATEGORIES.map((cat) => {
+          const items = statuses.filter((s) => s.category === cat);
+          if (!items.length) return null;
+          return (
+            <div key={cat}>
+              <p className="px-3 pt-2 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                {cat}
+              </p>
+              {items.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => { onChange(s.label); setOpen(false); }}
+                  className="w-full flex items-center gap-1.5 text-left px-3 py-1 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]"
+                >
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.textColor }} />
+                  <span className="text-xs text-[#37352f] dark:text-[#e6e6e4]">{s.label}</span>
+                </button>
+              ))}
+            </div>
+          );
+        })}
+      </AnchoredDropdown>
+    </>
   );
 }
 
@@ -782,23 +910,11 @@ function AddCustomerRow({
       </td>
       {/* 담당자 */}
       <td className="px-3 py-2">
-        <select
-          value={form.assignee}
-          onChange={(e) => set("assignee", e.target.value)}
-          className="bg-transparent text-sm outline-none dark:text-[#e6e6e4]"
-        >
-          {ASSIGNEES.map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
+        <AssigneeCell value={form.assignee} onChange={(v) => set("assignee", v)} />
       </td>
       {/* Tags */}
       <td className="px-3 py-2">
-        <select
-          value={form.route}
-          onChange={(e) => set("route", e.target.value as CustomerRoute)}
-          className="bg-transparent text-sm outline-none dark:text-[#e6e6e4]"
-        >
-          {ROUTES.map((r) => <option key={r} value={r}>{r || "—"}</option>)}
-        </select>
+        <TagsCell value={form.route} onChange={(v) => set("route", v)} />
       </td>
       {/* 알바 */}
       <td className="px-3 py-2">
@@ -1023,10 +1139,10 @@ function DataRow({
         <TextCell value={customer.name} onChange={(v) => onUpdate({ name: v })} placeholder="이름" />
       </td>
       <td className="px-3 py-2 min-w-[90px]">
-        <SelectCell value={customer.assignee} options={ASSIGNEES} onChange={(v) => onUpdate({ assignee: v })} />
+        <AssigneeCell value={customer.assignee} onChange={(v) => onUpdate({ assignee: v })} />
       </td>
       <td className="px-3 py-2 min-w-[80px]">
-        <SelectCell value={customer.route} options={ROUTES} onChange={(v) => onUpdate({ route: v as CustomerRoute })} />
+        <TagsCell value={customer.route} onChange={(v) => onUpdate({ route: v })} />
       </td>
       <td className="px-3 py-2 min-w-[80px]">
         <TextCell value={customer.alba} onChange={(v) => onUpdate({ alba: v })} placeholder="알바" />
