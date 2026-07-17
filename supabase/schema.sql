@@ -146,6 +146,15 @@ create table if not exists public.customers (
   total_amount      numeric,
   balance           numeric,
   custom_fields     jsonb   not null default '{}'::jsonb, -- dynamic checkbox columns, keyed by table_columns.id
+  -- LEGACY COMPAT: restored 2026-07-17 because another active branch
+  -- (claude/wizardly-curie-cfhpib) still reads/writes these as plain columns.
+  -- Not written to by this branch's frontend — remove once branches are reconciled
+  -- and every deployed frontend reads custom_fields instead.
+  review_proposed   boolean not null default false,
+  balance_received  boolean not null default false,
+  kmong_review      boolean not null default false,
+  kakao_review      boolean not null default false,
+  cash_receipt      boolean not null default false,
   submit_date       text,
   status            text    not null default '',
   memo              text    not null default '',
