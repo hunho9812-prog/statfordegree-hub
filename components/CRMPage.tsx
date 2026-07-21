@@ -1310,7 +1310,7 @@ export default function CRMPage({
           }`}
         >
           {customerSyncStatus === "error"
-            ? "○ 동기화 오류"
+            ? "○ 저장 오류"
             : customerSyncStatus === "saving"
             ? "● 저장 중…"
             : "● 저장됨"}
