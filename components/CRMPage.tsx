@@ -1297,34 +1297,31 @@ export default function CRMPage({
               </span>
             </>
           )}
-          <span>·</span>
-          <span
-            className={`flex items-center gap-1 text-xs font-medium ${
-              customerSyncStatus === "error"
-                ? "text-red-500"
-                : customerSyncStatus === "saving"
-                ? "text-blue-500"
-                : "text-emerald-600 dark:text-emerald-400"
-            }`}
-          >
-            {customerSyncStatus === "saving" && <RefreshCw size={11} className="animate-spin" />}
-            ●{" "}
-            {customerSyncStatus === "error"
-              ? "동기화 오류 — 재시도해주세요"
-              : customerSyncStatus === "saving"
-              ? "저장 중…"
-              : "저장됨"}
-          </span>
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <span
+          className={`text-xs font-semibold px-3 py-1 rounded-full ${
+            customerSyncStatus === "error"
+              ? "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400"
+              : customerSyncStatus === "saving"
+              ? "bg-blue-100 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"
+              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+          }`}
+        >
+          {customerSyncStatus === "error"
+            ? "○ 동기화 오류"
+            : customerSyncStatus === "saving"
+            ? "● 저장 중…"
+            : "● 저장됨"}
+        </span>
         <button
           onClick={() => syncNow()}
           disabled={isRefreshing}
           title="다른 기기의 변경사항을 지금 바로 가져오고, 저장 실패한 항목을 다시 저장합니다"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#9b9a97] dark:text-[#6b6b6b] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] rounded-lg transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
         >
-          <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} /> 동기화
+          <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} /> 동기화
         </button>
         <button
           onClick={() => setShowAddForm(true)}
