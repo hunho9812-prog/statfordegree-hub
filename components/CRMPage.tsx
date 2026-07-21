@@ -7,7 +7,7 @@ import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColum
 import { v4 as uuidv4 } from "uuid";
 import {
   Plus, Trash2, Settings, X, Check, GripVertical, ArrowRightLeft,
-  Filter, ChevronUp, ChevronDown, Columns3, RefreshCw,
+  Filter, ChevronUp, ChevronDown, Columns3, RefreshCw, Save,
 } from "lucide-react";
 
 const ASSIGNEES = ["김은호", "김세윤", "김현호", "오승준"];
@@ -1321,7 +1321,7 @@ export default function CRMPage({
           title="다른 기기의 변경사항을 지금 바로 가져오고, 저장 실패한 항목을 다시 저장합니다"
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
         >
-          <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} /> 동기화
+          {isRefreshing ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />} 저장
         </button>
         <button
           onClick={() => setShowAddForm(true)}
