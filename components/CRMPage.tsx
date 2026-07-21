@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useWorkspaceStore } from "@/lib/store";
 import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColumnDef } from "@/lib/types";
@@ -1109,6 +1109,7 @@ function DataRow({
   customer,
   statuses,
   columns,
+  isDirty,
   onUpdate,
   onDelete,
   onMove,
@@ -1116,6 +1117,7 @@ function DataRow({
   customer: Customer;
   statuses: StatusOption[];
   columns: CustomColumnDef[];
+  isDirty: boolean;
   onUpdate: (updates: Partial<Omit<Customer, "id" | "created_at">>) => void;
   onDelete: () => void;
   onMove: (targetMonthPageId: string | null) => void;
@@ -1134,8 +1136,8 @@ function DataRow({
   }
 
   return (
-    <tr className="border-t border-[#e9e9e7] dark:border-[#2f2f2f] hover:bg-gray-50 dark:hover:bg-[#1f1f1f] group">
-      <td className="px-3 py-2 min-w-[120px]">
+    <tr className={`border-t border-[#e9e9e7] dark:border-[#2f2f2f] hover:bg-gray-50 dark:hover:bg-[#1f1f1f] group transition-colors ${isDirty ? "bg-blue-50/50 dark:bg-blue-950/10" : ""}`}>
+      <td className={`px-3 py-2 min-w-[120px] relative ${isDirty ? "before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] before:bg-blue-400 before:rounded-r" : ""}`}>
         <TextCell value={customer.name} onChange={(v) => onUpdate({ name: v })} placeholder="이름" />
       </td>
       <td className="px-3 py-2 min-w-[90px]">
@@ -1236,11 +1238,38 @@ export default function CRMPage({
 }) {
   const {
     customers, customerStatuses, customColumns, createCustomer, updateCustomer, deleteCustomer,
-    customerSyncStatus, isRefreshing, syncNow,
+    isRefreshing, syncNow,
   } = useWorkspaceStore();
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showColumnManager, setShowColumnManager] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // ─── 장부 스타일 저장 추적 ────────────────────────────────────────
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
+  const isDirty = dirtyIds.size > 0;
+
+  const handleUpdate = useCallback((id: string, updates: Partial<Omit<Customer, "id" | "created_at">>) => {
+    updateCustomer(id, updates);
+    setDirtyIds((prev) => new Set(prev).add(id));
+  }, [updateCustomer]);
+
+  const handleSaveToDB = useCallback(async () => {
+    if (dirtyIds.size === 0) return;
+    setSaveStatus("saving");
+    await syncNow();
+    setDirtyIds(new Set());
+    setSaveStatus("saved");
+  }, [dirtyIds, syncNow]);
+
+  // Cmd/Ctrl+S 단축키
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); handleSaveToDB(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleSaveToDB]);
   const [assigneeFilter, setAssigneeFilter] = useState<Set<string> | null>(null);
   const [assigneeSort, setAssigneeSort] = useState<SortDir>(null);
 
@@ -1300,28 +1329,25 @@ export default function CRMPage({
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <span
-          className={`text-xs font-semibold px-3 py-1 rounded-full ${
-            customerSyncStatus === "error"
-              ? "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400"
-              : customerSyncStatus === "saving"
-              ? "bg-blue-100 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"
-              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+        <button
+          onClick={handleSaveToDB}
+          disabled={!isDirty || saveStatus === "saving" || isRefreshing}
+          title={isDirty ? `${dirtyIds.size}건 미저장 · 클릭하여 저장 (⌘S)` : "저장됨"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg font-medium transition-all ${
+            saveStatus === "saving" || isRefreshing
+              ? "bg-blue-400 text-white cursor-wait"
+              : isDirty
+              ? "bg-blue-500 text-white hover:bg-blue-600 shadow-sm"
+              : "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 cursor-default border border-emerald-200 dark:border-emerald-800"
           }`}
         >
-          {customerSyncStatus === "error"
-            ? "○ 저장 오류"
-            : customerSyncStatus === "saving"
-            ? "● 저장 중…"
-            : "● 저장됨"}
-        </span>
-        <button
-          onClick={() => syncNow()}
-          disabled={isRefreshing}
-          title="다른 기기의 변경사항을 지금 바로 가져오고, 저장 실패한 항목을 다시 저장합니다"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
-        >
-          {isRefreshing ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />} 저장
+          {saveStatus === "saving" || isRefreshing ? (
+            <><RefreshCw size={13} className="animate-spin" /> 저장 중…</>
+          ) : isDirty ? (
+            <><Save size={13} /> 저장 ({dirtyIds.size})</>
+          ) : (
+            <><Check size={13} /> 저장됨</>
+          )}
         </button>
         <button
           onClick={() => setShowAddForm(true)}
@@ -1398,9 +1424,10 @@ export default function CRMPage({
               customer={c}
               statuses={customerStatuses}
               columns={sortedColumns}
-              onUpdate={(updates) => updateCustomer(c.id, updates)}
-              onDelete={() => deleteCustomer(c.id)}
-              onMove={(targetMonthPageId) => updateCustomer(c.id, { monthPageId: targetMonthPageId })}
+              isDirty={dirtyIds.has(c.id)}
+              onUpdate={(updates) => handleUpdate(c.id, updates)}
+              onDelete={() => { deleteCustomer(c.id); setDirtyIds((p) => { const n = new Set(p); n.delete(c.id); return n; }); }}
+              onMove={(targetMonthPageId) => handleUpdate(c.id, { monthPageId: targetMonthPageId })}
             />
           ))}
           {showAddForm ? (

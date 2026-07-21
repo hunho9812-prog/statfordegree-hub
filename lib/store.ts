@@ -1737,20 +1737,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
 
       updateCustomer: (id, updates) => {
+        // 로컬 state만 업데이트 — DB 저장은 저장 버튼(syncNow/flushCustomers)에서 명시적으로 수행.
+        // 즉시 upsert하면 키 입력마다 Realtime 이벤트 → loadFromSupabase race condition 발생.
         set((state) => ({
           customers: state.customers.map((c) =>
             c.id === id
               ? { ...c, ...updates, updated_at: new Date().toISOString() }
               : c
           ),
-          customerSyncStatus: "saving",
+          customerSyncStatus: "saved", // 로컬 저장 완료 표시 (DB 저장 전)
         }));
-        const updated = get().customers.find((c) => c.id === id);
-        if (updated) {
-          dbCustomers.upsert(updated).then((res) => {
-            set({ customerSyncStatus: res.success ? "saved" : "error" });
-          });
-        }
       },
 
       deleteCustomer: (id) => {
