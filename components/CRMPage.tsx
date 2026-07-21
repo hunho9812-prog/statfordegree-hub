@@ -7,7 +7,7 @@ import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColum
 import { v4 as uuidv4 } from "uuid";
 import {
   Plus, Trash2, Settings, X, Check, GripVertical, ArrowRightLeft,
-  Filter, ChevronUp, ChevronDown, Columns3, RefreshCw, Save,
+  Filter, ChevronUp, ChevronDown, RefreshCw, Save, Pencil,
 } from "lucide-react";
 
 const ASSIGNEES = ["김은호", "김세윤", "김현호", "오승준"];
@@ -450,106 +450,256 @@ function StatusOptionRow({
 
 // ─── Status editor modal ──────────────────────────────────────────────────────
 
-// ─── Assignee column header: filter (multi-select checkbox) + 3-state sort ──
+// ─── Notion-style unified column header with popup menu ──────────────────────
 
 type SortDir = "asc" | "desc" | null;
+type ColKind = "fixed" | "custom" | "status";
 
-function AssigneeHeader({
-  assignees,
-  activeFilter,
-  onFilterChange,
-  sortDir,
-  onSortChange,
-}: {
-  assignees: string[];
-  activeFilter: Set<string> | null;
-  onFilterChange: (next: Set<string> | null) => void;
+interface ColumnHeaderProps {
+  label: string;
+  kind: ColKind;
+  field: string;
+  sortField: string | null;
   sortDir: SortDir;
-  onSortChange: (next: SortDir) => void;
-}) {
+  onSort: (field: string, dir: "asc" | "desc" | null) => void;
+  // Assignee filter (field === "assignee" only)
+  assignees?: string[];
+  assigneeFilter?: Set<string> | null;
+  onAssigneeFilter?: (next: Set<string> | null) => void;
+  // Status filter (kind === "status" only)
+  allStatuses?: StatusOption[];
+  statusFilter?: Set<string> | null;
+  onStatusFilter?: (next: Set<string> | null) => void;
+  // Custom column ops
+  onInsertLeft?: () => void;
+  onInsertRight?: () => void;
+  onRename?: (label: string) => void;
+  onDelete?: () => void;
+  // Status editor
+  onEditStatus?: () => void;
+}
+
+function ColumnHeader({
+  label, kind, field,
+  sortField, sortDir, onSort,
+  assignees, assigneeFilter, onAssigneeFilter,
+  allStatuses, statusFilter, onStatusFilter,
+  onInsertLeft, onInsertRight, onRename, onDelete,
+  onEditStatus,
+}: ColumnHeaderProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [subPanel, setSubPanel] = useState<"filter" | "rename" | null>(null);
+  const [renameVal, setRenameVal] = useState(label);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, []);
+  const isActiveSort = sortField === field;
+  const activeSortDir = isActiveSort ? sortDir : null;
 
-  const isFiltered = activeFilter !== null && activeFilter.size < assignees.length;
+  const hasAssigneeFilter =
+    field === "assignee" && assigneeFilter !== null && assigneeFilter !== undefined &&
+    assignees !== undefined && assigneeFilter.size < assignees.length;
+  const hasStatusFilter =
+    kind === "status" && statusFilter !== null && statusFilter !== undefined &&
+    allStatuses !== undefined && statusFilter.size < allStatuses.length;
+  const isFiltered = hasAssigneeFilter || hasStatusFilter;
 
-  const toggle = (a: string) => {
-    const base = activeFilter ?? new Set(assignees);
-    const next = new Set(base);
-    if (next.has(a)) next.delete(a);
-    else next.add(a);
-    onFilterChange(next);
-  };
+  const close = () => { setOpen(false); setSubPanel(null); setConfirmDelete(false); };
 
-  const cycleSort = () => {
-    onSortChange(sortDir === null ? "asc" : sortDir === "asc" ? "desc" : null);
-  };
+  const menuItem = (content: React.ReactNode, onClick?: () => void, extra?: string) => (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-[#3a3a3a] ${extra ?? ""}`}
+    >
+      {content}
+    </button>
+  );
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5">
       <button
-        onClick={cycleSort}
-        className="flex items-center gap-0.5 hover:text-[#37352f] dark:hover:text-[#e6e6e4] transition-colors"
-        title="클릭하여 가나다순 정렬"
+        ref={btnRef}
+        onClick={() => { setOpen((o) => !o); if (open) { setSubPanel(null); setConfirmDelete(false); } }}
+        className={`flex items-center gap-0.5 transition-colors hover:text-[#37352f] dark:hover:text-[#e6e6e4] ${isFiltered ? "text-blue-500" : ""} ${isActiveSort ? "font-bold" : ""}`}
       >
-        담당자
-        {sortDir === "asc" && <ChevronUp size={12} />}
-        {sortDir === "desc" && <ChevronDown size={12} />}
+        {label}
+        {isActiveSort && activeSortDir === "asc" && <ChevronUp size={11} />}
+        {isActiveSort && activeSortDir === "desc" && <ChevronDown size={11} />}
+        {isFiltered && !isActiveSort && <Filter size={10} fill="currentColor" className="ml-0.5" />}
       </button>
-      <div ref={ref} className="relative">
-        <button
-          onClick={() => setOpen((o) => !o)}
-          className={`p-0.5 rounded transition-colors ${isFiltered ? "text-blue-500" : "text-[#c4c3bf] hover:text-[#9b9a97]"}`}
-          title="담당자 필터"
-        >
-          <Filter size={11} fill={isFiltered ? "currentColor" : "none"} />
-        </button>
-        {open && (
-          <div className="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg shadow-lg w-40 py-1 max-h-64 overflow-y-auto">
-            <div className="flex items-center justify-between px-2 pb-1.5 mb-1 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
+
+      <AnchoredDropdown open={open} anchorRef={btnRef} onClose={close} width={210}>
+        {/* ── Delete confirmation ── */}
+        {confirmDelete && (
+          <div className="p-3">
+            <p className="text-xs font-semibold text-[#37352f] dark:text-[#e6e6e4] mb-1">열 삭제</p>
+            <p className="text-[11px] text-gray-400 mb-3">
+              &quot;{label}&quot; 열을 삭제하면 모든 고객의 체크 데이터가 사라집니다.
+            </p>
+            <div className="flex gap-2">
               <button
-                onClick={() => onFilterChange(null)}
-                className="text-[10px] text-blue-500 hover:underline"
-              >
-                전체 선택
-              </button>
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-1 text-xs rounded border border-[#e9e9e7] dark:border-[#3f3f3f] text-gray-400 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]"
+              >취소</button>
               <button
-                onClick={() => onFilterChange(new Set())}
-                className="text-[10px] text-gray-400 hover:underline"
-              >
-                선택 해제
-              </button>
+                onClick={() => { onDelete?.(); close(); }}
+                className="flex-1 py-1 text-xs rounded bg-red-500 text-white hover:bg-red-600"
+              >삭제</button>
             </div>
-            {assignees.length === 0 && (
-              <p className="px-3 py-1 text-xs text-gray-300 dark:text-gray-600">담당자 없음</p>
-            )}
-            {assignees.map((a) => {
-              const checked = activeFilter === null ? true : activeFilter.has(a);
+          </div>
+        )}
+
+        {/* ── Rename sub-panel ── */}
+        {!confirmDelete && subPanel === "rename" && (
+          <div className="p-3">
+            <p className="text-xs font-semibold text-[#37352f] dark:text-[#e6e6e4] mb-2">열 이름 변경</p>
+            <input
+              value={renameVal}
+              onChange={(e) => setRenameVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && renameVal.trim()) { onRename?.(renameVal.trim()); close(); }
+                if (e.key === "Escape") setSubPanel(null);
+              }}
+              autoFocus
+              className="input-style w-full text-xs mb-2"
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setSubPanel(null)} className="flex-1 py-1 text-xs rounded border border-[#e9e9e7] dark:border-[#3f3f3f] text-gray-400 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]">취소</button>
+              <button
+                onClick={() => { if (renameVal.trim()) { onRename?.(renameVal.trim()); close(); } }}
+                disabled={!renameVal.trim()}
+                className="flex-1 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40"
+              >확인</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Assignee filter sub-panel ── */}
+        {!confirmDelete && subPanel === "filter" && field === "assignee" && (
+          <div className="p-2">
+            <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
+              <button onClick={() => onAssigneeFilter?.(null)} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
+              <button onClick={() => onAssigneeFilter?.(new Set())} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
+            </div>
+            {(assignees ?? []).length === 0 && <p className="px-1 py-1 text-xs text-gray-300">담당자 없음</p>}
+            {(assignees ?? []).map((a) => {
+              const checked = assigneeFilter == null ? true : assigneeFilter.has(a);
               return (
-                <label
-                  key={a}
-                  className="flex items-center gap-2 px-2 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] font-normal"
-                >
+                <label key={a} className="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] rounded font-normal">
                   <input
                     type="checkbox"
                     checked={checked}
-                    onChange={() => toggle(a)}
-                    className="w-3.5 h-3.5 accent-blue-500 cursor-pointer"
+                    onChange={() => {
+                      const base = assigneeFilter ?? new Set(assignees);
+                      const next = new Set(base);
+                      if (next.has(a)) next.delete(a); else next.add(a);
+                      onAssigneeFilter?.(next);
+                    }}
+                    className="w-3.5 h-3.5 accent-blue-500"
                   />
+                  <AssigneeAvatar name={a} />
                   <span className="text-[#37352f] dark:text-[#e6e6e4]">{a}</span>
                 </label>
               );
             })}
           </div>
         )}
-      </div>
+
+        {/* ── Status filter sub-panel ── */}
+        {!confirmDelete && subPanel === "filter" && kind === "status" && (
+          <div className="p-2">
+            <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
+              <button onClick={() => onStatusFilter?.(null)} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
+              <button onClick={() => onStatusFilter?.(new Set())} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
+            </div>
+            {(allStatuses ?? []).map((s) => {
+              const checked = statusFilter == null ? true : statusFilter.has(s.label);
+              return (
+                <label key={s.id} className="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] rounded font-normal">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      const base = statusFilter ?? new Set(allStatuses?.map((x) => x.label));
+                      const next = new Set(base);
+                      if (next.has(s.label)) next.delete(s.label); else next.add(s.label);
+                      onStatusFilter?.(next);
+                    }}
+                    className="w-3.5 h-3.5 accent-blue-500"
+                  />
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.textColor }} />
+                  <span className="text-[#37352f] dark:text-[#e6e6e4]">{s.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Main menu ── */}
+        {!confirmDelete && subPanel === null && (
+          <>
+            <div className="px-2 pt-2 pb-1">
+              <p className="px-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">정렬</p>
+              {menuItem(
+                <><ChevronUp size={12} className="text-gray-400 flex-shrink-0" /><span>오름차순</span>{isActiveSort && activeSortDir === "asc" && <Check size={10} className="ml-auto text-blue-500" />}</>,
+                () => { onSort(field, isActiveSort && activeSortDir === "asc" ? null : "asc"); close(); }
+              )}
+              {menuItem(
+                <><ChevronDown size={12} className="text-gray-400 flex-shrink-0" /><span>내림차순</span>{isActiveSort && activeSortDir === "desc" && <Check size={10} className="ml-auto text-blue-500" />}</>,
+                () => { onSort(field, isActiveSort && activeSortDir === "desc" ? null : "desc"); close(); }
+              )}
+            </div>
+
+            {(field === "assignee" || kind === "status") && (
+              <>
+                <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
+                {menuItem(
+                  <><Filter size={12} className="text-gray-400 flex-shrink-0" /><span>필터</span>{isFiltered && <span className="ml-auto text-[10px] text-blue-500">적용됨</span>}</>,
+                  () => setSubPanel("filter")
+                )}
+              </>
+            )}
+
+            <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
+            <button className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs text-gray-300 dark:text-gray-600 cursor-default">
+              <span className="w-3 h-3 rounded bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+              <span>그룹화</span><span className="ml-auto text-[10px]">준비 중</span>
+            </button>
+            <button className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs text-gray-300 dark:text-gray-600 cursor-default">
+              <span className="w-3 h-3 rounded bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+              <span>고정</span><span className="ml-auto text-[10px]">준비 중</span>
+            </button>
+
+            {kind === "custom" && (
+              <>
+                <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
+                {menuItem(<span>왼쪽에 삽입</span>, () => { onInsertLeft?.(); close(); })}
+                {menuItem(<span>오른쪽에 삽입</span>, () => { onInsertRight?.(); close(); })}
+                <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
+                {menuItem(
+                  <><Pencil size={12} className="text-gray-400 flex-shrink-0" /><span>속성 편집</span></>,
+                  () => { setRenameVal(label); setSubPanel("rename"); }
+                )}
+                {menuItem(
+                  <><Trash2 size={12} className="flex-shrink-0" /><span>속성 삭제</span></>,
+                  () => setConfirmDelete(true),
+                  "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
+                )}
+              </>
+            )}
+
+            {kind === "status" && (
+              <>
+                <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
+                {menuItem(
+                  <><Settings size={12} className="text-gray-400 flex-shrink-0" /><span>Status 옵션 편집</span></>,
+                  () => { onEditStatus?.(); close(); }
+                )}
+              </>
+            )}
+          </>
+        )}
+      </AnchoredDropdown>
     </div>
   );
 }
@@ -1237,11 +1387,12 @@ export default function CRMPage({
   embedded?: boolean;
 }) {
   const {
-    customers, customerStatuses, customColumns, createCustomer, updateCustomer, deleteCustomer,
+    customers, customerStatuses, customColumns,
+    createCustomer, updateCustomer, deleteCustomer,
+    upsertCustomColumn, deleteCustomColumn, reorderCustomColumns,
     isRefreshing, syncNow,
   } = useWorkspaceStore();
   const [showStatusEditor, setShowStatusEditor] = useState(false);
-  const [showColumnManager, setShowColumnManager] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
 
   // ─── 장부 스타일 저장 추적 ────────────────────────────────────────
@@ -1271,9 +1422,20 @@ export default function CRMPage({
     return () => window.removeEventListener("keydown", handler);
   }, [handleSaveToDB]);
   const [assigneeFilter, setAssigneeFilter] = useState<Set<string> | null>(null);
-  const [assigneeSort, setAssigneeSort] = useState<SortDir>(null);
+  const [statusFilter, setStatusFilter] = useState<Set<string> | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ field: string; dir: "asc" | "desc" } | null>(null);
 
   const sortedColumns = [...customColumns].sort((a, b) => a.order - b.order);
+
+  // Insert a new custom checkbox column to the left or right of index atIdx
+  const insertColumn = (side: "left" | "right", atIdx: number) => {
+    const newId = uuidv4();
+    const ids = sortedColumns.map((c) => c.id);
+    const insertAt = side === "left" ? atIdx : atIdx + 1;
+    ids.splice(insertAt, 0, newId);
+    upsertCustomColumn({ id: newId, label: "새 열", type: "checkbox", order: 9999 });
+    reorderCustomColumns(ids);
+  };
 
   // Filter customers by month page when monthPageId is provided
   const monthScoped = monthPageId
@@ -1285,16 +1447,34 @@ export default function CRMPage({
     new Set(monthScoped.map((c) => c.assignee).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b, "ko"));
 
-  // 담당자 필터 적용 (다른 필터와 AND 조건으로 조합 가능하도록 순차 filter)
   let visibleCustomers = monthScoped;
   if (assigneeFilter !== null) {
     visibleCustomers = visibleCustomers.filter((c) => assigneeFilter.has(c.assignee));
   }
+  if (statusFilter !== null) {
+    visibleCustomers = visibleCustomers.filter((c) => statusFilter.has(c.status ?? ""));
+  }
 
-  // 담당자 가나다순 정렬 (3단계 토글: 오름차순 → 내림차순 → 정렬 해제)
-  if (assigneeSort) {
-    visibleCustomers = [...visibleCustomers].sort((a, b) => a.assignee.localeCompare(b.assignee, "ko"));
-    if (assigneeSort === "desc") visibleCustomers.reverse();
+  // Generic sort by any column field
+  if (sortConfig) {
+    const { field, dir } = sortConfig;
+    visibleCustomers = [...visibleCustomers].sort((a, b) => {
+      let av: string | number;
+      let bv: string | number;
+      if (field.startsWith("custom_")) {
+        const colId = field.slice(7);
+        av = (a.custom_fields?.[colId] ? 1 : 0);
+        bv = (b.custom_fields?.[colId] ? 1 : 0);
+      } else {
+        av = ((a as unknown) as Record<string, unknown>)[field] as string | number ?? "";
+        bv = ((b as unknown) as Record<string, unknown>)[field] as string | number ?? "";
+      }
+      if (typeof av === "number" && typeof bv === "number") {
+        return dir === "asc" ? av - bv : bv - av;
+      }
+      const cmp = String(av).localeCompare(String(bv), "ko");
+      return dir === "asc" ? cmp : -cmp;
+    });
   }
 
   // Monthly / total revenue (전체금액 기준) — 필터링된 결과 기준으로 재계산
@@ -1355,18 +1535,6 @@ export default function CRMPage({
         >
           <Plus size={15} /> 고객 추가
         </button>
-        <button
-          onClick={() => setShowColumnManager(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#9b9a97] dark:text-[#6b6b6b] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] rounded-lg transition-colors"
-        >
-          <Columns3 size={15} /> 열 관리
-        </button>
-        <button
-          onClick={() => setShowStatusEditor(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#9b9a97] dark:text-[#6b6b6b] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] rounded-lg transition-colors"
-        >
-          <Settings size={15} /> Status 편집
-        </button>
       </div>
     </div>
   );
@@ -1376,45 +1544,103 @@ export default function CRMPage({
       <table className="w-full border-collapse text-[#37352f] dark:text-[#e6e6e4] text-sm">
         <thead className="sticky top-0 bg-[#f7f6f3] dark:bg-[#252525] z-10">
           <tr>
-            {["이름", null, "Tags", "알바", "정산금액", "전체금액", "잔금"].map((h, i) =>
-              h === null ? (
-                <th
-                  key="assignee"
-                  className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap"
-                >
-                  <AssigneeHeader
-                    assignees={distinctAssignees}
-                    activeFilter={assigneeFilter}
-                    onFilterChange={setAssigneeFilter}
-                    sortDir={assigneeSort}
-                    onSortChange={setAssigneeSort}
-                  />
-                </th>
-              ) : (
-                <th
-                  key={i}
-                  className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap"
-                >
-                  {h}
-                </th>
-              )
-            )}
-            {sortedColumns.map((col) => (
+            {(
+              [
+                { label: "이름", field: "name" },
+                { label: "담당자", field: "assignee" },
+                { label: "Tags", field: "route" },
+                { label: "알바", field: "alba" },
+                { label: "정산금액", field: "settlement_amount" },
+                { label: "전체금액", field: "total_amount" },
+                { label: "잔금", field: "balance" },
+              ] as { label: string; field: string }[]
+            ).map(({ label, field }) => (
+              <th
+                key={field}
+                className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap"
+              >
+                <ColumnHeader
+                  label={label}
+                  kind="fixed"
+                  field={field}
+                  sortField={sortConfig?.field ?? null}
+                  sortDir={sortConfig?.dir ?? null}
+                  onSort={(f, d) => setSortConfig(d ? { field: f, dir: d } : null)}
+                  {...(field === "assignee"
+                    ? { assignees: distinctAssignees, assigneeFilter, onAssigneeFilter: setAssigneeFilter }
+                    : {})}
+                />
+              </th>
+            ))}
+            {sortedColumns.map((col, idx) => (
               <th
                 key={col.id}
                 className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap"
               >
-                {col.label}
+                <ColumnHeader
+                  label={col.label}
+                  kind="custom"
+                  field={`custom_${col.id}`}
+                  sortField={sortConfig?.field ?? null}
+                  sortDir={sortConfig?.dir ?? null}
+                  onSort={(f, d) => setSortConfig(d ? { field: f, dir: d } : null)}
+                  onInsertLeft={() => insertColumn("left", idx)}
+                  onInsertRight={() => insertColumn("right", idx)}
+                  onRename={(lbl) => upsertCustomColumn({ ...col, label: lbl })}
+                  onDelete={() => deleteCustomColumn(col.id)}
+                />
               </th>
             ))}
-            {["제출날짜", "Status", "메모", ""].map((h, i) => (
-              <th
-                key={`r-${i}`}
-                className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap"
+            {/* 제출날짜 */}
+            <th className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap">
+              <ColumnHeader
+                label="제출날짜"
+                kind="fixed"
+                field="submit_date"
+                sortField={sortConfig?.field ?? null}
+                sortDir={sortConfig?.dir ?? null}
+                onSort={(f, d) => setSortConfig(d ? { field: f, dir: d } : null)}
+              />
+            </th>
+            {/* Status */}
+            <th className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap">
+              <ColumnHeader
+                label="Status"
+                kind="status"
+                field="status"
+                sortField={sortConfig?.field ?? null}
+                sortDir={sortConfig?.dir ?? null}
+                onSort={(f, d) => setSortConfig(d ? { field: f, dir: d } : null)}
+                allStatuses={customerStatuses}
+                statusFilter={statusFilter}
+                onStatusFilter={setStatusFilter}
+                onEditStatus={() => setShowStatusEditor(true)}
+              />
+            </th>
+            {/* 메모 */}
+            <th className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap">
+              <ColumnHeader
+                label="메모"
+                kind="fixed"
+                field="memo"
+                sortField={sortConfig?.field ?? null}
+                sortDir={sortConfig?.dir ?? null}
+                onSort={(f, d) => setSortConfig(d ? { field: f, dir: d } : null)}
+              />
+            </th>
+            {/* 열 추가 버튼 */}
+            <th className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap">
+              <button
+                onClick={() => {
+                  const newId = uuidv4();
+                  upsertCustomColumn({ id: newId, label: "새 열", type: "checkbox", order: sortedColumns.length });
+                }}
+                title="새 체크박스 열 추가"
+                className="flex items-center gap-0.5 text-[#c4c3bf] hover:text-[#9b9a97] transition-colors"
               >
-                {h}
-              </th>
-            ))}
+                <Plus size={13} />
+              </button>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -1476,7 +1702,6 @@ export default function CRMPage({
         </div>
       )}
       {showStatusEditor && <StatusEditor onClose={() => setShowStatusEditor(false)} />}
-      {showColumnManager && <ColumnManager onClose={() => setShowColumnManager(false)} />}
     </>
   );
 }
