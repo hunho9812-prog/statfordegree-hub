@@ -1307,6 +1307,7 @@ const freshState = {
   darkMode: false,
   isRefreshing: false,
   syncError: false,
+  customerSyncStatus: "saved" as const,
 };
 
 // ── 일회성 localStorage → Supabase 마이그레이션 ──────────────────────────────
@@ -1379,7 +1380,7 @@ export async function runMigrationIfNeeded(): Promise<void> {
   for (const localCustomer of localUserCustomers) {
     const supaCustomer = supaCustomers.find((c) => c.id === localCustomer.id);
     if (!supaCustomer || localCustomer.updated_at > supaCustomer.updated_at) {
-      pushOps.push(dbCustomers.upsert(localCustomer));
+      pushOps.push(dbCustomers.upsert(localCustomer).then(() => {}));
     }
   }
 
@@ -1728,8 +1729,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
-        set((state) => ({ customers: [...state.customers, customer] }));
-        dbCustomers.upsert(customer);
+        set((state) => ({ customers: [...state.customers, customer], customerSyncStatus: "saving" }));
+        dbCustomers.upsert(customer).then((res) => {
+          set({ customerSyncStatus: res.success ? "saved" : "error" });
+        });
         return id;
       },
 
@@ -1740,9 +1743,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               ? { ...c, ...updates, updated_at: new Date().toISOString() }
               : c
           ),
+          customerSyncStatus: "saving",
         }));
         const updated = get().customers.find((c) => c.id === id);
-        if (updated) dbCustomers.upsert(updated);
+        if (updated) {
+          dbCustomers.upsert(updated).then((res) => {
+            set({ customerSyncStatus: res.success ? "saved" : "error" });
+          });
+        }
       },
 
       deleteCustomer: (id) => {
@@ -2032,7 +2040,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 const supa = supaCustomers.find((s) => s.id === c.id);
                 return !supa || c.updated_at > supa.updated_at;
               })
-              .map((c) => dbCustomers.upsert(c)),
+              .map((c) => dbCustomers.upsert(c).then(() => {})),
           ];
           if (pushOps.length > 0) await Promise.all(pushOps);
         } catch (e) {
@@ -2111,7 +2119,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const uploadOps: Promise<void>[] = [];
         if (localOnlyPages.length > 0) uploadOps.push(dbPages.upsertMany(localOnlyPages));
         if (localOnlyTasks.length > 0) uploadOps.push(...localOnlyTasks.map((t) => dbTasks.upsert(t)));
-        if (localOnlyCustomers.length > 0) uploadOps.push(...localOnlyCustomers.map((c) => dbCustomers.upsert(c)));
+        if (localOnlyCustomers.length > 0) uploadOps.push(...localOnlyCustomers.map((c) => dbCustomers.upsert(c).then(() => {})));
         if (uploadOps.length > 0) await Promise.all(uploadOps);
 
         // Seed workspace config if missing

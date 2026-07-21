@@ -7,7 +7,7 @@ import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColum
 import { v4 as uuidv4 } from "uuid";
 import {
   Plus, Trash2, Settings, X, Check, GripVertical, ArrowRightLeft,
-  Filter, ChevronUp, ChevronDown, Columns3,
+  Filter, ChevronUp, ChevronDown, Columns3, RefreshCw,
 } from "lucide-react";
 
 const ASSIGNEES = ["김은호", "김세윤", "김현호", "오승준"];
@@ -1234,8 +1234,10 @@ export default function CRMPage({
   monthPageId?: string | null;
   embedded?: boolean;
 }) {
-  const { customers, customerStatuses, customColumns, createCustomer, updateCustomer, deleteCustomer } =
-    useWorkspaceStore();
+  const {
+    customers, customerStatuses, customColumns, createCustomer, updateCustomer, deleteCustomer,
+    customerSyncStatus, isRefreshing, syncNow,
+  } = useWorkspaceStore();
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showColumnManager, setShowColumnManager] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1295,9 +1297,35 @@ export default function CRMPage({
               </span>
             </>
           )}
+          <span>·</span>
+          <span
+            className={`flex items-center gap-1 text-xs font-medium ${
+              customerSyncStatus === "error"
+                ? "text-red-500"
+                : customerSyncStatus === "saving"
+                ? "text-blue-500"
+                : "text-emerald-600 dark:text-emerald-400"
+            }`}
+          >
+            {customerSyncStatus === "saving" && <RefreshCw size={11} className="animate-spin" />}
+            ●{" "}
+            {customerSyncStatus === "error"
+              ? "동기화 오류 — 재시도해주세요"
+              : customerSyncStatus === "saving"
+              ? "저장 중…"
+              : "저장됨"}
+          </span>
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <button
+          onClick={() => syncNow()}
+          disabled={isRefreshing}
+          title="다른 기기의 변경사항을 지금 바로 가져오고, 저장 실패한 항목을 다시 저장합니다"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#9b9a97] dark:text-[#6b6b6b] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] rounded-lg transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} /> 동기화
+        </button>
         <button
           onClick={() => setShowAddForm(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"

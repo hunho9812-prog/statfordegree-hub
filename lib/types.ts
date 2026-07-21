@@ -129,6 +129,7 @@ export interface WorkspaceState {
   upsertMonthlyCost: (cost: MonthlyCost) => void;
   isRefreshing: boolean;
   syncError: boolean;
+  customerSyncStatus: "saved" | "saving" | "error";
   toggleSidebar: () => void;
   toggleDarkMode: () => void;
   loadFromSupabase: () => Promise<void>;

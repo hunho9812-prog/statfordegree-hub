@@ -238,10 +238,14 @@ export const dbCustomers = {
     return (data ?? []).map(dbToCustomer);
   },
 
-  async upsert(customer: Customer): Promise<void> {
-    if (!supabase) return;
+  async upsert(customer: Customer): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: true };
     const { error } = await supabase.from("customers").upsert(customerToDb(customer));
-    if (error) console.error("dbCustomers.upsert", error);
+    if (error) {
+      console.error("dbCustomers.upsert", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
   },
 
   async delete(id: string): Promise<void> {
