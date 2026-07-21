@@ -1430,7 +1430,7 @@ export async function runMigrationIfNeeded(): Promise<void> {
   );
 }
 
-const FORCE_RESEED_V9_FLAG = "manual_force_reseed_v14";
+const FORCE_RESEED_V9_FLAG = "manual_force_reseed_v15";
 
 export async function forceReseedManualPages(): Promise<void> {
   if (!isSupabaseConfigured || !supabase) return;
@@ -1479,11 +1479,20 @@ export async function forceReseedManualPages(): Promise<void> {
   const nowTs = new Date().toISOString();
   const ops: Promise<void>[] = [];
 
-  // Upsert content for all known pages
+  // Fetch current pages from Supabase to compare (avoid overwriting user edits)
+  const supaPages = await dbPages.fetchAll();
+
+  // Upsert content for all known pages — but only if the page is effectively empty
+  // (no user content). This prevents overwriting user-added text/images.
   for (const [id, content] of Object.entries(seeds)) {
-    const page = state.pages[id] ?? initialPages[id];
-    if (page) {
-      const updated = { ...page, content, updatedAt: nowTs };
+    const supaPage = supaPages[id];
+    const localPage = state.pages[id] ?? initialPages[id];
+    const currentContent = supaPage?.content ?? localPage?.content ?? "";
+    // Skip if the page already has meaningful user content
+    if (!isEffectivelyEmpty(currentContent)) continue;
+    const basePage = supaPage ?? localPage;
+    if (basePage) {
+      const updated = { ...basePage, content, updatedAt: nowTs };
       ops.push(dbPages.upsert(updated));
     }
   }
