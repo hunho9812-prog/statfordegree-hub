@@ -1830,10 +1830,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       // ── CRM column layout ─────────────────────────────────────────────────
 
-      setCrmColOrder: (order) => set({ crmColOrder: order }),
-      setCrmColLabel: (id, label) =>
-        set((state) => ({ crmColLabels: { ...state.crmColLabels, [id]: label } })),
-      setCrmHiddenCols: (cols) => set({ crmHiddenCols: cols }),
+      setCrmColOrder: (order) => {
+        set({ crmColOrder: order });
+        dbWorkspaceConfig.set("crmColOrder", order);
+      },
+      setCrmColLabel: (id, label) => {
+        set((state) => {
+          const next = { ...state.crmColLabels, [id]: label };
+          dbWorkspaceConfig.set("crmColLabels", next);
+          return { crmColLabels: next };
+        });
+      },
+      setCrmHiddenCols: (cols) => {
+        set({ crmHiddenCols: cols });
+        dbWorkspaceConfig.set("crmHiddenCols", cols);
+      },
 
       // ── Manual tree actions ────────────────────────────────────────────────
 
@@ -2084,7 +2095,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set({ isRefreshing: true, syncError: false });
         try {
 
-        const [pages, tasks, customers, statuses, columns, manualNodesData, manualRoots, rootPageIdsConfig] =
+        const [pages, tasks, customers, statuses, columns, manualNodesData, manualRoots,
+               rootPageIdsConfig, crmColOrderConfig, crmColLabelsConfig, crmHiddenColsConfig] =
           await Promise.all([
             dbPages.fetchAll(),
             dbTasks.fetchAll(),
@@ -2094,6 +2106,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             dbManualNodes.fetchAll(),
             dbManualPageRoots.fetchAll(),
             dbWorkspaceConfig.get("rootPageIds"),
+            dbWorkspaceConfig.get("crmColOrder"),
+            dbWorkspaceConfig.get("crmColLabels"),
+            dbWorkspaceConfig.get("crmHiddenCols"),
           ]);
 
         // Build manualPages from flat node list
@@ -2242,6 +2257,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           // manualPages: Supabase에 데이터가 있으면 사용, 비어있으면 로컬 유지
           // (인증 실패로 fetch가 빈 배열을 반환해도 로컬 데이터 보호)
           manualPages: Object.keys(manualPages).length > 0 ? manualPages : current.manualPages,
+          // CRM 열 레이아웃: Supabase 값 우선, 없으면 로컬 유지
+          ...(crmColOrderConfig !== null && { crmColOrder: crmColOrderConfig as string[] }),
+          ...(crmColLabelsConfig !== null && { crmColLabels: crmColLabelsConfig as Record<string, string> }),
+          ...(crmHiddenColsConfig !== null && { crmHiddenCols: crmHiddenColsConfig as string[] }),
           isRefreshing: false,
         });
         } catch (e) {
