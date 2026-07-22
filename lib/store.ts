@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuidv4 } from "uuid";
-import type { WorkspaceState, Page, Task, Customer, StatusOption, CustomColumnDef, ManualNode, ManualPageData } from "./types";
+import type { WorkspaceState, Page, Task, Customer, StatusOption, CustomColumnDef, CustomColumnType, ManualNode, ManualPageData } from "./types";
 import {
   dbPages,
   dbTasks,
@@ -1314,6 +1314,7 @@ const freshState = {
   crmColOrder: null,
   crmColLabels: {} as Record<string, string>,
   crmHiddenCols: [] as string[],
+  crmColTypes: {} as Record<string, CustomColumnType>,
 };
 
 // ── 일회성 localStorage → Supabase 마이그레이션 ──────────────────────────────
@@ -1854,6 +1855,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set({ crmHiddenCols: cols });
         dbWorkspaceConfig.set("crmHiddenCols", cols);
       },
+      setCrmColType: (id, type) => {
+        set((state) => {
+          const next = { ...state.crmColTypes, [id]: type };
+          dbWorkspaceConfig.set("crmColTypes", next);
+          return { crmColTypes: next };
+        });
+      },
 
       // ── Manual tree actions ────────────────────────────────────────────────
 
@@ -2105,7 +2113,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         try {
 
         const [pages, tasks, customers, statuses, columns, manualNodesData, manualRoots,
-               rootPageIdsConfig, crmColOrderConfig, crmColLabelsConfig, crmHiddenColsConfig] =
+               rootPageIdsConfig, crmColOrderConfig, crmColLabelsConfig, crmHiddenColsConfig, crmColTypesConfig] =
           await Promise.all([
             dbPages.fetchAll(),
             dbTasks.fetchAll(),
@@ -2118,6 +2126,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             dbWorkspaceConfig.get("crmColOrder"),
             dbWorkspaceConfig.get("crmColLabels"),
             dbWorkspaceConfig.get("crmHiddenCols"),
+            dbWorkspaceConfig.get("crmColTypes"),
           ]);
 
         // Build manualPages from flat node list
@@ -2270,6 +2279,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           ...(crmColOrderConfig !== null && { crmColOrder: crmColOrderConfig as string[] }),
           ...(crmColLabelsConfig !== null && { crmColLabels: crmColLabelsConfig as Record<string, string> }),
           ...(crmHiddenColsConfig !== null && { crmHiddenCols: crmHiddenColsConfig as string[] }),
+          ...(crmColTypesConfig !== null && { crmColTypes: crmColTypesConfig as Record<string, CustomColumnType> }),
           isRefreshing: false,
         });
         } catch (e) {

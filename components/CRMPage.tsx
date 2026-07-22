@@ -74,7 +74,22 @@ interface AnyCol {
   field?: keyof Customer;        // set for builtin
   colDef?: CustomColumnDef;      // set for checkbox
   deletable: boolean;
+  effectiveType: CustomColumnType; // actual rendering type (may be overridden)
 }
+
+// default type per builtin column id
+const BUILTIN_DEFAULT_TYPE: Record<string, CustomColumnType> = {
+  _name: "text",
+  _assignee: "assignee",
+  _route: "text",
+  _alba: "assignee",
+  _settlement: "number",
+  _total: "number",
+  _balance: "number",
+  _submit_date: "date",
+  _status: "status",
+  _memo: "text",
+};
 
 // ─── Portal dropdown ──────────────────────────────────────────────────────────
 
@@ -442,7 +457,7 @@ function ColumnHeader({
   const [open, setOpen] = useState(false);
   const [subPanel, setSubPanel] = useState<"filter" | "rename" | "type" | null>(null);
   const [renameVal, setRenameVal] = useState(col.label);
-  const [typeVal, setTypeVal] = useState<CustomColumnType>(col.colDef?.type ?? "checkbox");
+  const [typeVal, setTypeVal] = useState<CustomColumnType>(col.effectiveType);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
 
@@ -611,9 +626,8 @@ function ColumnHeader({
             <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
             {mi(<><Pencil size={12} className="text-gray-400 flex-shrink-0" /><span>이름 변경</span></>,
               () => { setRenameVal(col.label); setSubPanel("rename"); })}
-            {col.kind === "checkbox" &&
-              mi(<><span className="text-[13px] w-3 text-center flex-shrink-0">{COL_TYPE_OPTIONS.find(o => o.value === col.colDef?.type)?.icon ?? "☑"}</span><span>유형 선택</span><span className="ml-auto text-[10px] text-gray-400">{COL_TYPE_OPTIONS.find(o => o.value === col.colDef?.type)?.label ?? "체크박스"}</span></>,
-                () => { setTypeVal(col.colDef?.type ?? "checkbox"); setSubPanel("type"); })}
+            {mi(<><span className="text-[13px] w-3 text-center flex-shrink-0">{COL_TYPE_OPTIONS.find(o => o.value === col.effectiveType)?.icon ?? "T"}</span><span>유형 선택</span><span className="ml-auto text-[10px] text-gray-400">{COL_TYPE_OPTIONS.find(o => o.value === col.effectiveType)?.label ?? "텍스트"}</span></>,
+              () => { setTypeVal(col.effectiveType); setSubPanel("type"); })}
 
             {col.deletable && (
               mi(<><Trash2 size={12} className="flex-shrink-0" /><span>속성 삭제</span></>,
@@ -840,86 +854,79 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove }: {
       {allCols.map((col) => {
         const cellCls = "px-3 py-2";
 
-        if (col.kind === "builtin") {
-          if (col.id === "_name") return (
-            <td key={col.id} className={`${cellCls} min-w-[120px]`}>
-              <TextCell value={customer.name} onChange={(v) => onUpdate({ name: v })} placeholder="이름" />
-            </td>
-          );
-          if (col.id === "_assignee") return (
-            <td key={col.id} className={`${cellCls} min-w-[90px]`}>
-              <AssigneeCell value={customer.assignee} onChange={(v) => onUpdate({ assignee: v })} />
-            </td>
-          );
-          if (col.id === "_route") return (
-            <td key={col.id} className={`${cellCls} min-w-[80px]`}>
-              <TagsCell value={customer.route} onChange={(v) => onUpdate({ route: v })} />
-            </td>
-          );
-          if (col.id === "_alba") return (
-            <td key={col.id} className={`${cellCls} min-w-[80px]`}>
-              <TextCell value={customer.alba} onChange={(v) => onUpdate({ alba: v })} placeholder="알바" />
-            </td>
-          );
-          if (col.id === "_settlement") return (
-            <td key={col.id} className={`${cellCls} min-w-[90px]`}>
-              <NumberCell value={customer.settlement_amount ?? null} onChange={(v) => onUpdate({ settlement_amount: v })} placeholder="0" />
-            </td>
-          );
-          if (col.id === "_total") return (
-            <td key={col.id} className={`${cellCls} min-w-[90px]`}>
-              <NumberCell value={customer.total_amount} onChange={(v) => onUpdate({ total_amount: v })} placeholder="0" />
-            </td>
-          );
-          if (col.id === "_balance") return (
-            <td key={col.id} className={`${cellCls} min-w-[90px]`}>
-              <NumberCell value={customer.balance} onChange={(v) => onUpdate({ balance: v })} placeholder="0" />
-            </td>
-          );
-          if (col.id === "_submit_date") return (
-            <td key={col.id} className={`${cellCls} min-w-[130px]`}>
-              <input type="date" value={customer.submit_date ?? ""} onChange={(e) => onUpdate({ submit_date: e.target.value })}
-                className="w-full bg-transparent outline-none text-sm cursor-pointer dark:text-[#e6e6e4] dark:color-scheme-dark" />
-            </td>
-          );
-          if (col.id === "_status") return (
-            <td key={col.id} className={`${cellCls} min-w-[130px]`}>
-              <StatusCell value={customer.status} statuses={statuses} onChange={(v) => onUpdate({ status: v })} />
-            </td>
-          );
-          if (col.id === "_memo") return (
-            <td key={col.id} className={`${cellCls} min-w-[140px]`}>
-              <TextCell value={customer.memo} onChange={(v) => onUpdate({ memo: v })} placeholder="메모" />
-            </td>
-          );
-          // unknown builtin
-          return <td key={col.id} className={cellCls} />;
-        }
+        // ── Unified cell rendering based on effectiveType ──────────────────
+        // For builtin cols: value comes from customer[field], route col keeps TagsCell
+        // For custom cols: value comes from customer.custom_fields[id]
 
-        // custom col — render by type
-        const cfVal = customer.custom_fields?.[col.id] ?? null;
-        const cfUpdate = (v: boolean | string | null) =>
-          onUpdate({ custom_fields: { ...customer.custom_fields, [col.id]: v } });
-        switch (col.colDef?.type) {
-          case "text":
-            return <td key={col.id} className={`${cellCls} min-w-[100px]`}><TextCell value={String(cfVal ?? "")} onChange={(v) => cfUpdate(v)} placeholder="텍스트" /></td>;
+        // Special case: _route uses a dedicated dropdown (not overridable)
+        if (col.id === "_route") return (
+          <td key={col.id} className={`${cellCls} min-w-[80px]`}>
+            <TagsCell value={customer.route} onChange={(v) => onUpdate({ route: v })} />
+          </td>
+        );
+
+        // Get raw string/number value from the right source
+        const getRaw = (): string => {
+          if (col.kind === "builtin" && col.field) {
+            const v = customer[col.field];
+            return v === null || v === undefined ? "" : String(v);
+          }
+          const v = customer.custom_fields?.[col.id] ?? null;
+          return v === null ? "" : String(v);
+        };
+
+        const setVal = (v: string | number | boolean | null) => {
+          if (col.kind === "builtin" && col.field) {
+            onUpdate({ [col.field]: v } as Partial<Omit<Customer, "id" | "created_at">>);
+          } else {
+            const cfv: boolean | string | null =
+              typeof v === "number" ? String(v) : v;
+            onUpdate({ custom_fields: { ...customer.custom_fields, [col.id]: cfv } });
+          }
+        };
+
+        const rawStr = getRaw();
+
+        switch (col.effectiveType) {
           case "number":
-            return <td key={col.id} className={`${cellCls} min-w-[90px]`}><NumberCell value={cfVal !== null && cfVal !== "" ? Number(cfVal) : null} onChange={(v) => cfUpdate(v !== null ? String(v) : null)} placeholder="0" /></td>;
+            return (
+              <td key={col.id} className={`${cellCls} min-w-[90px]`}>
+                <NumberCell
+                  value={rawStr !== "" && rawStr !== null ? Number(rawStr) : null}
+                  onChange={(v) => setVal(v)}
+                  placeholder="0"
+                />
+              </td>
+            );
           case "date":
             return (
               <td key={col.id} className={`${cellCls} min-w-[130px]`}>
-                <input type="date" value={String(cfVal ?? "")} onChange={(e) => cfUpdate(e.target.value)}
-                  className="w-full bg-transparent outline-none text-sm cursor-pointer dark:text-[#e6e6e4]" />
+                <input type="date" value={rawStr} onChange={(e) => setVal(e.target.value)}
+                  className="w-full bg-transparent outline-none text-sm cursor-pointer dark:text-[#e6e6e4] dark:color-scheme-dark" />
               </td>
             );
           case "assignee":
-            return <td key={col.id} className={`${cellCls} min-w-[90px]`}><AssigneeCell value={String(cfVal ?? "")} onChange={(v) => cfUpdate(v)} /></td>;
+            return (
+              <td key={col.id} className={`${cellCls} min-w-[90px]`}>
+                <AssigneeCell value={rawStr} onChange={(v) => setVal(v)} />
+              </td>
+            );
           case "status":
-            return <td key={col.id} className={`${cellCls} min-w-[120px]`}><StatusCell value={String(cfVal ?? "")} statuses={statuses} onChange={(v) => cfUpdate(v)} /></td>;
-          default:
+            return (
+              <td key={col.id} className={`${cellCls} min-w-[120px]`}>
+                <StatusCell value={rawStr} statuses={statuses} onChange={(v) => setVal(v)} />
+              </td>
+            );
+          case "checkbox":
             return (
               <td key={col.id} className={`${cellCls} text-center`}>
-                <BoolCell value={Boolean(cfVal)} onChange={(v) => cfUpdate(v)} />
+                <BoolCell value={rawStr === "true" || rawStr === "1"} onChange={(v) => setVal(v)} />
+              </td>
+            );
+          default: // "text"
+            return (
+              <td key={col.id} className={`${cellCls} min-w-[100px]`}>
+                <TextCell value={rawStr} onChange={(v) => setVal(v)} placeholder="텍스트" />
               </td>
             );
         }
@@ -963,8 +970,8 @@ export default function CRMPage({
     customers, customerStatuses, customColumns,
     createCustomer, updateCustomer, deleteCustomer, restoreCustomer,
     upsertCustomColumn, deleteCustomColumn, reorderCustomColumns,
-    crmColOrder, crmColLabels, crmHiddenCols,
-    setCrmColOrder, setCrmColLabel, setCrmHiddenCols,
+    crmColOrder, crmColLabels, crmHiddenCols, crmColTypes,
+    setCrmColOrder, setCrmColLabel, setCrmHiddenCols, setCrmColType,
   } = useWorkspaceStore();
 
   const [showStatusEditor, setShowStatusEditor] = useState(false);
@@ -1089,6 +1096,7 @@ export default function CRMPage({
             kind: "builtin",
             field: spec.field,
             deletable: spec.deletable,
+            effectiveType: crmColTypes[id] ?? BUILTIN_DEFAULT_TYPE[id] ?? "text",
           };
         }
         const col = customById[id];
@@ -1099,10 +1107,11 @@ export default function CRMPage({
           kind: "checkbox",
           colDef: col,
           deletable: true,
+          effectiveType: crmColTypes[id] ?? col.type ?? "checkbox",
         };
       })
       .filter((c): c is AnyCol => c !== null);
-  }, [crmColOrder, crmColLabels, crmHiddenCols, sortedCustomCols, setCrmColOrder]);
+  }, [crmColOrder, crmColLabels, crmHiddenCols, crmColTypes, sortedCustomCols, setCrmColOrder]);
 
   // Move a column left or right in the unified order
   const moveCol = useCallback((colId: string, direction: "left" | "right") => {
@@ -1119,17 +1128,21 @@ export default function CRMPage({
     reorderCustomColumns(customOrder);
   }, [allCols, setCrmColOrder, reorderCustomColumns, pushUndoSnapshot]);
 
-  // Edit a column's name and/or type
+  // Edit a column's name and/or type (works for both builtin and custom)
   const editColProp = useCallback((colId: string, label: string, type?: CustomColumnType) => {
     pushUndoSnapshot(true);
     setCrmColLabel(colId, label);
-    const col = sortedCustomCols.find((c) => c.id === colId);
-    if (col) {
-      const updated = { ...col, label };
-      if (type) updated.type = type;
-      upsertCustomColumn(updated);
+    if (type) {
+      // Always store in crmColTypes (covers both builtin and custom cols)
+      setCrmColType(colId, type);
+      // For custom cols, also update the colDef so it syncs to Supabase table_columns
+      const col = sortedCustomCols.find((c) => c.id === colId);
+      if (col) upsertCustomColumn({ ...col, label, type });
+    } else {
+      const col = sortedCustomCols.find((c) => c.id === colId);
+      if (col) upsertCustomColumn({ ...col, label });
     }
-  }, [setCrmColLabel, sortedCustomCols, upsertCustomColumn, pushUndoSnapshot]);
+  }, [setCrmColLabel, setCrmColType, sortedCustomCols, upsertCustomColumn, pushUndoSnapshot]);
 
   // Delete / hide a column
   const deleteCol = useCallback((col: AnyCol) => {
