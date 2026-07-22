@@ -971,16 +971,30 @@ export default function CRMPage({
   const [showAddForm, setShowAddForm] = useState(false);
 
   // ─── Undo stack ───────────────────────────────────────────────────────────
-  const [undoStack, setUndoStack] = useState<Customer[][]>([]);
+  type UndoSnapshot = {
+    customers: Customer[];
+    columns: CustomColumnDef[];
+    colOrder: string[] | null;
+    colLabels: Record<string, string>;
+    hiddenCols: string[];
+  };
+  const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
   const lastUndoPushRef = useRef<number>(0);
   const monthScopedRef = useRef<Customer[]>([]);
 
-  const pushUndoSnapshot = useCallback(() => {
+  const pushUndoSnapshot = useCallback((force = false) => {
     const now = Date.now();
-    // 800ms 내 연속 변경은 같은 undo 단계로 묶음 (타이핑 중 매 글자마다 스냅샷 방지)
-    if (now - lastUndoPushRef.current < 800) return;
+    // 800ms 내 연속 변경은 같은 undo 단계로 묶음 (force=true이면 항상 찍음)
+    if (!force && now - lastUndoPushRef.current < 800) return;
     lastUndoPushRef.current = now;
-    setUndoStack((prev) => [...prev.slice(-19), [...monthScopedRef.current]]);
+    const { customColumns: cols, crmColOrder: colOrder, crmColLabels: colLabels, crmHiddenCols: hiddenCols } = useWorkspaceStore.getState();
+    setUndoStack((prev) => [...prev.slice(-19), {
+      customers: [...monthScopedRef.current],
+      columns: cols.map((c) => ({ ...c })),
+      colOrder: colOrder ? [...colOrder] : null,
+      colLabels: { ...colLabels },
+      hiddenCols: [...hiddenCols],
+    }]);
   }, []);
 
   const handleUndo = useCallback(() => {
@@ -988,12 +1002,21 @@ export default function CRMPage({
       if (prev.length === 0) return prev;
       const snapshot = prev[prev.length - 1];
       const current = monthScopedRef.current;
-      const snapshotIds = new Set(snapshot.map((c) => c.id));
-      const currentIds = new Set(current.map((c) => c.id));
-      // 스냅샷 고객 복원 (수정된 것은 이전 값으로, 삭제된 것은 재삽입)
-      snapshot.forEach((c) => restoreCustomer(c));
-      // 스냅샷 이후 추가된 고객 삭제
+      const snapshotIds = new Set(snapshot.customers.map((c) => c.id));
+      // 고객 복원
+      snapshot.customers.forEach((c) => restoreCustomer(c));
       current.forEach((c) => { if (!snapshotIds.has(c.id)) deleteCustomer(c.id); });
+      // 컬럼 복원
+      const { customColumns: curCols, upsertCustomColumn: upsertCol, deleteCustomColumn: delCol } = useWorkspaceStore.getState();
+      const snapColIds = new Set(snapshot.columns.map((c) => c.id));
+      snapshot.columns.forEach((c) => upsertCol(c));
+      curCols.forEach((c) => { if (!snapColIds.has(c.id)) delCol(c.id); });
+      // 컬럼 순서/라벨/숨김 복원 (setState로 한 번에 덮어씀)
+      useWorkspaceStore.setState({
+        crmColOrder: snapshot.colOrder,
+        crmColLabels: { ...snapshot.colLabels },
+        crmHiddenCols: [...snapshot.hiddenCols],
+      });
       return prev.slice(0, -1);
     });
   }, [restoreCustomer, deleteCustomer]);
@@ -1083,6 +1106,7 @@ export default function CRMPage({
 
   // Move a column left or right in the unified order
   const moveCol = useCallback((colId: string, direction: "left" | "right") => {
+    pushUndoSnapshot(true);
     const ids = allCols.map((c) => c.id);
     const idx = ids.indexOf(colId);
     if (idx === -1) return;
@@ -1090,15 +1114,14 @@ export default function CRMPage({
     if (newIdx < 0 || newIdx >= ids.length) return;
     const newIds = [...ids];
     [newIds[idx], newIds[newIdx]] = [newIds[newIdx], newIds[idx]];
-    // Persist unified order
     setCrmColOrder(newIds);
-    // Also update customColumns order field
     const customOrder = newIds.filter((id) => !BUILTIN_BY_ID[id]);
     reorderCustomColumns(customOrder);
-  }, [allCols, setCrmColOrder, reorderCustomColumns]);
+  }, [allCols, setCrmColOrder, reorderCustomColumns, pushUndoSnapshot]);
 
   // Edit a column's name and/or type
   const editColProp = useCallback((colId: string, label: string, type?: CustomColumnType) => {
+    pushUndoSnapshot(true);
     setCrmColLabel(colId, label);
     const col = sortedCustomCols.find((c) => c.id === colId);
     if (col) {
@@ -1106,22 +1129,23 @@ export default function CRMPage({
       if (type) updated.type = type;
       upsertCustomColumn(updated);
     }
-  }, [setCrmColLabel, sortedCustomCols, upsertCustomColumn]);
+  }, [setCrmColLabel, sortedCustomCols, upsertCustomColumn, pushUndoSnapshot]);
 
   // Delete / hide a column
   const deleteCol = useCallback((col: AnyCol) => {
+    pushUndoSnapshot(true);
     if (col.kind === "builtin") {
       setCrmHiddenCols([...crmHiddenCols, col.id]);
-      // Also remove from colOrder
       if (crmColOrder) setCrmColOrder(crmColOrder.filter((id) => id !== col.id));
     } else {
       deleteCustomColumn(col.id);
       if (crmColOrder) setCrmColOrder(crmColOrder.filter((id) => id !== col.id));
     }
-  }, [crmHiddenCols, crmColOrder, setCrmHiddenCols, setCrmColOrder, deleteCustomColumn]);
+  }, [crmHiddenCols, crmColOrder, setCrmHiddenCols, setCrmColOrder, deleteCustomColumn, pushUndoSnapshot]);
 
   // Insert a new custom column to the left or right of a given column
   const insertCol = useCallback((atColId: string, side: "left" | "right") => {
+    pushUndoSnapshot(true);
     const newId = uuidv4();
     const currentOrder = crmColOrder ?? [
       ...DEFAULT_COL_ORDER.slice(0, 7),
@@ -1133,10 +1157,11 @@ export default function CRMPage({
     newOrder.splice(atIdx === -1 ? newOrder.length : (side === "left" ? atIdx : atIdx + 1), 0, newId);
     upsertCustomColumn({ id: newId, label: "새 열", type: "checkbox", order: sortedCustomCols.length });
     setCrmColOrder(newOrder);
-  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder]);
+  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder, pushUndoSnapshot]);
 
   // Add a new custom column (inserted at the end before _submit_date)
   const addColumn = useCallback(() => {
+    pushUndoSnapshot(true);
     const newId = uuidv4();
     const currentOrder = crmColOrder ?? [
       ...DEFAULT_COL_ORDER.slice(0, 7),
@@ -1148,7 +1173,7 @@ export default function CRMPage({
     newOrder.splice(insertAt === -1 ? newOrder.length : insertAt, 0, newId);
     upsertCustomColumn({ id: newId, label: "새 열", type: "checkbox", order: sortedCustomCols.length });
     setCrmColOrder(newOrder);
-  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder]);
+  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder, pushUndoSnapshot]);
 
   // ─── Customers visible in this month scope ────────────────────────────────
   const monthScoped = monthPageId ? customers.filter((c) => c.monthPageId === monthPageId) : customers;
@@ -1190,7 +1215,7 @@ export default function CRMPage({
   const totalColSpan = allCols.length + 1;
 
   const handleCreateCustomer = (data: Omit<Customer, "id" | "created_at" | "updated_at">) => {
-    pushUndoSnapshot();
+    pushUndoSnapshot(true);
     createCustomer({ ...data, monthPageId: monthPageId ?? null });
     setShowAddForm(false);
   };
@@ -1267,7 +1292,7 @@ export default function CRMPage({
               statuses={customerStatuses}
               allCols={allCols}
               onUpdate={(updates) => handleUpdate(c.id, updates)}
-              onDelete={() => { pushUndoSnapshot(); deleteCustomer(c.id); }}
+              onDelete={() => { pushUndoSnapshot(true); deleteCustomer(c.id); }}
               onMove={(targetMonthPageId) => handleUpdate(c.id, { monthPageId: targetMonthPageId })}
             />
           ))}
