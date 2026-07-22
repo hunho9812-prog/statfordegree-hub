@@ -890,7 +890,7 @@ export default function CRMPage({
 }) {
   const {
     customers, customerStatuses, customColumns,
-    createCustomer, updateCustomer, deleteCustomer,
+    createCustomer, updateCustomer, deleteCustomer, restoreCustomer,
     upsertCustomColumn, deleteCustomColumn, reorderCustomColumns,
     crmColOrder, crmColLabels, crmHiddenCols,
     setCrmColOrder, setCrmColLabel, setCrmHiddenCols,
@@ -899,9 +899,50 @@ export default function CRMPage({
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
 
+  // ─── Undo stack ───────────────────────────────────────────────────────────
+  const [undoStack, setUndoStack] = useState<Customer[][]>([]);
+  const lastUndoPushRef = useRef<number>(0);
+  const monthScopedRef = useRef<Customer[]>([]);
+
+  const pushUndoSnapshot = useCallback(() => {
+    const now = Date.now();
+    // 800ms 내 연속 변경은 같은 undo 단계로 묶음 (타이핑 중 매 글자마다 스냅샷 방지)
+    if (now - lastUndoPushRef.current < 800) return;
+    lastUndoPushRef.current = now;
+    setUndoStack((prev) => [...prev.slice(-19), [...monthScopedRef.current]]);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    setUndoStack((prev) => {
+      if (prev.length === 0) return prev;
+      const snapshot = prev[prev.length - 1];
+      const current = monthScopedRef.current;
+      const snapshotIds = new Set(snapshot.map((c) => c.id));
+      const currentIds = new Set(current.map((c) => c.id));
+      // 스냅샷 고객 복원 (수정된 것은 이전 값으로, 삭제된 것은 재삽입)
+      snapshot.forEach((c) => restoreCustomer(c));
+      // 스냅샷 이후 추가된 고객 삭제
+      current.forEach((c) => { if (!snapshotIds.has(c.id)) deleteCustomer(c.id); });
+      return prev.slice(0, -1);
+    });
+  }, [restoreCustomer, deleteCustomer]);
+
+  // Ctrl+Z 단축키
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleUndo]);
+
   const handleUpdate = useCallback((id: string, updates: Partial<Omit<Customer, "id" | "created_at">>) => {
+    pushUndoSnapshot();
     updateCustomer(id, updates);
-  }, [updateCustomer]);
+  }, [updateCustomer, pushUndoSnapshot]);
 
   // ─── Filters & sort ───────────────────────────────────────────────────────
   const [assigneeFilter, setAssigneeFilter] = useState<Set<string> | null>(null);
@@ -1037,6 +1078,8 @@ export default function CRMPage({
 
   // ─── Customers visible in this month scope ────────────────────────────────
   const monthScoped = monthPageId ? customers.filter((c) => c.monthPageId === monthPageId) : customers;
+  // undo 스냅샷 캡처용 ref 동기화 (매 렌더마다 최신값 유지)
+  monthScopedRef.current = monthScoped;
 
   const distinctAssignees = useMemo(() =>
     Array.from(new Set(monthScoped.map((c) => c.assignee).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko")),
@@ -1073,6 +1116,7 @@ export default function CRMPage({
   const totalColSpan = allCols.length + 1;
 
   const handleCreateCustomer = (data: Omit<Customer, "id" | "created_at" | "updated_at">) => {
+    pushUndoSnapshot();
     createCustomer({ ...data, monthPageId: monthPageId ?? null });
     setShowAddForm(false);
   };
@@ -1087,6 +1131,12 @@ export default function CRMPage({
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {undoStack.length > 0 && (
+          <button onClick={handleUndo} title={`실행 취소 (Ctrl+Z) — ${undoStack.length}단계 남음`}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors">
+            ↩ 되돌리기 <span className="font-semibold text-blue-400">{undoStack.length}</span>
+          </button>
+        )}
         <button onClick={() => setShowAddForm(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
           <Plus size={15} /> 고객 추가
@@ -1143,7 +1193,7 @@ export default function CRMPage({
               statuses={customerStatuses}
               allCols={allCols}
               onUpdate={(updates) => handleUpdate(c.id, updates)}
-              onDelete={() => deleteCustomer(c.id)}
+              onDelete={() => { pushUndoSnapshot(); deleteCustomer(c.id); }}
               onMove={(targetMonthPageId) => handleUpdate(c.id, { monthPageId: targetMonthPageId })}
             />
           ))}

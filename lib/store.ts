@@ -1773,6 +1773,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         dbCustomers.delete(id);
       },
 
+      restoreCustomer: (customer) => {
+        set((state) => ({
+          customers: state.customers.some((c) => c.id === customer.id)
+            ? state.customers.map((c) => (c.id === customer.id ? customer : c))
+            : [...state.customers, customer],
+        }));
+        dbCustomers.upsert(customer);
+      },
+
       upsertCustomerStatus: (status) => {
         set((state) => {
           const exists = state.customerStatuses.find((s) => s.id === status.id);
