@@ -1741,10 +1741,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
-        set((state) => ({ customers: [...state.customers, customer], customerSyncStatus: "saving" }));
-        dbCustomers.upsert(customer).then((res) => {
-          set({ customerSyncStatus: res.success ? "saved" : "error" });
-        });
+        // 로컬 state만 추가 — DB 저장은 저장 버튼(syncNow)에서 명시적으로 수행.
+        set((state) => ({ customers: [...state.customers, customer] }));
         return id;
       },
 

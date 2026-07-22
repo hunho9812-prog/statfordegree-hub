@@ -410,6 +410,8 @@ interface ColumnHeaderProps {
   // Mutations
   onMoveLeft?: () => void;
   onMoveRight?: () => void;
+  onInsertLeft?: () => void;
+  onInsertRight?: () => void;
   onRename?: (label: string) => void;
   onDelete?: () => void;
   onEditStatus?: () => void;
@@ -422,7 +424,8 @@ function ColumnHeader({
   sortField, sortDir, onSort,
   assignees, assigneeFilter, onAssigneeFilter,
   allStatuses, statusFilter, onStatusFilter,
-  onMoveLeft, onMoveRight, onRename, onDelete, onEditStatus,
+  onMoveLeft, onMoveRight, onInsertLeft, onInsertRight,
+  onRename, onDelete, onEditStatus,
   isFirst, isLast,
 }: ColumnHeaderProps) {
   const [open, setOpen] = useState(false);
@@ -563,6 +566,12 @@ function ColumnHeader({
             {mi(<><ChevronRight size={12} className="text-gray-400 flex-shrink-0" /><span>오른쪽으로 이동</span></>,
               () => { onMoveRight?.(); close(); },
               isLast ? "opacity-30 cursor-not-allowed pointer-events-none" : "")}
+
+            <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
+            {mi(<><ChevronLeft size={12} className="text-blue-400 flex-shrink-0" /><span>왼쪽에 삽입</span></>,
+              () => { onInsertLeft?.(); close(); })}
+            {mi(<><ChevronRight size={12} className="text-blue-400 flex-shrink-0" /><span>오른쪽에 삽입</span></>,
+              () => { onInsertRight?.(); close(); })}
 
             <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
             {mi(<><Pencil size={12} className="text-gray-400 flex-shrink-0" /><span>속성 편집 (이름 변경)</span></>,
@@ -1021,6 +1030,21 @@ export default function CRMPage({
     }
   }, [crmHiddenCols, crmColOrder, setCrmHiddenCols, setCrmColOrder, deleteCustomColumn]);
 
+  // Insert a new custom column to the left or right of a given column
+  const insertCol = useCallback((atColId: string, side: "left" | "right") => {
+    const newId = uuidv4();
+    const currentOrder = crmColOrder ?? [
+      ...DEFAULT_COL_ORDER.slice(0, 7),
+      ...sortedCustomCols.map((c) => c.id),
+      ...DEFAULT_COL_ORDER.slice(7),
+    ];
+    const atIdx = currentOrder.indexOf(atColId);
+    const newOrder = [...currentOrder];
+    newOrder.splice(atIdx === -1 ? newOrder.length : (side === "left" ? atIdx : atIdx + 1), 0, newId);
+    upsertCustomColumn({ id: newId, label: "새 열", type: "checkbox", order: sortedCustomCols.length });
+    setCrmColOrder(newOrder);
+  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder]);
+
   // Add a new custom column (inserted at the end before _submit_date)
   const addColumn = useCallback(() => {
     const newId = uuidv4();
@@ -1074,7 +1098,9 @@ export default function CRMPage({
   const totalColSpan = allCols.length + 1;
 
   const handleCreateCustomer = (data: Omit<Customer, "id" | "created_at" | "updated_at">) => {
-    createCustomer({ ...data, monthPageId: monthPageId ?? null });
+    const newId = createCustomer({ ...data, monthPageId: monthPageId ?? null });
+    setDirtyIds((prev) => new Set(prev).add(newId));
+    setSaveStatus("unsaved");
     setShowAddForm(false);
   };
 
@@ -1134,6 +1160,8 @@ export default function CRMPage({
                   onStatusFilter={setStatusFilter}
                   onMoveLeft={() => moveCol(col.id, "left")}
                   onMoveRight={() => moveCol(col.id, "right")}
+                  onInsertLeft={() => insertCol(col.id, "left")}
+                  onInsertRight={() => insertCol(col.id, "right")}
                   onRename={(label) => renameCol(col.id, label)}
                   onDelete={() => deleteCol(col)}
                   onEditStatus={() => setShowStatusEditor(true)}
