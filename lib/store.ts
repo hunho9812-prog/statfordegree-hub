@@ -2384,3 +2384,39 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }
   )
 );
+
+// ── Supabase Realtime 구독 (장부와 동일한 방식) ───────────────────────────────
+// customers / table_columns / workspace_config / customer_statuses 변경 시
+// loadFromSupabase를 호출해 모든 팀원의 화면을 즉시 동기화합니다.
+
+let _realtimeChannel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+
+// 300ms 디바운스 — 동시 다발적 변경을 하나의 reload로 묶음
+let _reloadTimer: ReturnType<typeof setTimeout> | null = null;
+function _scheduleReload() {
+  if (_reloadTimer) clearTimeout(_reloadTimer);
+  _reloadTimer = setTimeout(() => {
+    _reloadTimer = null;
+    useWorkspaceStore.getState().loadFromSupabase();
+  }, 300);
+}
+
+export function subscribeCRMRealtime() {
+  if (!isSupabaseConfigured || !supabase) return;
+  if (_realtimeChannel) return; // 이미 구독 중
+
+  _realtimeChannel = supabase
+    .channel("crm_realtime_sync")
+    .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, _scheduleReload)
+    .on("postgres_changes", { event: "*", schema: "public", table: "table_columns" }, _scheduleReload)
+    .on("postgres_changes", { event: "*", schema: "public", table: "customer_statuses" }, _scheduleReload)
+    .on("postgres_changes", { event: "*", schema: "public", table: "workspace_config" }, _scheduleReload)
+    .subscribe();
+}
+
+export function unsubscribeCRMRealtime() {
+  if (_realtimeChannel && supabase) {
+    supabase.removeChannel(_realtimeChannel);
+    _realtimeChannel = null;
+  }
+}
