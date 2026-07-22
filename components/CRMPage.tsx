@@ -1397,21 +1397,31 @@ export default function CRMPage({
 
   // ─── 장부 스타일 저장 추적 ────────────────────────────────────────
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
-  const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
+  const [saveStatus, setSaveStatus] = useState<"saved" | "unsaved" | "saving">("saved");
   const isDirty = dirtyIds.size > 0;
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleUpdate = useCallback((id: string, updates: Partial<Omit<Customer, "id" | "created_at">>) => {
     updateCustomer(id, updates);
     setDirtyIds((prev) => new Set(prev).add(id));
+    setSaveStatus("unsaved");
   }, [updateCustomer]);
 
   const handleSaveToDB = useCallback(async () => {
-    if (dirtyIds.size === 0) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     setSaveStatus("saving");
     await syncNow();
     setDirtyIds(new Set());
     setSaveStatus("saved");
-  }, [dirtyIds, syncNow]);
+  }, [syncNow]);
+
+  // 3초 자동 저장 — 마지막 변경 후 3초 뒤 DB에 반영 (Realtime으로 다른 PC에 즉시 전파)
+  useEffect(() => {
+    if (saveStatus !== "unsaved") return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => { handleSaveToDB(); }, 3000);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [saveStatus, handleSaveToDB]);
 
   // Cmd/Ctrl+S 단축키
   useEffect(() => {
@@ -1509,25 +1519,26 @@ export default function CRMPage({
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <span className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors ${
+          saveStatus === "saving" || isRefreshing
+            ? "bg-blue-100 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"
+            : saveStatus === "saved" && !isDirty
+            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+            : "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+        }`}>
+          {saveStatus === "saving" || isRefreshing
+            ? "● 저장 중…"
+            : saveStatus === "saved" && !isDirty
+            ? "● 저장됨"
+            : `○ 미저장 (${dirtyIds.size})`}
+        </span>
         <button
           onClick={handleSaveToDB}
-          disabled={!isDirty || saveStatus === "saving" || isRefreshing}
-          title={isDirty ? `${dirtyIds.size}건 미저장 · 클릭하여 저장 (⌘S)` : "저장됨"}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg font-medium transition-all ${
-            saveStatus === "saving" || isRefreshing
-              ? "bg-blue-400 text-white cursor-wait"
-              : isDirty
-              ? "bg-blue-500 text-white hover:bg-blue-600 shadow-sm"
-              : "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 cursor-default border border-emerald-200 dark:border-emerald-800"
-          }`}
+          disabled={saveStatus === "saving" || isRefreshing || (!isDirty && saveStatus === "saved")}
+          title={isDirty ? `${dirtyIds.size}건 미저장 · 클릭하여 즉시 저장 (⌘S)` : "저장됨"}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
         >
-          {saveStatus === "saving" || isRefreshing ? (
-            <><RefreshCw size={13} className="animate-spin" /> 저장 중…</>
-          ) : isDirty ? (
-            <><Save size={13} /> 저장 ({dirtyIds.size})</>
-          ) : (
-            <><Check size={13} /> 저장됨</>
-          )}
+          <Save size={13} /> 저장
         </button>
         <button
           onClick={() => setShowAddForm(true)}
