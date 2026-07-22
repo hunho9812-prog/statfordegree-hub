@@ -856,16 +856,17 @@ function DataRow({ customer, statuses, allCols, isDirty, onUpdate, onDelete, onM
         );
       })}
       {/* Action cell */}
-      <td className="px-3 py-2">
-        <div className="flex items-center gap-1">
+      <td className="px-3 py-2 min-w-[100px]">
+        <div className="flex items-center gap-1.5">
           <button onClick={() => setShowMoveModal(true)} title="다른 달로 이동"
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-[#c4c3bf] hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all">
-            <ArrowRightLeft size={12} />
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-[#6b6b6b] dark:text-[#9b9a97] bg-[#f0efed] dark:bg-[#2f2f2f] hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-950/40 transition-all">
+            <ArrowRightLeft size={14} />
+            <span>이동</span>
           </button>
           <button onClick={handleDeleteClick} title={confirmDelete ? "한 번 더 클릭하면 삭제됩니다" : "삭제"}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-all ${confirmDelete ? "bg-red-500 text-white font-semibold animate-pulse" : "text-[#c4c3bf] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"}`}>
-            <Trash2 size={12} />
-            {confirmDelete && "삭제?"}
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all ${confirmDelete ? "bg-red-500 text-white animate-pulse" : "text-[#6b6b6b] dark:text-[#9b9a97] bg-[#f0efed] dark:bg-[#2f2f2f] hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-950/40"}`}>
+            <Trash2 size={14} />
+            <span>{confirmDelete ? "삭제?" : "삭제"}</span>
           </button>
         </div>
         {showMoveModal && <MoveModal currentMonthPageId={customer.monthPageId} onMove={onMove} onClose={() => setShowMoveModal(false)} />}
@@ -1115,17 +1116,17 @@ export default function CRMPage({
       </div>
       <div className="flex items-center gap-2">
         <span className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors ${
-          saveStatus === "saving" || isRefreshing
+          saveStatus === "saving"
             ? "bg-blue-100 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"
             : isDirty
             ? "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
             : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
         }`}>
-          {saveStatus === "saving" || isRefreshing ? "● 저장 중…" : isDirty ? `○ 미저장 (${dirtyIds.size})` : "● 저장됨"}
+          {saveStatus === "saving" ? "● 저장 중…" : isDirty ? `○ 미저장 (${dirtyIds.size})` : "● 저장됨"}
         </span>
         <button
           onClick={handleSaveToDB}
-          disabled={saveStatus === "saving" || isRefreshing || (!isDirty && saveStatus === "saved")}
+          disabled={saveStatus === "saving" || (!isDirty && saveStatus === "saved")}
           title={isDirty ? `${dirtyIds.size}건 미저장 · 클릭하여 저장 (⌘S)` : "저장됨"}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
         >
