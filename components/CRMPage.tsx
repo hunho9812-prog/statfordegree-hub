@@ -920,6 +920,15 @@ export default function CRMPage({
     setSaveStatus("saved");
   }, [syncNow]);
 
+  // 3초 자동 저장 (장부 페이지와 동일한 방식)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (saveStatus !== "unsaved") return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => { handleSaveToDB(); }, 3000);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [saveStatus, handleSaveToDB]);
+
   // ⌘S shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
