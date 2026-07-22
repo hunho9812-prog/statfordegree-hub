@@ -1308,6 +1308,9 @@ const freshState = {
   isRefreshing: false,
   syncError: false,
   customerSyncStatus: "saved" as const,
+  crmColOrder: null,
+  crmColLabels: {} as Record<string, string>,
+  crmHiddenCols: [] as string[],
 };
 
 // ── 일회성 localStorage → Supabase 마이그레이션 ──────────────────────────────
@@ -1819,6 +1822,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         });
         dbTableColumns.upsertMany(get().customColumns);
       },
+
+      // ── CRM column layout ─────────────────────────────────────────────────
+
+      setCrmColOrder: (order) => set({ crmColOrder: order }),
+      setCrmColLabel: (id, label) =>
+        set((state) => ({ crmColLabels: { ...state.crmColLabels, [id]: label } })),
+      setCrmHiddenCols: (cols) => set({ crmHiddenCols: cols }),
 
       // ── Manual tree actions ────────────────────────────────────────────────
 

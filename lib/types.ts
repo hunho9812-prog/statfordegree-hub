@@ -122,6 +122,13 @@ export interface WorkspaceState {
   upsertCustomColumn: (column: CustomColumnDef) => void;
   deleteCustomColumn: (id: string) => void;
   reorderCustomColumns: (orderedIds: string[]) => void;
+  // CRM column layout (all columns, fixed + checkbox)
+  crmColOrder: string[] | null; // null = use default order
+  crmColLabels: Record<string, string>; // label overrides by col id
+  crmHiddenCols: string[]; // hidden builtin col ids
+  setCrmColOrder: (order: string[]) => void;
+  setCrmColLabel: (id: string, label: string) => void;
+  setCrmHiddenCols: (cols: string[]) => void;
   addManualNode: (pageId: string, parentId: string | null, afterId?: string) => string;
   updateManualNode: (pageId: string, nodeId: string, updates: Partial<Pick<ManualNode, "text" | "isExpanded" | "isPinned">>) => void;
   deleteManualNode: (pageId: string, nodeId: string) => void;
