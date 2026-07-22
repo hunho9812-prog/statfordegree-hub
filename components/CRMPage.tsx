@@ -7,7 +7,7 @@ import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColum
 import { v4 as uuidv4 } from "uuid";
 import {
   Plus, Trash2, Settings, X, Check, GripVertical, ArrowRightLeft,
-  Filter, ChevronUp, ChevronDown, Save, Pencil,
+  Filter, ChevronUp, ChevronDown, Pencil,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
 
@@ -766,11 +766,10 @@ function MoveModal({ currentMonthPageId, onMove, onClose }: { currentMonthPageId
 
 // ─── Data row ─────────────────────────────────────────────────────────────────
 
-function DataRow({ customer, statuses, allCols, isDirty, onUpdate, onDelete, onMove }: {
+function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove }: {
   customer: Customer;
   statuses: StatusOption[];
   allCols: AnyCol[];
-  isDirty: boolean;
   onUpdate: (updates: Partial<Omit<Customer, "id" | "created_at">>) => void;
   onDelete: () => void;
   onMove: (targetMonthPageId: string | null) => void;
@@ -784,10 +783,9 @@ function DataRow({ customer, statuses, allCols, isDirty, onUpdate, onDelete, onM
   }
 
   return (
-    <tr className={`border-t border-[#e9e9e7] dark:border-[#2f2f2f] hover:bg-gray-50 dark:hover:bg-[#1f1f1f] group transition-colors ${isDirty ? "bg-blue-50/50 dark:bg-blue-950/10" : ""}`}>
-      {allCols.map((col, idx) => {
-        const isNameCol = col.id === "_name";
-        const cellCls = `px-3 py-2${isNameCol && isDirty ? " relative before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] before:bg-blue-400 before:rounded-r" : ""}`;
+    <tr className="border-t border-[#e9e9e7] dark:border-[#2f2f2f] hover:bg-gray-50 dark:hover:bg-[#1f1f1f] group transition-colors">
+      {allCols.map((col) => {
+        const cellCls = "px-3 py-2";
 
         if (col.kind === "builtin") {
           if (col.id === "_name") return (
@@ -896,47 +894,14 @@ export default function CRMPage({
     upsertCustomColumn, deleteCustomColumn, reorderCustomColumns,
     crmColOrder, crmColLabels, crmHiddenCols,
     setCrmColOrder, setCrmColLabel, setCrmHiddenCols,
-    isRefreshing, syncNow,
   } = useWorkspaceStore();
 
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
 
-  // ─── Explicit-only save (no auto-save) ────────────────────────────────────
-  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
-  const [saveStatus, setSaveStatus] = useState<"saved" | "unsaved" | "saving">("saved");
-  const isDirty = dirtyIds.size > 0;
-
   const handleUpdate = useCallback((id: string, updates: Partial<Omit<Customer, "id" | "created_at">>) => {
     updateCustomer(id, updates);
-    setDirtyIds((prev) => new Set(prev).add(id));
-    setSaveStatus("unsaved");
   }, [updateCustomer]);
-
-  const handleSaveToDB = useCallback(async () => {
-    setSaveStatus("saving");
-    await syncNow();
-    setDirtyIds(new Set());
-    setSaveStatus("saved");
-  }, [syncNow]);
-
-  // 3초 자동 저장 (장부 페이지와 동일한 방식)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (saveStatus !== "unsaved") return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => { handleSaveToDB(); }, 3000);
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [saveStatus, handleSaveToDB]);
-
-  // ⌘S shortcut
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); handleSaveToDB(); }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [handleSaveToDB]);
 
   // ─── Filters & sort ───────────────────────────────────────────────────────
   const [assigneeFilter, setAssigneeFilter] = useState<Set<string> | null>(null);
@@ -1108,9 +1073,7 @@ export default function CRMPage({
   const totalColSpan = allCols.length + 1;
 
   const handleCreateCustomer = (data: Omit<Customer, "id" | "created_at" | "updated_at">) => {
-    const newId = createCustomer({ ...data, monthPageId: monthPageId ?? null });
-    setDirtyIds((prev) => new Set(prev).add(newId));
-    setSaveStatus("unsaved");
+    createCustomer({ ...data, monthPageId: monthPageId ?? null });
     setShowAddForm(false);
   };
 
@@ -1124,23 +1087,6 @@ export default function CRMPage({
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <span className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors ${
-          saveStatus === "saving"
-            ? "bg-blue-100 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"
-            : isDirty
-            ? "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
-            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
-        }`}>
-          {saveStatus === "saving" ? "● 저장 중…" : isDirty ? `○ 미저장 (${dirtyIds.size})` : "● 저장됨"}
-        </span>
-        <button
-          onClick={handleSaveToDB}
-          disabled={saveStatus === "saving" || (!isDirty && saveStatus === "saved")}
-          title={isDirty ? `${dirtyIds.size}건 미저장 · 클릭하여 저장 (⌘S)` : "저장됨"}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
-        >
-          <Save size={13} /> 저장
-        </button>
         <button onClick={() => setShowAddForm(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
           <Plus size={15} /> 고객 추가
@@ -1196,9 +1142,8 @@ export default function CRMPage({
               customer={c}
               statuses={customerStatuses}
               allCols={allCols}
-              isDirty={dirtyIds.has(c.id)}
               onUpdate={(updates) => handleUpdate(c.id, updates)}
-              onDelete={() => { deleteCustomer(c.id); setDirtyIds((p) => { const n = new Set(p); n.delete(c.id); return n; }); }}
+              onDelete={() => deleteCustomer(c.id)}
               onMove={(targetMonthPageId) => handleUpdate(c.id, { monthPageId: targetMonthPageId })}
             />
           ))}
