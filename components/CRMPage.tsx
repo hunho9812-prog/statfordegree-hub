@@ -440,7 +440,7 @@ function ColumnHeader({
   isFirst, isLast,
 }: ColumnHeaderProps) {
   const [open, setOpen] = useState(false);
-  const [subPanel, setSubPanel] = useState<"filter" | "rename" | null>(null);
+  const [subPanel, setSubPanel] = useState<"filter" | "rename" | "type" | null>(null);
   const [renameVal, setRenameVal] = useState(col.label);
   const [typeVal, setTypeVal] = useState<CustomColumnType>(col.colDef?.type ?? "checkbox");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -486,36 +486,41 @@ function ColumnHeader({
           </div>
         )}
 
-        {/* 속성 편집 (이름 + 유형) */}
+        {/* 이름 변경 패널 */}
         {!confirmDelete && subPanel === "rename" && (
-          <div className="p-3 space-y-2.5">
-            <p className="text-xs font-semibold text-[#37352f] dark:text-[#e6e6e4]">속성 편집</p>
-            <div>
-              <p className="text-[10px] text-gray-400 mb-1">열 이름</p>
-              <input value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Escape") setSubPanel(null); }}
-                autoFocus className="input-style w-full text-xs" />
-            </div>
-            {col.kind === "checkbox" && (
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1">열 유형</p>
-                <div className="grid grid-cols-2 gap-1">
-                  {COL_TYPE_OPTIONS.map((opt) => (
-                    <button key={opt.value} onClick={() => setTypeVal(opt.value)}
-                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs border transition-colors ${typeVal === opt.value ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400" : "border-[#e9e9e7] dark:border-[#3f3f3f] text-[#37352f] dark:text-[#e6e6e4] hover:bg-gray-50 dark:hover:bg-[#3a3a3a]"}`}>
-                      <span className="text-[11px] w-4 text-center">{opt.icon}</span>
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="flex gap-2 pt-1">
+          <div className="p-3 space-y-2">
+            <p className="text-xs font-semibold text-[#37352f] dark:text-[#e6e6e4]">이름 변경</p>
+            <input value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && renameVal.trim()) { onEditProp?.(renameVal.trim()); close(); }
+                if (e.key === "Escape") setSubPanel(null);
+              }}
+              autoFocus className="input-style w-full text-xs" />
+            <div className="flex gap-2">
               <button onClick={() => setSubPanel(null)} className="flex-1 py-1 text-xs rounded border border-[#e9e9e7] dark:border-[#3f3f3f] text-gray-400 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]">취소</button>
-              <button onClick={() => { if (renameVal.trim()) { onEditProp?.(renameVal.trim(), col.kind === "checkbox" ? typeVal : undefined); close(); } }}
+              <button onClick={() => { if (renameVal.trim()) { onEditProp?.(renameVal.trim()); close(); } }}
                 disabled={!renameVal.trim()}
                 className="flex-1 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40">확인</button>
             </div>
+          </div>
+        )}
+
+        {/* 유형 선택 패널 (커스텀 열 전용) */}
+        {!confirmDelete && subPanel === "type" && (
+          <div className="p-3 space-y-2">
+            <p className="text-xs font-semibold text-[#37352f] dark:text-[#e6e6e4]">유형 선택</p>
+            <div className="grid grid-cols-2 gap-1">
+              {COL_TYPE_OPTIONS.map((opt) => (
+                <button key={opt.value}
+                  onClick={() => { setTypeVal(opt.value); onEditProp?.(col.label, opt.value); close(); }}
+                  className={`flex items-center gap-1.5 px-2 py-2 rounded text-xs border transition-colors ${typeVal === opt.value ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-semibold" : "border-[#e9e9e7] dark:border-[#3f3f3f] text-[#37352f] dark:text-[#e6e6e4] hover:bg-gray-50 dark:hover:bg-[#3a3a3a]"}`}>
+                  <span className="text-[13px] w-5 text-center flex-shrink-0">{opt.icon}</span>
+                  {opt.label}
+                  {typeVal === opt.value && <Check size={10} className="ml-auto flex-shrink-0" />}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setSubPanel(null)} className="w-full py-1 text-xs rounded border border-[#e9e9e7] dark:border-[#3f3f3f] text-gray-400 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]">취소</button>
           </div>
         )}
 
@@ -604,8 +609,11 @@ function ColumnHeader({
               () => { onInsertRight?.(); close(); })}
 
             <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
-            {mi(<><Pencil size={12} className="text-gray-400 flex-shrink-0" /><span>속성 편집</span>{col.kind === "checkbox" && <span className="ml-auto text-[10px] text-gray-400">{COL_TYPE_OPTIONS.find(o => o.value === col.colDef?.type)?.label ?? "체크박스"}</span>}</>,
-              () => { setRenameVal(col.label); setTypeVal(col.colDef?.type ?? "checkbox"); setSubPanel("rename"); })}
+            {mi(<><Pencil size={12} className="text-gray-400 flex-shrink-0" /><span>이름 변경</span></>,
+              () => { setRenameVal(col.label); setSubPanel("rename"); })}
+            {col.kind === "checkbox" &&
+              mi(<><span className="text-[13px] w-3 text-center flex-shrink-0">{COL_TYPE_OPTIONS.find(o => o.value === col.colDef?.type)?.icon ?? "☑"}</span><span>유형 선택</span><span className="ml-auto text-[10px] text-gray-400">{COL_TYPE_OPTIONS.find(o => o.value === col.colDef?.type)?.label ?? "체크박스"}</span></>,
+                () => { setTypeVal(col.colDef?.type ?? "checkbox"); setSubPanel("type"); })}
 
             {col.deletable && (
               mi(<><Trash2 size={12} className="flex-shrink-0" /><span>속성 삭제</span></>,
@@ -1093,7 +1101,11 @@ export default function CRMPage({
   const editColProp = useCallback((colId: string, label: string, type?: CustomColumnType) => {
     setCrmColLabel(colId, label);
     const col = sortedCustomCols.find((c) => c.id === colId);
-    if (col) upsertCustomColumn({ ...col, label, ...(type ? { type } : {}) });
+    if (col) {
+      const updated = { ...col, label };
+      if (type) updated.type = type;
+      upsertCustomColumn(updated);
+    }
   }, [setCrmColLabel, sortedCustomCols, upsertCustomColumn]);
 
   // Delete / hide a column
