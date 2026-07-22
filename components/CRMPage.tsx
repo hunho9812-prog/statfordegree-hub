@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useWorkspaceStore } from "@/lib/store";
-import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColumnDef } from "@/lib/types";
+import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColumnDef, CustomColumnType } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import {
   Plus, Trash2, Settings, X, Check, GripVertical, ArrowRightLeft,
@@ -24,6 +24,17 @@ const ROUTE_STYLES: Record<string, { bg: string; text: string }> = {
   "크몽": { bg: "#eef2ff", text: "#4338ca" },
   "메일": { bg: "#eff6ff", text: "#1d4ed8" },
 };
+
+// ─── Custom column type metadata ─────────────────────────────────────────────
+
+const COL_TYPE_OPTIONS: { value: CustomColumnType; label: string; icon: string }[] = [
+  { value: "checkbox",  label: "체크박스", icon: "☑" },
+  { value: "text",      label: "텍스트",   icon: "T" },
+  { value: "number",    label: "숫자",     icon: "#" },
+  { value: "date",      label: "날짜",     icon: "📅" },
+  { value: "assignee",  label: "담당자",   icon: "👤" },
+  { value: "status",    label: "Status",   icon: "●" },
+];
 
 // ─── Built-in (fixed) column specs ───────────────────────────────────────────
 
@@ -412,7 +423,7 @@ interface ColumnHeaderProps {
   onMoveRight?: () => void;
   onInsertLeft?: () => void;
   onInsertRight?: () => void;
-  onRename?: (label: string) => void;
+  onEditProp?: (label: string, type?: CustomColumnType) => void;
   onDelete?: () => void;
   onEditStatus?: () => void;
   isFirst: boolean;
@@ -425,12 +436,13 @@ function ColumnHeader({
   assignees, assigneeFilter, onAssigneeFilter,
   allStatuses, statusFilter, onStatusFilter,
   onMoveLeft, onMoveRight, onInsertLeft, onInsertRight,
-  onRename, onDelete, onEditStatus,
+  onEditProp, onDelete, onEditStatus,
   isFirst, isLast,
 }: ColumnHeaderProps) {
   const [open, setOpen] = useState(false);
   const [subPanel, setSubPanel] = useState<"filter" | "rename" | null>(null);
   const [renameVal, setRenameVal] = useState(col.label);
+  const [typeVal, setTypeVal] = useState<CustomColumnType>(col.colDef?.type ?? "checkbox");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
 
@@ -474,16 +486,34 @@ function ColumnHeader({
           </div>
         )}
 
-        {/* Rename */}
+        {/* 속성 편집 (이름 + 유형) */}
         {!confirmDelete && subPanel === "rename" && (
-          <div className="p-3">
-            <p className="text-xs font-semibold text-[#37352f] dark:text-[#e6e6e4] mb-2">열 이름 변경</p>
-            <input value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && renameVal.trim()) { onRename?.(renameVal.trim()); close(); } if (e.key === "Escape") setSubPanel(null); }}
-              autoFocus className="input-style w-full text-xs mb-2" />
-            <div className="flex gap-2">
-              <button onClick={() => setSubPanel(null)} className="flex-1 py-1 text-xs rounded border border-[#e9e9e7] dark:border-[#3f3f3f] text-gray-400 hover:bg-gray-50">취소</button>
-              <button onClick={() => { if (renameVal.trim()) { onRename?.(renameVal.trim()); close(); } }} disabled={!renameVal.trim()}
+          <div className="p-3 space-y-2.5">
+            <p className="text-xs font-semibold text-[#37352f] dark:text-[#e6e6e4]">속성 편집</p>
+            <div>
+              <p className="text-[10px] text-gray-400 mb-1">열 이름</p>
+              <input value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Escape") setSubPanel(null); }}
+                autoFocus className="input-style w-full text-xs" />
+            </div>
+            {col.kind === "checkbox" && (
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1">열 유형</p>
+                <div className="grid grid-cols-2 gap-1">
+                  {COL_TYPE_OPTIONS.map((opt) => (
+                    <button key={opt.value} onClick={() => setTypeVal(opt.value)}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs border transition-colors ${typeVal === opt.value ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400" : "border-[#e9e9e7] dark:border-[#3f3f3f] text-[#37352f] dark:text-[#e6e6e4] hover:bg-gray-50 dark:hover:bg-[#3a3a3a]"}`}>
+                      <span className="text-[11px] w-4 text-center">{opt.icon}</span>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setSubPanel(null)} className="flex-1 py-1 text-xs rounded border border-[#e9e9e7] dark:border-[#3f3f3f] text-gray-400 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]">취소</button>
+              <button onClick={() => { if (renameVal.trim()) { onEditProp?.(renameVal.trim(), col.kind === "checkbox" ? typeVal : undefined); close(); } }}
+                disabled={!renameVal.trim()}
                 className="flex-1 py-1 text-xs rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40">확인</button>
             </div>
           </div>
@@ -574,8 +604,8 @@ function ColumnHeader({
               () => { onInsertRight?.(); close(); })}
 
             <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
-            {mi(<><Pencil size={12} className="text-gray-400 flex-shrink-0" /><span>속성 편집 (이름 변경)</span></>,
-              () => { setRenameVal(col.label); setSubPanel("rename"); })}
+            {mi(<><Pencil size={12} className="text-gray-400 flex-shrink-0" /><span>속성 편집</span>{col.kind === "checkbox" && <span className="ml-auto text-[10px] text-gray-400">{COL_TYPE_OPTIONS.find(o => o.value === col.colDef?.type)?.label ?? "체크박스"}</span>}</>,
+              () => { setRenameVal(col.label); setTypeVal(col.colDef?.type ?? "checkbox"); setSubPanel("rename"); })}
 
             {col.deletable && (
               mi(<><Trash2 size={12} className="flex-shrink-0" /><span>속성 삭제</span></>,
@@ -603,7 +633,7 @@ const EMPTY_FORM = {
   name: "", assignee: ASSIGNEES[0], route: "" as CustomerRoute,
   settlement_amount: null as number | null, alba: "",
   total_amount: null as number | null, balance: null as number | null,
-  custom_fields: {} as Record<string, boolean>,
+  custom_fields: {} as Record<string, boolean | string | null>,
   submit_date: "", status: "", memo: "", monthPageId: null as string | null,
 };
 
@@ -679,14 +709,29 @@ function AddCustomerRow({ statuses, allCols, onSave, onCancel }: {
             </td>
           );
         }
-        // checkbox custom col
-        return (
-          <td key={col.id} className="px-3 py-2 text-center">
-            <input type="checkbox" checked={form.custom_fields[col.id] ?? false}
-              onChange={(e) => set("custom_fields", { ...form.custom_fields, [col.id]: e.target.checked })}
-              className="w-4 h-4 accent-blue-500 cursor-pointer" />
-          </td>
-        );
+        // custom col — by type
+        const cfVal2 = form.custom_fields[col.id] ?? null;
+        const cfSet = (v: boolean | string | null) => set("custom_fields", { ...form.custom_fields, [col.id]: v });
+        switch (col.colDef?.type) {
+          case "text":
+            return <td key={col.id} className="px-3 py-2"><input value={String(cfVal2 ?? "")} onChange={(e) => cfSet(e.target.value)} placeholder="텍스트" className="w-full bg-transparent outline-none text-sm" /></td>;
+          case "number":
+            return <td key={col.id} className="px-3 py-2"><input type="number" value={cfVal2 !== null && cfVal2 !== "" ? String(cfVal2) : ""} onChange={(e) => cfSet(e.target.value === "" ? null : e.target.value)} placeholder="0" className="w-full bg-transparent outline-none text-sm text-right" /></td>;
+          case "date":
+            return <td key={col.id} className="px-3 py-2"><input type="date" value={String(cfVal2 ?? "")} onChange={(e) => cfSet(e.target.value)} className="w-full bg-transparent outline-none text-sm cursor-pointer" /></td>;
+          case "assignee":
+            return <td key={col.id} className="px-3 py-2"><AssigneeCell value={String(cfVal2 ?? "")} onChange={(v) => cfSet(v)} /></td>;
+          case "status":
+            return <td key={col.id} className="px-3 py-2 min-w-[120px]"><StatusCell value={String(cfVal2 ?? "")} statuses={statuses} onChange={(v) => cfSet(v)} /></td>;
+          default:
+            return (
+              <td key={col.id} className="px-3 py-2 text-center">
+                <input type="checkbox" checked={Boolean(cfVal2)}
+                  onChange={(e) => cfSet(e.target.checked)}
+                  className="w-4 h-4 accent-blue-500 cursor-pointer" />
+              </td>
+            );
+        }
       })}
       <td className="px-3 py-2">
         <div className="flex gap-1">
@@ -843,15 +888,33 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove }: {
           return <td key={col.id} className={cellCls} />;
         }
 
-        // checkbox custom col
-        return (
-          <td key={col.id} className={`${cellCls} text-center`}>
-            <BoolCell
-              value={customer.custom_fields?.[col.id] ?? false}
-              onChange={(v) => onUpdate({ custom_fields: { ...customer.custom_fields, [col.id]: v } })}
-            />
-          </td>
-        );
+        // custom col — render by type
+        const cfVal = customer.custom_fields?.[col.id] ?? null;
+        const cfUpdate = (v: boolean | string | null) =>
+          onUpdate({ custom_fields: { ...customer.custom_fields, [col.id]: v } });
+        switch (col.colDef?.type) {
+          case "text":
+            return <td key={col.id} className={`${cellCls} min-w-[100px]`}><TextCell value={String(cfVal ?? "")} onChange={(v) => cfUpdate(v)} placeholder="텍스트" /></td>;
+          case "number":
+            return <td key={col.id} className={`${cellCls} min-w-[90px]`}><NumberCell value={cfVal !== null && cfVal !== "" ? Number(cfVal) : null} onChange={(v) => cfUpdate(v !== null ? String(v) : null)} placeholder="0" /></td>;
+          case "date":
+            return (
+              <td key={col.id} className={`${cellCls} min-w-[130px]`}>
+                <input type="date" value={String(cfVal ?? "")} onChange={(e) => cfUpdate(e.target.value)}
+                  className="w-full bg-transparent outline-none text-sm cursor-pointer dark:text-[#e6e6e4]" />
+              </td>
+            );
+          case "assignee":
+            return <td key={col.id} className={`${cellCls} min-w-[90px]`}><AssigneeCell value={String(cfVal ?? "")} onChange={(v) => cfUpdate(v)} /></td>;
+          case "status":
+            return <td key={col.id} className={`${cellCls} min-w-[120px]`}><StatusCell value={String(cfVal ?? "")} statuses={statuses} onChange={(v) => cfUpdate(v)} /></td>;
+          default:
+            return (
+              <td key={col.id} className={`${cellCls} text-center`}>
+                <BoolCell value={Boolean(cfVal)} onChange={(v) => cfUpdate(v)} />
+              </td>
+            );
+        }
       })}
       {/* Action cell */}
       <td className="px-3 py-2 min-w-[100px]">
@@ -1026,12 +1089,11 @@ export default function CRMPage({
     reorderCustomColumns(customOrder);
   }, [allCols, setCrmColOrder, reorderCustomColumns]);
 
-  // Rename a column
-  const renameCol = useCallback((colId: string, label: string) => {
+  // Edit a column's name and/or type
+  const editColProp = useCallback((colId: string, label: string, type?: CustomColumnType) => {
     setCrmColLabel(colId, label);
-    // For custom cols, also update the colDef label in store
     const col = sortedCustomCols.find((c) => c.id === colId);
-    if (col) upsertCustomColumn({ ...col, label });
+    if (col) upsertCustomColumn({ ...col, label, ...(type ? { type } : {}) });
   }, [setCrmColLabel, sortedCustomCols, upsertCustomColumn]);
 
   // Delete / hide a column
@@ -1168,7 +1230,7 @@ export default function CRMPage({
                   onMoveRight={() => moveCol(col.id, "right")}
                   onInsertLeft={() => insertCol(col.id, "left")}
                   onInsertRight={() => insertCol(col.id, "right")}
-                  onRename={(label) => renameCol(col.id, label)}
+                  onEditProp={(label, type) => editColProp(col.id, label, type)}
                   onDelete={() => deleteCol(col)}
                   onEditStatus={() => setShowStatusEditor(true)}
                   isFirst={idx === 0}

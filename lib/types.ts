@@ -42,7 +42,7 @@ export interface StatusOption {
 // Replaces the old hardcoded 후기제안/잔금받음?/크몽후기/카톡후기/현금영수증 boolean columns.
 // Values live in Customer.custom_fields, keyed by CustomColumnDef.id.
 
-export type CustomColumnType = "checkbox";
+export type CustomColumnType = "checkbox" | "text" | "number" | "date" | "assignee" | "status";
 
 export interface CustomColumnDef {
   id: string;
@@ -60,7 +60,7 @@ export interface Customer {
   alba: string;                   // 알바 (자유 입력)
   total_amount: number | null;    // 전체금액
   balance: number | null;         // 잔금
-  custom_fields: Record<string, boolean>; // dynamic checkbox columns, keyed by CustomColumnDef.id
+  custom_fields: Record<string, boolean | string | null>; // dynamic columns, keyed by CustomColumnDef.id
   submit_date: string;
   status: string;                 // references a StatusOption id or label
   memo: string;
