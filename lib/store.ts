@@ -2165,14 +2165,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               (t) => !supaTaskIds.has(t.id) && !DEFAULT_TASK_TITLES.includes(t.title)
             );
 
-        const supaCustomerIds = new Set(customers.map((c) => c.id));
-        // 항상 로컬에만 있는 고객을 추적 (Supabase upsert가 아직 완료되지 않은 신규 고객 포함)
-        const localOnlyCustomers = current.customers.filter((c) => !supaCustomerIds.has(c.id));
-
         const uploadOps: Promise<void>[] = [];
         if (localOnlyPages.length > 0) uploadOps.push(dbPages.upsertMany(localOnlyPages));
         if (localOnlyTasks.length > 0) uploadOps.push(...localOnlyTasks.map((t) => dbTasks.upsert(t)));
-        if (localOnlyCustomers.length > 0) uploadOps.push(...localOnlyCustomers.map((c) => dbCustomers.upsert(c).then(() => {})));
         if (uploadOps.length > 0) await Promise.all(uploadOps);
 
         // Seed workspace config if missing
@@ -2248,8 +2243,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const mergedTasks = supabaseHasTasks
           ? cleanedTasks
           : [...cleanedTasks, ...localOnlyTasks];
-        // Supabase 목록 + 아직 Supabase에 없는 로컬 신규 고객 병합
-        const mergedCustomers = [...customers, ...localOnlyCustomers];
 
         // rootPageIds 결정: workspace_config > Supabase pages에서 도출 > 로컬 유지
         const derivedRootPageIds = (rootPageIdsConfig as string[] | null) ??
@@ -2265,22 +2258,31 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           dbWorkspaceConfig.set("rootPageIds", derivedRootPageIds);
         }
 
-        set({
-          pages: Object.keys(mergedPages).length > 0 ? mergedPages : current.pages,
-          rootPageIds: derivedRootPageIds,
-          tasks: mergedTasks,
-          customers: mergedCustomers,
-          customerStatuses: statuses.length > 0 ? statuses : current.customerStatuses,
-          customColumns: columns.length > 0 ? columns : current.customColumns,
-          // manualPages: Supabase에 데이터가 있으면 사용, 비어있으면 로컬 유지
-          // (인증 실패로 fetch가 빈 배열을 반환해도 로컬 데이터 보호)
-          manualPages: Object.keys(manualPages).length > 0 ? manualPages : current.manualPages,
-          // CRM 열 레이아웃: Supabase 값 우선, 없으면 로컬 유지
-          ...(crmColOrderConfig !== null && { crmColOrder: crmColOrderConfig as string[] }),
-          ...(crmColLabelsConfig !== null && { crmColLabels: crmColLabelsConfig as Record<string, string> }),
-          ...(crmHiddenColsConfig !== null && { crmHiddenCols: crmHiddenColsConfig as string[] }),
-          ...(crmColTypesConfig !== null && { crmColTypes: crmColTypesConfig as Record<string, CustomColumnType> }),
-          isRefreshing: false,
+        const supaCustomerIds = new Set(customers.map((c) => c.id));
+
+        // set()에 함수를 넘겨 실행 시점의 최신 state를 참조
+        // (async fetch 동안 추가된 신규 고객도 latest.customers에 포함되어 유실되지 않음)
+        set((latest) => {
+          // fetch 완료 시점의 최신 로컬 상태 기준으로 localOnly 재계산
+          const localOnlyCustomers = latest.customers.filter((c) => !supaCustomerIds.has(c.id));
+          const mergedCustomers = [...customers, ...localOnlyCustomers];
+
+          return {
+            pages: Object.keys(mergedPages).length > 0 ? mergedPages : latest.pages,
+            rootPageIds: derivedRootPageIds,
+            tasks: mergedTasks,
+            customers: mergedCustomers,
+            customerStatuses: statuses.length > 0 ? statuses : latest.customerStatuses,
+            customColumns: columns.length > 0 ? columns : latest.customColumns,
+            // manualPages: Supabase에 데이터가 있으면 사용, 비어있으면 로컬 유지
+            manualPages: Object.keys(manualPages).length > 0 ? manualPages : latest.manualPages,
+            // CRM 열 레이아웃: Supabase 값 우선, 없으면 로컬 유지
+            ...(crmColOrderConfig !== null && { crmColOrder: crmColOrderConfig as string[] }),
+            ...(crmColLabelsConfig !== null && { crmColLabels: crmColLabelsConfig as Record<string, string> }),
+            ...(crmHiddenColsConfig !== null && { crmHiddenCols: crmHiddenColsConfig as string[] }),
+            ...(crmColTypesConfig !== null && { crmColTypes: crmColTypesConfig as Record<string, CustomColumnType> }),
+            isRefreshing: false,
+          };
         });
         } catch (e) {
           set({ isRefreshing: false, syncError: true });
