@@ -7,7 +7,7 @@ import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColum
 import { v4 as uuidv4 } from "uuid";
 import {
   Plus, Trash2, Settings, X, Check, GripVertical, ArrowRightLeft,
-  Filter, ChevronUp, ChevronDown, Pencil, Save, Loader2,
+  Filter, ChevronUp, ChevronDown, Pencil,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
 
@@ -972,14 +972,10 @@ export default function CRMPage({
     upsertCustomColumn, deleteCustomColumn, reorderCustomColumns,
     crmColOrder, crmColLabels, crmHiddenCols, crmColTypes,
     setCrmColOrder, setCrmColLabel, setCrmHiddenCols, setCrmColType,
-    syncNow, isRefreshing,
   } = useWorkspaceStore();
 
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
-  const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
-  const isDirty = dirtyIds.size > 0;
 
   // ─── Undo stack ───────────────────────────────────────────────────────────
   type UndoSnapshot = {
@@ -1048,24 +1044,7 @@ export default function CRMPage({
   const handleUpdate = useCallback((id: string, updates: Partial<Omit<Customer, "id" | "created_at">>) => {
     pushUndoSnapshot();
     updateCustomer(id, updates);
-    setDirtyIds((prev) => new Set(prev).add(id));
   }, [updateCustomer, pushUndoSnapshot]);
-
-  const handleSaveToDB = useCallback(async () => {
-    if (dirtyIds.size === 0) return;
-    setSaveStatus("saving");
-    await syncNow();
-    setDirtyIds(new Set());
-    setSaveStatus("saved");
-  }, [dirtyIds, syncNow]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); handleSaveToDB(); }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [handleSaveToDB]);
 
   // ─── Filters & sort ───────────────────────────────────────────────────────
   const [assigneeFilter, setAssigneeFilter] = useState<Set<string> | null>(null);
@@ -1271,26 +1250,6 @@ export default function CRMPage({
             ↩ 되돌리기 <span className="font-semibold text-blue-400">{undoStack.length}</span>
           </button>
         )}
-        <button
-          onClick={handleSaveToDB}
-          disabled={!isDirty || saveStatus === "saving" || isRefreshing}
-          title={isDirty ? `${dirtyIds.size}건 미저장 · 클릭하여 저장 (Ctrl+S)` : "저장됨"}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-            saveStatus === "saving" || isRefreshing
-              ? "border-blue-300 text-blue-400 cursor-wait"
-              : isDirty
-              ? "border-blue-400 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20"
-              : "border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] cursor-default"
-          }`}
-        >
-          {saveStatus === "saving" || isRefreshing ? (
-            <><Loader2 size={13} className="animate-spin" /> 저장 중</>
-          ) : isDirty ? (
-            <><Save size={13} /> 저장 ({dirtyIds.size})</>
-          ) : (
-            <><Check size={13} /> 저장됨</>
-          )}
-        </button>
         <button onClick={() => setShowAddForm(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
           <Plus size={15} /> 고객 추가
