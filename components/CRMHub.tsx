@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, ChevronDown, ChevronRight, Users, Trash2, X, AlertTriangle, RefreshCw } from "lucide-react";
-import { useWorkspaceStore, subscribeCRMRealtime, unsubscribeCRMRealtime } from "@/lib/store";
+import { useWorkspaceStore } from "@/lib/store";
 
 const MONTH_NAMES = [
   "1월", "2월", "3월", "4월", "5월", "6월",
@@ -66,12 +66,6 @@ function DeleteConfirmModal({
 export default function CRMHub() {
   const router = useRouter();
   const { pages, createPage, updatePage, deletePage, loadFromSupabase, isRefreshing } = useWorkspaceStore();
-
-  // 고객 관리 페이지 진입 시 Realtime 구독 시작 (타인 변경사항 실시간 반영)
-  useEffect(() => {
-    subscribeCRMRealtime();
-    return () => unsubscribeCRMRealtime();
-  }, []);
 
   const [expandedYears, setExpandedYears] = useState<Set<string>>(() => new Set());
   const [showYearInput, setShowYearInput] = useState(false);

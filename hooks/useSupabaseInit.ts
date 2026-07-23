@@ -1,32 +1,41 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useWorkspaceStore, runMigrationIfNeeded, forceReseedManualPages } from "@/lib/store";
+import {
+  useWorkspaceStore,
+  runMigrationIfNeeded,
+  forceReseedManualPages,
+  _reloadCustomers,
+  _reloadColumns,
+  _reloadStatuses,
+  _reloadWorkspaceConfig,
+} from "@/lib/store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/AuthProvider";
 
-// 실시간 변경을 감지할 테이블 목록
-const REALTIME_TABLES = [
-  "pages",
-  "tasks",
-  "customers",
-  "customer_statuses",
-  "table_columns",
-  "manual_nodes",
-  "manual_page_roots",
-  "workspace_config",
-];
+// 페이지/태스크/메뉴얼 테이블 — 변경 시 전체 로드
+const FULL_RELOAD_TABLES = ["pages", "tasks", "manual_nodes", "manual_page_roots"];
 
-// 연속 이벤트를 하나로 묶어 불필요한 중복 fetch 방지 (ms)
-const DEBOUNCE_MS = 300;
+// CRM 테이블 — 변경 시 해당 테이블만 부분 reload (빠르고 가벼움)
+const CRM_TABLE_RELOADERS: Record<string, () => Promise<void>> = {
+  customers: _reloadCustomers,
+  table_columns: _reloadColumns,
+  customer_statuses: _reloadStatuses,
+  workspace_config: _reloadWorkspaceConfig,
+};
+
+// 전체 reload 디바운스 (ms) — 연속 이벤트 묶음
+const FULL_DEBOUNCE_MS = 300;
+// CRM 부분 reload 디바운스 (ms)
+const CRM_DEBOUNCE_MS = 800;
 
 export function useSupabaseInit() {
   const loadFromSupabase = useWorkspaceStore((s) => s.loadFromSupabase);
   const { user } = useAuth();
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fullDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const crmDebounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // 탭/창이 다시 보이게 될 때 자동 새로고침
-  // → 다른 기기에서 변경한 내용을 노트북으로 전환 시 즉시 반영
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase || !user) return;
 
@@ -41,23 +50,28 @@ export function useSupabaseInit() {
   }, [user?.id, loadFromSupabase]);
 
   useEffect(() => {
-    // 로그인 완료 전 또는 Supabase 미설정 시 중단
     if (!isSupabaseConfigured || !supabase || !user) return;
 
-    // 최초 로드: 마이그레이션 먼저 실행 후 Supabase 데이터 로드
-    // runMigrationIfNeeded: localStorage 데이터를 Supabase로 한 번만 업로드 (각 기기별)
     runMigrationIfNeeded()
       .then(() => forceReseedManualPages())
       .then(() => loadFromSupabase());
 
-    // 300ms 디바운스 재로드: 연속 이벤트를 하나의 fetch로 묶음
-    const scheduleReload = () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      debounceTimer.current = setTimeout(() => loadFromSupabase(), DEBOUNCE_MS);
+    // 전체 reload 스케줄러 (pages, tasks, manual 계열)
+    const scheduleFullReload = () => {
+      if (fullDebounceTimer.current) clearTimeout(fullDebounceTimer.current);
+      fullDebounceTimer.current = setTimeout(() => loadFromSupabase(), FULL_DEBOUNCE_MS);
     };
 
-    // Realtime WebSocket에 인증 토큰을 먼저 설정한 뒤 채널 구독
-    // (토큰 설정 전에 구독하면 이벤트를 수신하지 못할 수 있음)
+    // CRM 테이블별 부분 reload 스케줄러
+    const scheduleCrmReload = (table: string) => {
+      const timers = crmDebounceTimers.current;
+      if (timers[table]) clearTimeout(timers[table]);
+      timers[table] = setTimeout(() => {
+        delete timers[table];
+        CRM_TABLE_RELOADERS[table]?.();
+      }, CRM_DEBOUNCE_MS);
+    };
+
     let channels: ReturnType<typeof supabase.channel>[] = [];
     let cancelled = false;
 
@@ -67,25 +81,34 @@ export function useSupabaseInit() {
         supabase!.realtime.setAuth(session.access_token);
       }
 
-      channels = REALTIME_TABLES.map((table) =>
+      // 전체 reload 테이블 구독
+      const fullChannels = FULL_RELOAD_TABLES.map((table) =>
         supabase!
           .channel(`realtime:public:${table}`)
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table },
-            scheduleReload
-          )
-          .subscribe((status, err) => {
-            if (err) {
-              console.error(`[Realtime] ${table} 구독 오류:`, err);
-            }
+          .on("postgres_changes", { event: "*", schema: "public", table }, scheduleFullReload)
+          .subscribe((_, err) => {
+            if (err) console.error(`[Realtime] ${table} 구독 오류:`, err);
           })
       );
+
+      // CRM 테이블 구독 (테이블별 부분 reload)
+      const crmChannels = Object.keys(CRM_TABLE_RELOADERS).map((table) =>
+        supabase!
+          .channel(`realtime:public:${table}`)
+          .on("postgres_changes", { event: "*", schema: "public", table },
+            () => scheduleCrmReload(table))
+          .subscribe((_, err) => {
+            if (err) console.error(`[Realtime] ${table} 구독 오류:`, err);
+          })
+      );
+
+      channels = [...fullChannels, ...crmChannels];
     });
 
     return () => {
       cancelled = true;
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      if (fullDebounceTimer.current) clearTimeout(fullDebounceTimer.current);
+      Object.values(crmDebounceTimers.current).forEach(clearTimeout);
       channels.forEach((ch) => supabase?.removeChannel(ch));
     };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps

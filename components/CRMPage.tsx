@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { useWorkspaceStore, subscribeCRMRealtime, unsubscribeCRMRealtime } from "@/lib/store";
+import { useWorkspaceStore } from "@/lib/store";
 import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColumnDef, CustomColumnType } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -1040,11 +1040,6 @@ export default function CRMPage({
     return () => window.removeEventListener("keydown", handler);
   }, [handleUndo]);
 
-  // Realtime 구독 — CRMPage가 직접 렌더링될 때도 동기화되도록
-  useEffect(() => {
-    subscribeCRMRealtime();
-    return () => unsubscribeCRMRealtime();
-  }, []);
 
   const handleUpdate = useCallback((id: string, updates: Partial<Omit<Customer, "id" | "created_at">>) => {
     pushUndoSnapshot();
