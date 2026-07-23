@@ -2265,11 +2265,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const supaCustomerIds = new Set(customers.map((c) => c.id));
 
         // set()에 함수를 넘겨 실행 시점의 최신 state를 참조
-        // (async fetch 동안 추가된 신규 고객도 latest.customers에 포함되어 유실되지 않음)
+        // (async fetch 동안 추가/편집된 고객도 유실되지 않음)
         set((latest) => {
-          // fetch 완료 시점의 최신 로컬 상태 기준으로 localOnly 재계산
-          const localOnlyCustomers = latest.customers.filter((c) => !supaCustomerIds.has(c.id));
-          const mergedCustomers = [...customers, ...localOnlyCustomers];
+          const localById = new Map(latest.customers.map((c) => [c.id, c]));
+
+          // Supabase 버전과 로컬 버전 중 updated_at이 더 최신인 것을 채택
+          // → 현재 편집 중인 행은 로컬 버전 유지, 타 PC 변경 사항은 Supabase 버전 반영
+          const mergedCustomers = [
+            ...customers.map((supaC) => {
+              const localC = localById.get(supaC.id);
+              return localC && localC.updated_at > supaC.updated_at ? localC : supaC;
+            }),
+            // Supabase에 아직 없는 로컬 신규 고객 보존
+            ...latest.customers.filter((c) => !supaCustomerIds.has(c.id)),
+          ];
 
           return {
             pages: Object.keys(mergedPages).length > 0 ? mergedPages : latest.pages,
