@@ -2306,8 +2306,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               const localC = localById.get(supaC.id);
               return localC && localC.updated_at > supaC.updated_at ? localC : supaC;
             }),
-            // Supabase에 아직 없는 로컬 신규 고객 보존 (삭제 진행 중인 ID 제외)
-            ...latest.customers.filter((c) => !supaCustomerIds.has(c.id) && !pendingDeletedCustomerIds.has(c.id)),
+            // Supabase에 아직 없는 로컬 신규 고객 보존 — Supabase에 데이터가 있을 때만
+            // (Supabase가 비어있으면 의도적 삭제로 간주, 로컬 고객 재업로드 금지)
+            ...(supabaseHasCustomers
+              ? latest.customers.filter((c) => !supaCustomerIds.has(c.id) && !pendingDeletedCustomerIds.has(c.id))
+              : []),
           ];
 
           return {
