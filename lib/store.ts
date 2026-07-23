@@ -18,6 +18,10 @@ import { isSupabaseConfigured, supabase } from "./supabase";
 const customerUpsertTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 const taskUpsertTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
+// 삭제 진행 중인 ID — Realtime race condition 시 부활 방지
+const pendingDeletedTaskIds = new Set<string>();
+const pendingDeletedCustomerIds = new Set<string>();
+
 // Fixed IDs for the manual page hierarchy
 export const MENU_IDS = {
   MANUAL: "menu-manual",
@@ -1738,6 +1742,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
 
       deleteTask: (id) => {
+        pendingDeletedTaskIds.add(id);
+        setTimeout(() => pendingDeletedTaskIds.delete(id), 5000);
         set((state) => ({
           tasks: state.tasks.filter((t) => t.id !== id),
         }));
@@ -1778,6 +1784,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
 
       deleteCustomer: (id) => {
+        pendingDeletedCustomerIds.add(id);
+        setTimeout(() => pendingDeletedCustomerIds.delete(id), 5000);
         set((state) => ({
           customers: state.customers.filter((c) => c.id !== id),
         }));
@@ -2248,15 +2256,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         if (defaultTasksInSupa.length > 0) {
           defaultTasksInSupa.forEach((t) => dbTasks.delete(t.id));
         }
-        const cleanedTasks = tasks.filter((t) => !DEFAULT_TASK_TITLES.includes(t.title));
+        const cleanedTasks = tasks.filter(
+          (t) => !DEFAULT_TASK_TITLES.includes(t.title) && !pendingDeletedTaskIds.has(t.id)
+        );
 
         // tasks도 customers와 동일하게 updatedAt 기준으로 최신 버전 채택
         // → 현재 편집/이동 중인 태스크는 로컬 버전 유지, 타 PC 변경은 Supabase 반영
         const supaTaskById = new Map(cleanedTasks.map((t) => [t.id, t]));
         const mergedTasks = supabaseHasTasks
           ? (() => {
-              // set() 내부에서 latest를 읽지 못하므로 여기서는 current 기준으로 비교
-              // (loadFromSupabase 호출 시점의 로컬 state)
               const localTaskById = new Map(current.tasks.map((t) => [t.id, t]));
               return [
                 ...cleanedTasks.map((supaT) => {
@@ -2264,7 +2272,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                   return localT && localT.updatedAt > supaT.updatedAt ? localT : supaT;
                 }),
                 // Supabase에 없는 로컬 신규 태스크 보존
-                ...current.tasks.filter((t) => !supaTaskById.has(t.id) && !DEFAULT_TASK_TITLES.includes(t.title)),
+                ...current.tasks.filter((t) => !supaTaskById.has(t.id) && !DEFAULT_TASK_TITLES.includes(t.title) && !pendingDeletedTaskIds.has(t.id)),
               ];
             })()
           : [...cleanedTasks, ...localOnlyTasks];
@@ -2283,7 +2291,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           dbWorkspaceConfig.set("rootPageIds", derivedRootPageIds);
         }
 
-        const supaCustomerIds = new Set(customers.map((c) => c.id));
+        const effectiveCustomers = customers.filter((c) => !pendingDeletedCustomerIds.has(c.id));
+        const supaCustomerIds = new Set(effectiveCustomers.map((c) => c.id));
 
         // set()에 함수를 넘겨 실행 시점의 최신 state를 참조
         // (async fetch 동안 추가/편집된 고객도 유실되지 않음)
@@ -2293,12 +2302,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           // Supabase 버전과 로컬 버전 중 updated_at이 더 최신인 것을 채택
           // → 현재 편집 중인 행은 로컬 버전 유지, 타 PC 변경 사항은 Supabase 버전 반영
           const mergedCustomers = [
-            ...customers.map((supaC) => {
+            ...effectiveCustomers.map((supaC) => {
               const localC = localById.get(supaC.id);
               return localC && localC.updated_at > supaC.updated_at ? localC : supaC;
             }),
-            // Supabase에 아직 없는 로컬 신규 고객 보존
-            ...latest.customers.filter((c) => !supaCustomerIds.has(c.id)),
+            // Supabase에 아직 없는 로컬 신규 고객 보존 (삭제 진행 중인 ID 제외)
+            ...latest.customers.filter((c) => !supaCustomerIds.has(c.id) && !pendingDeletedCustomerIds.has(c.id)),
           ];
 
           return {
