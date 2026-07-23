@@ -17,11 +17,10 @@ const REALTIME_TABLES = [
   "workspace_config",
 ];
 
-// 페이지/태스크/매뉴얼 변경은 빠르게, CRM 변경은 느리게 묶어서 처리
-// (CRM 셀 편집은 키 입력마다 이벤트가 발생하므로 더 긴 디바운스 사용)
+// updateCustomer는 로컬 state만 수정하므로 CRM도 짧은 디바운스로 처리
 const CRM_TABLES = new Set(["customers", "customer_statuses", "table_columns", "workspace_config"]);
 const FULL_DEBOUNCE_MS = 400;
-const CRM_DEBOUNCE_MS = 2000;
+const CRM_DEBOUNCE_MS = 300;
 
 export function useSupabaseInit() {
   const loadFromSupabase = useWorkspaceStore((s) => s.loadFromSupabase);
