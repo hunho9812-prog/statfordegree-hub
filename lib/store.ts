@@ -2291,6 +2291,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     {
       name: "statfordegree-hub-storage",
       version: 9,
+      // Supabase가 진실의 원천이므로 무거운 CRM 데이터는 localStorage에 저장하지 않음
+      // → 페이지 로드 시 항상 Supabase에서 최신 데이터를 가져옴 (localStorage I/O 부담 감소)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      partialize: (state: WorkspaceState): any => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { customers, customColumns, customerStatuses, manualPages, isRefreshing, syncError, customerSyncStatus, ...rest } = state;
+        return rest;
+      },
       migrate: (persistedState: unknown, version: number) => {
         const s = persistedState as Record<string, unknown>;
         const DEFAULT_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
@@ -2385,32 +2393,76 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   )
 );
 
-// ── Supabase Realtime 구독 (장부와 동일한 방식) ───────────────────────────────
-// customers / table_columns / workspace_config / customer_statuses 변경 시
-// loadFromSupabase를 호출해 모든 팀원의 화면을 즉시 동기화합니다.
+// ── Supabase Realtime 구독 ────────────────────────────────────────────────────
+// 변경된 테이블만 fetch해서 state를 업데이트합니다.
+// loadFromSupabase (전체 12테이블 동시 fetch) 대신 가벼운 부분 reload를 사용합니다.
 
 let _realtimeChannel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
 
-// 300ms 디바운스 — 동시 다발적 변경을 하나의 reload로 묶음
-let _reloadTimer: ReturnType<typeof setTimeout> | null = null;
-function _scheduleReload() {
-  if (_reloadTimer) clearTimeout(_reloadTimer);
-  _reloadTimer = setTimeout(() => {
-    _reloadTimer = null;
-    useWorkspaceStore.getState().loadFromSupabase();
-  }, 300);
+// 테이블별 1500ms 디바운스 타이머 — 연속 입력을 하나의 fetch로 묶음
+const _reloadTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+async function _reloadCustomers() {
+  const next = await dbCustomers.fetchAll();
+  if (next.length === 0) return;
+  useWorkspaceStore.setState((state) => {
+    // Supabase 목록 기준으로 교체 + 아직 저장 안 된 로컬 신규 고객 보존
+    const supaIds = new Set(next.map((c) => c.id));
+    const localOnly = state.customers.filter((c) => !supaIds.has(c.id));
+    return { customers: [...next, ...localOnly] };
+  });
+}
+
+async function _reloadColumns() {
+  const next = await dbTableColumns.fetchAll();
+  if (next.length === 0) return;
+  useWorkspaceStore.setState({ customColumns: next });
+}
+
+async function _reloadStatuses() {
+  const next = await dbCustomerStatuses.fetchAll();
+  if (next.length === 0) return;
+  useWorkspaceStore.setState({ customerStatuses: next });
+}
+
+async function _reloadWorkspaceConfig() {
+  if (!supabase) return;
+  const [colOrder, colLabels, hiddenCols, colTypes] = await Promise.all([
+    dbWorkspaceConfig.get("crmColOrder"),
+    dbWorkspaceConfig.get("crmColLabels"),
+    dbWorkspaceConfig.get("crmHiddenCols"),
+    dbWorkspaceConfig.get("crmColTypes"),
+  ]);
+  useWorkspaceStore.setState({
+    ...(colOrder !== null && { crmColOrder: colOrder as string[] }),
+    ...(colLabels !== null && { crmColLabels: colLabels as Record<string, string> }),
+    ...(hiddenCols !== null && { crmHiddenCols: hiddenCols as string[] }),
+    ...(colTypes !== null && { crmColTypes: colTypes as Record<string, CustomColumnType> }),
+  });
+}
+
+function _schedule(key: string, fn: () => Promise<void>, delay = 1500) {
+  if (_reloadTimers[key]) clearTimeout(_reloadTimers[key]);
+  _reloadTimers[key] = setTimeout(() => {
+    delete _reloadTimers[key];
+    fn();
+  }, delay);
 }
 
 export function subscribeCRMRealtime() {
   if (!isSupabaseConfigured || !supabase) return;
-  if (_realtimeChannel) return; // 이미 구독 중
+  if (_realtimeChannel) return;
 
   _realtimeChannel = supabase
     .channel("crm_realtime_sync")
-    .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, _scheduleReload)
-    .on("postgres_changes", { event: "*", schema: "public", table: "table_columns" }, _scheduleReload)
-    .on("postgres_changes", { event: "*", schema: "public", table: "customer_statuses" }, _scheduleReload)
-    .on("postgres_changes", { event: "*", schema: "public", table: "workspace_config" }, _scheduleReload)
+    .on("postgres_changes", { event: "*", schema: "public", table: "customers" },
+      () => _schedule("customers", _reloadCustomers))
+    .on("postgres_changes", { event: "*", schema: "public", table: "table_columns" },
+      () => _schedule("columns", _reloadColumns))
+    .on("postgres_changes", { event: "*", schema: "public", table: "customer_statuses" },
+      () => _schedule("statuses", _reloadStatuses))
+    .on("postgres_changes", { event: "*", schema: "public", table: "workspace_config" },
+      () => _schedule("config", _reloadWorkspaceConfig))
     .subscribe();
 }
 
