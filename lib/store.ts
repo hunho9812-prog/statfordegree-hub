@@ -2266,16 +2266,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const mergedTasks = supabaseHasTasks
           ? (() => {
               const localTaskById = new Map(current.tasks.map((t) => [t.id, t]));
-              return [
-                ...cleanedTasks.map((supaT) => {
-                  const localT = localTaskById.get(supaT.id);
-                  return localT && localT.updatedAt > supaT.updatedAt ? localT : supaT;
-                }),
-                // Supabase에 없는 로컬 신규 태스크 보존
-                ...current.tasks.filter((t) => !supaTaskById.has(t.id) && !DEFAULT_TASK_TITLES.includes(t.title) && !pendingDeletedTaskIds.has(t.id)),
-              ];
+              return cleanedTasks.map((supaT) => {
+                const localT = localTaskById.get(supaT.id);
+                return localT && localT.updatedAt > supaT.updatedAt ? localT : supaT;
+              });
             })()
-          : [...cleanedTasks, ...localOnlyTasks];
+          : cleanedTasks;
 
         // rootPageIds 결정: workspace_config > Supabase pages에서 도출 > 로컬 유지
         const derivedRootPageIds = (rootPageIdsConfig as string[] | null) ??
@@ -2306,11 +2302,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               const localC = localById.get(supaC.id);
               return localC && localC.updated_at > supaC.updated_at ? localC : supaC;
             }),
-            // Supabase에 아직 없는 로컬 신규 고객 보존 — Supabase에 데이터가 있을 때만
-            // (Supabase가 비어있으면 의도적 삭제로 간주, 로컬 고객 재업로드 금지)
-            ...(supabaseHasCustomers
-              ? latest.customers.filter((c) => !supaCustomerIds.has(c.id) && !pendingDeletedCustomerIds.has(c.id))
-              : []),
           ];
 
           return {
