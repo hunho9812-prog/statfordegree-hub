@@ -15,7 +15,6 @@ import {
 import { isSupabaseConfigured, supabase } from "./supabase";
 
 // 고객 업데이트 디바운스 타이머 (키 입력마다 Supabase 저장 방지)
-const customerUpsertTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
 // Fixed IDs for the manual page hierarchy
 export const MENU_IDS = {
@@ -1751,7 +1750,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
 
       updateCustomer: (id, updates) => {
-        // 로컬 state 즉시 반영, Supabase는 500ms 디바운스로 저장 (키 입력마다 Realtime 폭탄 방지)
+        // 로컬 state만 업데이트 — DB 저장은 저장 버튼(syncNow)에서 명시적으로 수행.
+        // 즉시 upsert하면 키 입력마다 Realtime 이벤트 → loadFromSupabase race condition 발생.
         set((state) => ({
           customers: state.customers.map((c) =>
             c.id === id
@@ -1759,12 +1759,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               : c
           ),
         }));
-        if (customerUpsertTimers[id]) clearTimeout(customerUpsertTimers[id]);
-        customerUpsertTimers[id] = setTimeout(() => {
-          const customer = get().customers.find((c) => c.id === id);
-          if (customer) dbCustomers.upsert(customer);
-          delete customerUpsertTimers[id];
-        }, 500);
       },
 
       deleteCustomer: (id) => {
