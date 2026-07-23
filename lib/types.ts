@@ -107,7 +107,7 @@ export interface WorkspaceState {
   monthlyCosts: MonthlyCost[];
   sidebarCollapsed: boolean;
   darkMode: boolean;
-  createPage: (parentId?: string | null, insertAfter?: string) => string;
+  createPage: (parentId?: string | null, insertAfter?: string, customId?: string) => string;
   updatePage: (id: string, updates: Partial<Omit<Page, "id">>) => void;
   deletePage: (id: string) => void;
   togglePageExpand: (id: string) => void;

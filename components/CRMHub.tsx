@@ -101,6 +101,12 @@ export default function CRMHub() {
     return map;
   };
 
+  // 년도 결정적 ID: 어느 PC에서 만들어도 동일한 ID
+  const yearPageDeterministicId = (year: number) => `crm-year-${year}`;
+  // 월 결정적 ID: 어느 PC에서 만들어도 동일한 ID
+  const monthPageDeterministicId = (year: number, month: number) =>
+    `crm-month-${year}-${String(month).padStart(2, "0")}`;
+
   // 월 클릭: 없으면 생성 후 이동, 있으면 바로 이동
   const handleMonthClick = (yearPageId: string, monthNum: number) => {
     const monthMap = getMonthMap(yearPageId);
@@ -109,7 +115,13 @@ export default function CRMHub() {
       router.push(`/p/${existingId}`);
       return;
     }
-    const id = createPage(yearPageId);
+    // 년도 페이지 제목에서 연도 추출 → 결정적 ID 생성
+    const yearTitle = pages[yearPageId]?.title ?? "";
+    const yearNum = parseInt(yearTitle.match(/^(\d{4})/)?.[1] ?? "0");
+    const deterministicId = yearNum
+      ? monthPageDeterministicId(yearNum, monthNum)
+      : undefined; // 연도 파싱 실패 시 fallback
+    const id = createPage(yearPageId, undefined, deterministicId);
     updatePage(id, { title: `${monthNum}월`, emoji: "📋" });
     router.push(`/p/${id}`);
   };
@@ -125,7 +137,9 @@ export default function CRMHub() {
       setShowYearInput(false);
       return;
     }
-    const id = createPage(null);
+    // 결정적 ID로 생성 — 두 PC가 동시에 같은 년도를 만들어도 동일한 ID
+    const deterministicId = yearPageDeterministicId(y);
+    const id = createPage(null, undefined, deterministicId);
     updatePage(id, { title, emoji: "📅" });
     setShowYearInput(false);
     setExpandedYears((prev) => new Set([...prev, id]));

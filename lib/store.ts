@@ -1556,8 +1556,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     (set, get) => ({
       ...freshState,
 
-      createPage: (parentId = null, insertAfter) => {
-        const id = uuidv4();
+      createPage: (parentId = null, insertAfter, customId) => {
+        const id = customId ?? uuidv4();
+        // 이미 동일한 ID가 있으면 중복 생성 방지 (결정적 ID 사용 시 멱등성 보장)
+        if (get().pages[id]) return id;
         const newPage: Page = {
           id,
           title: "제목 없음",
