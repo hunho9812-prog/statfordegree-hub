@@ -2391,24 +2391,25 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
 export async function _reloadCustomers() {
   const next = await dbCustomers.fetchAll();
-  if (next.length === 0) return;
-  useWorkspaceStore.setState((state) => {
-    // Supabase 목록 기준으로 교체 + 아직 저장 안 된 로컬 신규 고객 보존
-    const supaIds = new Set(next.map((c) => c.id));
-    const localOnly = state.customers.filter((c) => !supaIds.has(c.id));
-    return { customers: [...next, ...localOnly] };
-  });
+  // fetch 실패(빈 배열 반환)와 실제로 DB가 빈 경우를 구분
+  // 로컬에 고객이 있는데 next가 비어있으면 fetch 오류로 간주하고 건너뜀
+  const currentCount = useWorkspaceStore.getState().customers.length;
+  if (next.length === 0 && currentCount > 0) return;
+  // Supabase가 진실의 원천 — 전체 교체 (localOnly 로직을 쓰면 삭제된 고객이 되살아나는 버그 발생)
+  useWorkspaceStore.setState({ customers: next });
 }
 
 export async function _reloadColumns() {
   const next = await dbTableColumns.fetchAll();
-  if (next.length === 0) return;
+  const currentCount = useWorkspaceStore.getState().customColumns.length;
+  if (next.length === 0 && currentCount > 0) return;
   useWorkspaceStore.setState({ customColumns: next });
 }
 
 export async function _reloadStatuses() {
   const next = await dbCustomerStatuses.fetchAll();
-  if (next.length === 0) return;
+  const currentCount = useWorkspaceStore.getState().customerStatuses.length;
+  if (next.length === 0 && currentCount > 0) return;
   useWorkspaceStore.setState({ customerStatuses: next });
 }
 
