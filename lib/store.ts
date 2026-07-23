@@ -14,8 +14,9 @@ import {
 } from "./db";
 import { isSupabaseConfigured, supabase } from "./supabase";
 
-// 자동 저장 디바운스 타이머 — 편집 후 1.5초 뒤 Supabase 저장
+// 자동 저장 디바운스 타이머
 const customerUpsertTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+const taskUpsertTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
 // Fixed IDs for the manual page hierarchy
 export const MENU_IDS = {
@@ -1727,8 +1728,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               : t
           ),
         }));
-        const updated = get().tasks.find((t) => t.id === id);
-        if (updated) dbTasks.upsert(updated);
+        // 500ms 디바운스: 드래그 이동·연속 편집 시 Realtime 이벤트 폭탄 방지
+        if (taskUpsertTimers[id]) clearTimeout(taskUpsertTimers[id]);
+        taskUpsertTimers[id] = setTimeout(() => {
+          const updated = get().tasks.find((t) => t.id === id);
+          if (updated) dbTasks.upsert(updated);
+          delete taskUpsertTimers[id];
+        }, 500);
       },
 
       deleteTask: (id) => {
@@ -2244,8 +2250,23 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }
         const cleanedTasks = tasks.filter((t) => !DEFAULT_TASK_TITLES.includes(t.title));
 
+        // tasks도 customers와 동일하게 updatedAt 기준으로 최신 버전 채택
+        // → 현재 편집/이동 중인 태스크는 로컬 버전 유지, 타 PC 변경은 Supabase 반영
+        const supaTaskById = new Map(cleanedTasks.map((t) => [t.id, t]));
         const mergedTasks = supabaseHasTasks
-          ? cleanedTasks
+          ? (() => {
+              // set() 내부에서 latest를 읽지 못하므로 여기서는 current 기준으로 비교
+              // (loadFromSupabase 호출 시점의 로컬 state)
+              const localTaskById = new Map(current.tasks.map((t) => [t.id, t]));
+              return [
+                ...cleanedTasks.map((supaT) => {
+                  const localT = localTaskById.get(supaT.id);
+                  return localT && localT.updatedAt > supaT.updatedAt ? localT : supaT;
+                }),
+                // Supabase에 없는 로컬 신규 태스크 보존
+                ...current.tasks.filter((t) => !supaTaskById.has(t.id) && !DEFAULT_TASK_TITLES.includes(t.title)),
+              ];
+            })()
           : [...cleanedTasks, ...localOnlyTasks];
 
         // rootPageIds 결정: workspace_config > Supabase pages에서 도출 > 로컬 유지
