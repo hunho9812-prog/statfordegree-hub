@@ -26,11 +26,11 @@ const SERVICES = [
   {
     id: "fluento",
     emoji: "💡",
-    bg: "#f1f2f0",
+    bg: "#eef5ee",
     title: "플루엔토",
     desc: "교육·콘텐츠 운영.",
-    href: null,
-    ready: false,
+    href: "/fluento",
+    ready: true,
   },
   {
     id: "statgenie",
