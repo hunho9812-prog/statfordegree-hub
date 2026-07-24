@@ -24,3 +24,6 @@ create policy "Users can manage their own ledger"
 
 -- 실시간 구독 활성화 (Supabase Realtime)
 alter publication supabase_realtime add table ledger;
+
+-- 영업외이익 컬럼 추가 (순이익 = 영업이익 + 영업외이익)
+alter table ledger add column if not exists non_operating_profit bigint not null default 0;

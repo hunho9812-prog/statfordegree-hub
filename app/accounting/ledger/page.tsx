@@ -38,10 +38,26 @@ function MoneyInput({ label, value, onChange }: { label: string; value: string; 
   );
 }
 
-type DataState = { sales: string; bizCost: string; laborTotal: string; eunhoLabor: string; hyunhoLabor: string; reserve: string };
+function ComputedMoney({ label, value, note }: { label: string; value: number; note: string }) {
+  return (
+    <div className="flex items-center gap-4">
+      <span className="w-28 flex-shrink-0 text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">{label}</span>
+      <div className="flex items-center border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg bg-[#f1f1ef] dark:bg-[#292929] overflow-hidden max-w-72 w-full">
+        <span className="px-3 text-[#9b9a97] text-sm font-semibold">₩</span>
+        <span className="flex-1 py-2 pr-3 text-sm text-[#9b9a97]">{fmt(value)}</span>
+      </div>
+      <span className="text-xs text-[#9b9a97]">{note}</span>
+    </div>
+  );
+}
+
+type DataState = {
+  sales: string; bizCost: string; laborTotal: string; nonOperating: string;
+  eunhoLabor: string; hyunhoLabor: string; reserve: string;
+};
 type Toast = { type: "success" | "error"; msg: string };
 
-const EMPTY: DataState = { sales: "", bizCost: "", laborTotal: "", eunhoLabor: "", hyunhoLabor: "", reserve: "" };
+const EMPTY: DataState = { sales: "", bizCost: "", laborTotal: "", nonOperating: "", eunhoLabor: "", hyunhoLabor: "", reserve: "" };
 
 export default function LedgerPage() {
   const router = useRouter();
@@ -79,6 +95,7 @@ export default function LedgerPage() {
         sales: entry.sales ? String(entry.sales) : "",
         bizCost: entry.businessCost ? String(entry.businessCost) : "",
         laborTotal: entry.laborCost ? String(entry.laborCost) : "",
+        nonOperating: entry.nonOperatingProfit ? String(entry.nonOperatingProfit) : "",
         eunhoLabor: "",
         hyunhoLabor: "",
         reserve: "",
@@ -115,7 +132,10 @@ export default function LedgerPage() {
 
   const g = (k: keyof DataState) => parseFloat(data[k]) || 0;
   const sales = g("sales"), bizCost = g("bizCost"), laborTotal = g("laborTotal");
-  const profit = sales - bizCost - laborTotal;
+  const vat = sales * 0.1;
+  const operatingProfit = sales - vat - bizCost - laborTotal;
+  const nonOperating = g("nonOperating");
+  const profit = operatingProfit + nonOperating;
   const eunhoLabor = g("eunhoLabor"), hyunhoLabor = g("hyunhoLabor"), reserve = g("reserve");
   const dividend = profit - eunhoLabor - hyunhoLabor - reserve;
   const eunhoDiv = dividend * 0.7, hyunhoDiv = dividend * 0.3;
@@ -132,13 +152,15 @@ export default function LedgerPage() {
     const s = parseFloat(data.sales) || 0;
     const b = parseFloat(data.bizCost) || 0;
     const l = parseFloat(data.laborTotal) || 0;
+    const n = parseFloat(data.nonOperating) || 0;
     const result = await upsert({
       year: yr,
       month: mo,
       sales: s,
       businessCost: b,
       laborCost: l,
-      profit: s - b - l,
+      nonOperatingProfit: n,
+      profit: (s - s * 0.1 - b - l) + n,
     });
     if (result.success) {
       setSaveStatus("saved");
@@ -302,13 +324,24 @@ export default function LedgerPage() {
               </div>
               <div className="px-5 py-4 flex flex-col gap-3">
                 <MoneyInput label="매출" value={data.sales} onChange={update("sales")} />
+                <ComputedMoney label="부가세" value={vat} note="매출 × 10%" />
                 <MoneyInput label="사업비용" value={data.bizCost} onChange={update("bizCost")} />
-                <MoneyInput label="인건비 합계" value={data.laborTotal} onChange={update("laborTotal")} />
+                <MoneyInput label="인건비" value={data.laborTotal} onChange={update("laborTotal")} />
               </div>
-              <div className={`flex items-center justify-between px-5 py-3 ${profit < 0 ? "bg-red-50 dark:bg-red-950/30 border-l-4 border-red-500" : "bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500"}`}>
+              <div className={`flex items-center justify-between px-5 py-3 border-t border-[#e9e9e7] dark:border-[#2f2f2f] ${operatingProfit < 0 ? "bg-red-50 dark:bg-red-950/30 border-l-4 border-red-500" : "bg-sky-50 dark:bg-sky-950/20 border-l-4 border-sky-400"}`}>
+                <div>
+                  <span className="text-sm font-bold text-[#37352f] dark:text-[#e6e6e4]">영업이익</span>
+                  <span className="ml-2 text-xs text-[#9b9a97]">= 매출 − 부가세 − 사업비용 − 인건비</span>
+                </div>
+                <span className={`text-lg font-extrabold ${operatingProfit < 0 ? "text-red-500" : "text-sky-600 dark:text-sky-400"}`}>{fmt(operatingProfit)}</span>
+              </div>
+              <div className="px-5 py-4 border-t border-[#e9e9e7] dark:border-[#2f2f2f]">
+                <MoneyInput label="영업외이익" value={data.nonOperating} onChange={update("nonOperating")} />
+              </div>
+              <div className={`flex items-center justify-between px-5 py-3 border-t border-[#e9e9e7] dark:border-[#2f2f2f] ${profit < 0 ? "bg-red-50 dark:bg-red-950/30 border-l-4 border-red-500" : "bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500"}`}>
                 <div>
                   <span className="text-sm font-bold text-[#37352f] dark:text-[#e6e6e4]">순이익</span>
-                  <span className="ml-2 text-xs text-[#9b9a97]">= 매출 − 사업비용 − 인건비</span>
+                  <span className="ml-2 text-xs text-[#9b9a97]">= 영업이익 + 영업외이익</span>
                 </div>
                 <span className={`text-lg font-extrabold ${profit < 0 ? "text-red-500" : "text-blue-600 dark:text-blue-400"}`}>{fmt(profit)}</span>
               </div>

@@ -71,7 +71,7 @@ export default function StatsPage() {
 
   // 기간 범위 내 데이터 필터링
   const rawMonthly = useMemo(() => {
-    const result: { year: number; month: number; revenue: number; labor: number; expense: number; profit: number }[] = [];
+    const result: { year: number; month: number; revenue: number; labor: number; expense: number; nonOperating: number; profit: number }[] = [];
     for (let y = startYear; y <= endYear; y++) {
       const mStart = y === startYear ? startMonth : 1;
       const mEnd = y === endYear ? endMonth : 12;
@@ -84,6 +84,7 @@ export default function StatsPage() {
           revenue: entry?.sales ?? 0,
           labor: entry?.laborCost ?? 0,
           expense: entry?.businessCost ?? 0,
+          nonOperating: entry?.nonOperatingProfit ?? 0,
           profit: entry?.profit ?? 0,
         });
       }
@@ -103,37 +104,43 @@ export default function StatsPage() {
       }));
     }
     if (groupBy === "quarterly") {
-      const quarters: Record<string, { revenue: number; labor: number; expense: number }> = {};
+      const quarters: Record<string, { revenue: number; labor: number; expense: number; nonOperating: number }> = {};
       rawMonthly.forEach((d) => {
         const q = Math.ceil(d.month / 3);
         const key = `${d.year}-Q${q}`;
-        if (!quarters[key]) quarters[key] = { revenue: 0, labor: 0, expense: 0 };
+        if (!quarters[key]) quarters[key] = { revenue: 0, labor: 0, expense: 0, nonOperating: 0 };
         quarters[key].revenue += d.revenue;
         quarters[key].labor += d.labor;
         quarters[key].expense += d.expense;
+        quarters[key].nonOperating += d.nonOperating;
       });
       return Object.entries(quarters).map(([key, v]) => {
         const [y, q] = key.split("-");
+        const { revenue, labor, expense, nonOperating } = v;
         return {
           label: startYear !== endYear ? `${y}/${q}` : q,
-          ...v,
-          profit: v.revenue - v.labor - v.expense,
+          revenue, labor, expense,
+          profit: revenue - revenue * 0.1 - labor - expense + nonOperating,
         };
       });
     }
     // yearly
-    const years: Record<number, { revenue: number; labor: number; expense: number }> = {};
+    const years: Record<number, { revenue: number; labor: number; expense: number; nonOperating: number }> = {};
     rawMonthly.forEach((d) => {
-      if (!years[d.year]) years[d.year] = { revenue: 0, labor: 0, expense: 0 };
+      if (!years[d.year]) years[d.year] = { revenue: 0, labor: 0, expense: 0, nonOperating: 0 };
       years[d.year].revenue += d.revenue;
       years[d.year].labor += d.labor;
       years[d.year].expense += d.expense;
+      years[d.year].nonOperating += d.nonOperating;
     });
-    return Object.entries(years).map(([y, v]) => ({
-      label: `${y}년`,
-      ...v,
-      profit: v.revenue - v.labor - v.expense,
-    }));
+    return Object.entries(years).map(([y, v]) => {
+      const { revenue, labor, expense, nonOperating } = v;
+      return {
+        label: `${y}년`,
+        revenue, labor, expense,
+        profit: revenue - revenue * 0.1 - labor - expense + nonOperating,
+      };
+    });
   }, [rawMonthly, groupBy, startYear, endYear]);
 
   // 합계 카드
@@ -141,7 +148,8 @@ export default function StatsPage() {
     const revenue = rawMonthly.reduce((s, d) => s + d.revenue, 0);
     const labor = rawMonthly.reduce((s, d) => s + d.labor, 0);
     const expense = rawMonthly.reduce((s, d) => s + d.expense, 0);
-    return { revenue, labor, expense, profit: revenue - labor - expense };
+    const nonOperating = rawMonthly.reduce((s, d) => s + d.nonOperating, 0);
+    return { revenue, labor, expense, profit: revenue - revenue * 0.1 - labor - expense + nonOperating };
   }, [rawMonthly]);
 
   const toggleSeries = useCallback((key: SeriesKey) => {

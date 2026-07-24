@@ -7,6 +7,7 @@ export interface LedgerRow {
   sales: number;
   labor_cost: number;
   business_cost: number;
+  non_operating_profit: number;
   profit: number;
   created_at: string;
   updated_at: string;
@@ -18,6 +19,7 @@ export interface LedgerEntry {
   sales: number;
   laborCost: number;
   businessCost: number;
+  nonOperatingProfit: number;
   profit: number;
 }
 
@@ -28,6 +30,7 @@ function rowToEntry(r: LedgerRow): LedgerEntry {
     sales: r.sales,
     laborCost: r.labor_cost,
     businessCost: r.business_cost,
+    nonOperatingProfit: r.non_operating_profit ?? 0,
     profit: r.profit,
   };
 }
@@ -53,6 +56,7 @@ export const dbLedger = {
         sales: entry.sales,
         labor_cost: entry.laborCost,
         business_cost: entry.businessCost,
+        non_operating_profit: entry.nonOperatingProfit,
         profit: entry.profit,
         updated_at: new Date().toISOString(),
       },
