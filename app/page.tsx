@@ -29,8 +29,8 @@ const SERVICES = [
     bg: "#f1f2f0",
     title: "플루엔토",
     desc: "교육·콘텐츠 운영.",
-    href: null,
-    ready: false,
+    href: "/fluento/ledger",
+    ready: true,
   },
   {
     id: "statgenie",
