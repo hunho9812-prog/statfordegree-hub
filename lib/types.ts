@@ -117,6 +117,7 @@ export interface WorkspaceState {
   createCustomer: (customer: Omit<Customer, "id" | "created_at" | "updated_at">) => string;
   updateCustomer: (id: string, updates: Partial<Omit<Customer, "id" | "created_at">>) => void;
   deleteCustomer: (id: string) => void;
+  reorderCustomers: (orderedIds: string[]) => void;
   restoreCustomer: (customer: Customer) => void;
   upsertCustomerStatus: (status: StatusOption) => void;
   deleteCustomerStatus: (id: string) => void;

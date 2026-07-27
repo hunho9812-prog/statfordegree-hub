@@ -1792,6 +1792,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         dbCustomers.delete(id);
       },
 
+      reorderCustomers: (orderedIds: string[]) => {
+        set((state) => {
+          const byId = Object.fromEntries(state.customers.map((c) => [c.id, c]));
+          const reordered = orderedIds.map((id) => byId[id]).filter(Boolean) as typeof state.customers;
+          const rest = state.customers.filter((c) => !orderedIds.includes(c.id));
+          return { customers: [...reordered, ...rest] };
+        });
+      },
+
       restoreCustomer: (customer) => {
         set((state) => ({
           customers: state.customers.some((c) => c.id === customer.id)

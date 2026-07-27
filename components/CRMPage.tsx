@@ -833,16 +833,21 @@ function MoveModal({ currentMonthPageId, onMove, onClose }: { currentMonthPageId
 
 // ─── Data row ─────────────────────────────────────────────────────────────────
 
-function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove }: {
+function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, draggable, onDragStart, onDragOver, onDrop }: {
   customer: Customer;
   statuses: StatusOption[];
   allCols: AnyCol[];
   onUpdate: (updates: Partial<Omit<Customer, "id" | "created_at">>) => void;
   onDelete: () => void;
   onMove: (targetMonthPageId: string | null) => void;
+  draggable?: boolean;
+  onDragStart?: () => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDrop?: () => void;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   function handleDeleteClick() {
     if (confirmDelete) { onDelete(); }
@@ -850,7 +855,14 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove }: {
   }
 
   return (
-    <tr className="border-t border-[#e9e9e7] dark:border-[#2f2f2f] hover:bg-gray-50 dark:hover:bg-[#1f1f1f] group transition-colors">
+    <tr
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); onDragOver?.(e); }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={() => { setIsDragOver(false); onDrop?.(); }}
+      className={`border-t border-[#e9e9e7] dark:border-[#2f2f2f] hover:bg-gray-50 dark:hover:bg-[#1f1f1f] group transition-colors ${isDragOver ? "border-t-2 border-t-blue-400" : ""}`}
+    >
       {allCols.map((col) => {
         const cellCls = "px-3 py-2";
 
@@ -934,6 +946,9 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove }: {
       {/* Action cell */}
       <td className="px-3 py-2 min-w-[100px]">
         <div className="flex items-center gap-1.5">
+          <span title="드래그하여 순서 변경" className="cursor-grab active:cursor-grabbing text-[#c7c7c7] dark:text-[#555] hover:text-[#9b9a97] dark:hover:text-[#9b9a97] opacity-0 group-hover:opacity-100 transition-opacity">
+            <GripVertical size={14} />
+          </span>
           <button onClick={() => setShowMoveModal(true)} title="다른 달로 이동"
             className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-[#6b6b6b] dark:text-[#9b9a97] bg-[#f0efed] dark:bg-[#2f2f2f] hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-950/40 transition-all">
             <ArrowRightLeft size={14} />
@@ -968,7 +983,7 @@ export default function CRMPage({
 }) {
   const {
     customers, customerStatuses, customColumns,
-    createCustomer, updateCustomer, deleteCustomer, restoreCustomer,
+    createCustomer, updateCustomer, deleteCustomer, restoreCustomer, reorderCustomers,
     upsertCustomColumn, deleteCustomColumn, reorderCustomColumns,
     crmColOrder, crmColLabels, crmHiddenCols, crmColTypes,
     setCrmColOrder, setCrmColLabel, setCrmHiddenCols, setCrmColType,
@@ -976,6 +991,38 @@ export default function CRMPage({
 
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // ─── Row drag-and-drop ────────────────────────────────────────────────────
+  const dragRowId = useRef<string | null>(null);
+  const dragOverRowId = useRef<string | null>(null);
+
+  const handleRowDragStart = useCallback((id: string) => {
+    dragRowId.current = id;
+  }, []);
+
+  const handleRowDragOver = useCallback((e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    dragOverRowId.current = id;
+  }, []);
+
+  const handleRowDrop = useCallback((pageId: string) => {
+    const fromId = dragRowId.current;
+    const toId = dragOverRowId.current;
+    if (!fromId || !toId || fromId === toId) return;
+    dragRowId.current = null;
+    dragOverRowId.current = null;
+
+    const scopedIds = customers
+      .filter((c) => c.monthPageId === pageId)
+      .map((c) => c.id);
+    const fromIdx = scopedIds.indexOf(fromId);
+    const toIdx = scopedIds.indexOf(toId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const reordered = [...scopedIds];
+    reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, fromId);
+    reorderCustomers(reordered);
+  }, [customers, reorderCustomers]);
 
   // ─── Undo stack ───────────────────────────────────────────────────────────
   type UndoSnapshot = {
@@ -1240,7 +1287,6 @@ export default function CRMPage({
         {!embedded && <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">고객 관리</h1>}
         <div className="flex items-center gap-3 text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
           <span>총 {visibleCustomers.length}명</span>
-          {totalRevenue > 0 && <><span>·</span><span className="font-semibold text-blue-500">매출 {formatWon(totalRevenue)}</span></>}
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -1308,6 +1354,10 @@ export default function CRMPage({
               onUpdate={(updates) => handleUpdate(c.id, updates)}
               onDelete={() => { pushUndoSnapshot(true); deleteCustomer(c.id); }}
               onMove={(targetMonthPageId) => handleUpdate(c.id, { monthPageId: targetMonthPageId })}
+              draggable
+              onDragStart={() => handleRowDragStart(c.id)}
+              onDragOver={(e) => handleRowDragOver(e, c.id)}
+              onDrop={() => handleRowDrop(monthPageId ?? "")}
             />
           ))}
           {showAddForm ? (
