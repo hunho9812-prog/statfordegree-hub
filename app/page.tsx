@@ -29,7 +29,7 @@ const SERVICES = [
     bg: "#f1f2f0",
     title: "플루엔토",
     desc: "교육·콘텐츠 운영.",
-    href: "/fluento/ledger",
+    href: "/fluento",
     ready: true,
   },
   {
