@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Search,
   LayoutDashboard,
   ChevronLeft,
   ChevronRight,
@@ -29,8 +28,6 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
   const [statOpen, setStatOpen] = useState(true);
 
   const { darkMode, toggleDarkMode } = useWorkspaceStore();
@@ -147,49 +144,6 @@ export default function Sidebar() {
       {/* Navigation */}
       <div className="px-3 py-1">
         {/* Search */}
-        <button
-          onClick={() => setShowSearch(!showSearch)}
-          className={cn("w-full flex items-center gap-2 px-[11px] py-2 rounded-[8px] text-[13px] text-[#9aa39b] bg-[#eef0ed] dark:bg-[#2a2a2a] transition-colors mb-[11px]")}
-        >
-          <Search size={14} />
-          <span>검색</span>
-        </button>
-
-        {showSearch && (
-          <div className="mt-1 mb-2">
-            <input
-              autoFocus
-              type="text"
-              placeholder="페이지 검색..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-md bg-white dark:bg-[#1f1f1f] text-[#37352f] dark:text-[#e6e6e4] outline-none focus:ring-2 focus:ring-blue-200"
-            />
-            {searchQuery && (
-              <div className="mt-1 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-md shadow-md max-h-48 overflow-y-auto">
-                {filteredPages.length === 0 ? (
-                  <p className="px-3 py-2 text-sm text-[#9b9a97]">검색 결과 없음</p>
-                ) : (
-                  filteredPages.map((page) => (
-                    <button
-                      key={page.id}
-                      className={cn("w-full flex items-center gap-2 px-3 py-2 text-sm text-[#37352f] dark:text-[#e6e6e4] text-left", hover)}
-                      onClick={() => {
-                        router.push(`/p/${page.id}`);
-                        setShowSearch(false);
-                        setSearchQuery("");
-                      }}
-                    >
-                      <span>{page.emoji}</span>
-                      <span className="truncate">{page.title}</span>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Nav links */}
         <Link href="/">
           <div className={navItem(pathname === "/")}>
