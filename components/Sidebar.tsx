@@ -1,32 +1,27 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Search,
-  Plus,
   LayoutDashboard,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  FileText,
   CheckSquare,
   Users,
   BookOpen,
   Sun,
   Moon,
   LogOut,
-  Crown,
   UserCog,
   ClipboardList,
-  RefreshCw,
   BarChart2,
   LineChart,
 } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import SidebarPageItem from "./SidebarPageItem";
 import { useAuth } from "./AuthProvider";
 
 export default function Sidebar() {
@@ -38,26 +33,8 @@ export default function Sidebar() {
   const [showSearch, setShowSearch] = useState(false);
   const [statOpen, setStatOpen] = useState(true);
 
-  const { pages, rootPageIds, createPage, darkMode, toggleDarkMode, syncNow, isRefreshing, syncError } = useWorkspaceStore();
+  const { darkMode, toggleDarkMode } = useWorkspaceStore();
   const { user, profile, signOut } = useAuth();
-
-  // 동기화 완료 후 잠깐 초록 유지
-  const [syncSuccess, setSyncSuccess] = useState(false);
-  const [lastSynced, setLastSynced] = useState<Date | null>(null);
-  const prevIsRefreshing = useRef(false);
-  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (prevIsRefreshing.current && !isRefreshing) {
-      if (!syncError) {
-        setLastSynced(new Date());
-        setSyncSuccess(true);
-        if (successTimer.current) clearTimeout(successTimer.current);
-        successTimer.current = setTimeout(() => setSyncSuccess(false), 3000);
-      }
-    }
-    prevIsRefreshing.current = isRefreshing;
-  }, [isRefreshing, syncError]);
 
   useEffect(() => {
     setMounted(true);
@@ -68,36 +45,6 @@ export default function Sidebar() {
       <div className="w-64 h-screen bg-[#f7f6f3] dark:bg-[#252525] border-r border-[#e9e9e7] dark:border-[#2f2f2f] flex-shrink-0" />
     );
   }
-
-  const handleNewPage = () => {
-    const newId = createPage(null);
-    router.push(`/p/${newId}`);
-  };
-
-  const filteredPages = searchQuery
-    ? Object.values(pages).filter(
-        (p) =>
-          p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.emoji.includes(searchQuery)
-      )
-    : [];
-
-  // 동기화 상태 표시등
-  const syncDot = isRefreshing
-    ? "bg-green-400 animate-pulse"
-    : syncError
-    ? "bg-red-500"
-    : syncSuccess
-    ? "bg-green-500"
-    : "bg-gray-300 dark:bg-gray-600";
-
-  const syncDotTitle = isRefreshing
-    ? "동기화 중..."
-    : syncError
-    ? "동기화 실패"
-    : syncSuccess
-    ? "동기화 완료"
-    : "대기 중";
 
   const hover = "hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)]";
   const navItem = (active: boolean) =>
@@ -156,23 +103,7 @@ export default function Sidebar() {
             </button>
           </Link>
         )}
-        <button
-          onClick={handleNewPage}
-          className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)}
-          title="새 페이지"
-        >
-          <Plus size={16} />
-        </button>
         <div className="flex-1" />
-        <button
-          onClick={() => syncNow()}
-          disabled={isRefreshing}
-          className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97] disabled:opacity-50 relative", hover)}
-          title={`데이터 동기화 (${syncDotTitle})`}
-        >
-          <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} />
-          <span className={cn("absolute top-1 right-1 w-2 h-2 rounded-full", syncDot)} />
-        </button>
         <button
           onClick={toggleDarkMode}
           className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)}
@@ -338,54 +269,7 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Divider */}
-      <div className="mx-[18px] my-[13px] h-px bg-[#e9ece9] dark:bg-[#2a2a2a]" />
-
-      {/* Pages section */}
-      <div className="flex-1 overflow-y-auto px-3 pb-2">
-        <div className="flex items-center justify-between px-[9px] py-1">
-          <span className="text-[10px] font-semibold text-[#9aa39b] uppercase tracking-[0.06em]">
-            페이지
-          </span>
-          <button
-            onClick={handleNewPage}
-            className={cn("w-5 h-5 flex items-center justify-center rounded text-[#9b9a97]", hover)}
-            title="새 페이지 추가"
-          >
-            <Plus size={14} />
-          </button>
-        </div>
-
-        <div className="space-y-0.5">
-          {rootPageIds.map((pageId) => {
-            const page = pages[pageId];
-            if (!page) return null;
-            return <SidebarPageItem key={pageId} page={page} depth={0} />;
-          })}
-        </div>
-
-        {rootPageIds.length === 0 && (
-          <div className="px-4 py-3 text-center">
-            <FileText size={20} className="mx-auto text-[#c4c3bf] mb-1" />
-            <p className="text-xs text-[#9b9a97]">페이지가 없습니다</p>
-            <button onClick={handleNewPage} className="mt-1 text-xs text-blue-500 hover:underline">
-              새 페이지 만들기
-            </button>
-          </div>
-        )}
-
-        <button
-          onClick={handleNewPage}
-          className={cn(
-            "w-full flex items-center gap-2 px-2 py-1.5 mt-1 rounded-md",
-            "text-sm text-[#9b9a97] transition-colors",
-            hover
-          )}
-        >
-          <Plus size={15} />
-          <span>페이지 추가</span>
-        </button>
-      </div>
+      <div className="flex-1" />
 
       {/* Bottom: user info + actions */}
       <div className="px-3 pb-3 border-t border-[#e9ece9] dark:border-[#2f2f2f] pt-[11px] space-y-0.5">
@@ -411,34 +295,6 @@ export default function Sidebar() {
             </div>
           </div>
         )}
-
-        {/* 동기화 버튼 */}
-        <button
-          onClick={() => syncNow()}
-          disabled={isRefreshing}
-          className={cn(
-            "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors disabled:opacity-50",
-            syncError
-              ? "text-red-500 dark:text-red-400"
-              : isRefreshing
-              ? "text-blue-500 dark:text-blue-400"
-              : "text-[#9b9a97]",
-            hover
-          )}
-        >
-          <span className="relative flex-shrink-0">
-            <RefreshCw size={15} className={isRefreshing ? "animate-spin" : ""} />
-            <span className={cn("absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-white dark:border-[#252525]", syncDot)} />
-          </span>
-          <span>
-            {isRefreshing ? "동기화 중..." : syncError ? "동기화 실패 — 재시도" : "데이터 동기화"}
-          </span>
-          {!isRefreshing && !syncError && lastSynced && (
-            <span className="ml-auto text-[10px] text-[#c4c3bf] dark:text-[#4f4f4f]">
-              {lastSynced.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          )}
-        </button>
 
         {/* Dark mode */}
         <button
