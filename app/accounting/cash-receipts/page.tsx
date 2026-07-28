@@ -15,15 +15,15 @@ import { cn } from "@/lib/utils";
 
 // ── Column config ─────────────────────────────────────────────────────────────
 
-const COL_IDS = ["customer_name", "assignee", "phone", "amount", "issued"] as const;
+const COL_IDS = ["issued", "customer_name", "assignee", "phone", "amount"] as const;
 type ColId = typeof COL_IDS[number];
 
 const DEFAULT_LABELS: Record<ColId, string> = {
+  issued: "발급완료",
   customer_name: "고객 이름",
   assignee: "담당자",
   phone: "번호",
   amount: "비용",
-  issued: "발급완료",
 };
 
 const LABEL_STORAGE_KEY = "cash_receipts_col_labels_v1";
@@ -329,8 +329,8 @@ function ColHeader({ colId, label, sortDir, onSort, hasFilter, onAddFilter, onRe
 }
 
 // ── Grid layout ───────────────────────────────────────────────────────────────
-// drag | 이름(고정) | 담당자 | 번호 | 비용(flex) | 발급 | actions
-const GRID = "grid-cols-[28px_160px_110px_130px_1fr_90px_72px]";
+// drag | 발급 | 이름 | 담당자 | 번호 | 비용 | actions
+const GRID = "grid-cols-[20px_80px_1fr_90px_120px_110px_60px]";
 
 // ── Empty row ─────────────────────────────────────────────────────────────────
 
@@ -521,7 +521,7 @@ export default function CashReceiptsPage() {
         </div>
       )}
 
-      <div className="px-6 py-6">
+      <div className="px-5 py-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -531,16 +531,10 @@ export default function CashReceiptsPage() {
             </button>
             <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">현금영수증</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => reload()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-white dark:hover:bg-[#252525] border border-[#e9e9e7] dark:border-[#2f2f2f] transition-colors">
-              <RefreshCw size={14} />
-            </button>
-            <button onClick={() => setAdding(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-blue-500 text-white hover:bg-blue-600 transition-colors">
-              <Plus size={14} /> 추가
-            </button>
-          </div>
+          <button onClick={() => reload()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-white dark:hover:bg-[#252525] border border-[#e9e9e7] dark:border-[#2f2f2f] transition-colors">
+            <RefreshCw size={14} />
+          </button>
         </div>
 
         <div className="flex gap-5">
@@ -584,6 +578,10 @@ export default function CashReceiptsPage() {
                   className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] bg-white dark:bg-[#252525] text-[#9b9a97] hover:text-blue-500 hover:border-blue-400 transition-colors">
                   <ChevronRight size={14} />
                 </button>
+                <button onClick={() => setAdding(true)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm bg-blue-500 text-white hover:bg-blue-600 transition-colors">
+                  <Plus size={13} /> 추가
+                </button>
               </div>
               <div className="flex items-center gap-3 text-xs text-[#9b9a97]">
                 <span>총 {visibleRows.length}건</span>
@@ -614,7 +612,7 @@ export default function CashReceiptsPage() {
             {/* Table */}
             <div className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#2f2f2f] shadow-sm overflow-hidden">
               {/* Header */}
-              <div className={`grid ${GRID} gap-2 items-center px-4 py-2.5 border-b border-[#e9e9e7] dark:border-[#2f2f2f] bg-[#f7f6f3] dark:bg-[#2a2a2a]`}>
+              <div className={`grid ${GRID} gap-2 items-center px-3 py-2 border-b border-[#e9e9e7] dark:border-[#2f2f2f] bg-[#f7f6f3] dark:bg-[#2a2a2a]`}>
                 <div />
                 {COL_IDS.map((colId) => (
                   <ColHeader key={colId} colId={colId} label={colLabels[colId]}
@@ -630,8 +628,11 @@ export default function CashReceiptsPage() {
 
               {/* Add row */}
               {adding && (
-                <div className={`grid ${GRID} gap-2 items-center px-4 py-2 border-b border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10`}>
+                <div className={`grid ${GRID} gap-2 items-center px-3 py-2 border-b border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10`}>
                   <div />
+                  <button onClick={() => setAddDraft((p) => ({ ...p, issued: !p.issued }))}>
+                    {addDraft.issued ? <CheckSquare size={16} className="text-blue-500" /> : <Square size={16} className="text-[#9b9a97]" />}
+                  </button>
                   <CustomerPicker value={addDraft.customer_name}
                     onChange={(v) => setAddDraft((p) => ({ ...p, customer_name: v }))}
                     onSelect={(name, assignee, id, total_amount) =>
@@ -647,9 +648,6 @@ export default function CashReceiptsPage() {
                   <input type="number" value={addDraft.amount || ""} onChange={(e) => setAddDraft((p) => ({ ...p, amount: parseInt(e.target.value) || 0 }))}
                     placeholder="비용"
                     className="px-2 py-1 text-sm border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg bg-white dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] outline-none focus:border-blue-400" />
-                  <button onClick={() => setAddDraft((p) => ({ ...p, issued: !p.issued }))}>
-                    {addDraft.issued ? <CheckSquare size={18} className="text-blue-500" /> : <Square size={18} className="text-[#9b9a97]" />}
-                  </button>
                   <div className="flex gap-1">
                     <button onClick={handleAdd} disabled={submitting || !addDraft.customer_name.trim()}
                       className="p-1.5 rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40"><Check size={12} /></button>
@@ -675,16 +673,19 @@ export default function CashReceiptsPage() {
                     onDragEnd={() => { dragIdx.current = null; }}
                     onDoubleClick={() => { if (editId !== row.id) startEdit(row); }}
                     className={cn(
-                      `group grid ${GRID} gap-2 items-center px-4 py-2.5 border-b border-[#e9e9e7] dark:border-[#2f2f2f] last:border-0 transition-colors cursor-pointer`,
+                      `group grid ${GRID} gap-2 items-center px-3 py-2 border-b border-[#e9e9e7] dark:border-[#2f2f2f] last:border-0 transition-colors cursor-pointer`,
                       editId === row.id ? "bg-blue-50/50 dark:bg-blue-900/10" : "hover:bg-[#f7f6f3] dark:hover:bg-[#2a2a2a]"
                     )}
                   >
                     <div className="text-[#9b9a97] opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
-                      <GripVertical size={14} />
+                      <GripVertical size={13} />
                     </div>
 
                     {editId === row.id ? (
                       <>
+                        <button onClick={() => setEditDraft((p) => ({ ...p, issued: !p.issued }))}>
+                          {editDraft.issued ? <CheckSquare size={16} className="text-blue-500" /> : <Square size={16} className="text-[#9b9a97]" />}
+                        </button>
                         <CustomerPicker value={editDraft.customer_name}
                           onChange={(v) => setEditDraft((p) => ({ ...p, customer_name: v }))}
                           onSelect={(name, assignee, id, total_amount) =>
@@ -698,9 +699,6 @@ export default function CashReceiptsPage() {
                         <input type="number" value={editDraft.amount || ""}
                           onChange={(e) => setEditDraft((p) => ({ ...p, amount: parseInt(e.target.value) || 0 }))}
                           className="px-2 py-1 text-sm border border-blue-400 rounded-lg bg-white dark:bg-[#2f2f2f] outline-none text-[#37352f] dark:text-[#e6e6e4]" />
-                        <button onClick={() => setEditDraft((p) => ({ ...p, issued: !p.issued }))}>
-                          {editDraft.issued ? <CheckSquare size={18} className="text-blue-500" /> : <Square size={18} className="text-[#9b9a97]" />}
-                        </button>
                         <div className="flex gap-1">
                           <button onClick={() => saveEdit(row)} className="p-1.5 rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Check size={12} /></button>
                           <button onClick={() => setEditId(null)} className="p-1.5 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97]"><X size={12} /></button>
@@ -708,15 +706,15 @@ export default function CashReceiptsPage() {
                       </>
                     ) : (
                       <>
+                        <div>
+                          {row.issued
+                            ? <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><CheckSquare size={13} />완료</span>
+                            : <span className="flex items-center gap-1 text-xs text-[#9b9a97]"><Square size={13} />미발급</span>}
+                        </div>
                         <span className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4] truncate">{row.customer_name || "—"}</span>
                         <span className="text-sm text-[#37352f] dark:text-[#e6e6e4] truncate">{row.assignee || "—"}</span>
                         <span className="text-sm text-[#37352f] dark:text-[#e6e6e4] truncate">{row.phone || "—"}</span>
                         <span className="text-sm text-[#37352f] dark:text-[#e6e6e4]">{row.amount ? fmt(row.amount) : "—"}</span>
-                        <div>
-                          {row.issued
-                            ? <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><CheckSquare size={14} />완료</span>
-                            : <span className="flex items-center gap-1 text-xs text-[#9b9a97]"><Square size={14} />미발급</span>}
-                        </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
                           <button onClick={(e) => { e.stopPropagation(); startEdit(row); }}
                             className="p-1.5 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-blue-500 hover:border-blue-400 transition-colors">
@@ -735,10 +733,11 @@ export default function CashReceiptsPage() {
 
               {/* Footer */}
               {visibleRows.length > 0 && (
-                <div className={`grid ${GRID} gap-2 items-center px-4 py-2 border-t border-[#e9e9e7] dark:border-[#2f2f2f] bg-[#f7f6f3] dark:bg-[#2a2a2a]`}>
-                  <div /><div /><div /><div />
-                  <span className="text-xs font-bold text-[#37352f] dark:text-[#e6e6e4]">{fmt(totalAmount)}</span>
+                <div className={`grid ${GRID} gap-2 items-center px-3 py-2 border-t border-[#e9e9e7] dark:border-[#2f2f2f] bg-[#f7f6f3] dark:bg-[#2a2a2a]`}>
+                  <div />
                   <span className="text-xs text-[#9b9a97]">{issuedCount}/{visibleRows.length}</span>
+                  <div /><div /><div />
+                  <span className="text-xs font-bold text-[#37352f] dark:text-[#e6e6e4]">{fmt(totalAmount)}</span>
                   <div />
                 </div>
               )}
