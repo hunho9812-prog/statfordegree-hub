@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronLeft, ChevronRight, Save, CheckCircle, XCircle, BarChart2, Trash2 } from "lucide-react";
 import { useLedger } from "@/hooks/useLedger";
@@ -70,7 +70,6 @@ export default function LedgerPage() {
   const [toast, setToast] = useState<Toast | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ year: number; month: number } | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [y, m] = month.split("-");
@@ -167,15 +166,6 @@ export default function LedgerPage() {
     }
   }, [month, data, upsert, showToast]);
 
-  const handleSaveRef = useRef(handleSave);
-  useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
-
-  useEffect(() => {
-    if (saveStatus !== "unsaved") return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => { handleSaveRef.current(); }, 3000);
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [saveStatus]);
 
   const goToMonth = (mo: number) => {
     setMonth(`${currentYear}-${String(mo).padStart(2, "0")}`);
