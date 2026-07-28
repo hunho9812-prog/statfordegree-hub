@@ -76,6 +76,7 @@ function dbToCustomer(r: Record<string, unknown>): Customer {
     status: r.status as string,
     memo: r.memo as string,
     monthPageId: r.month_page_id as string | null,
+    display_order: r.display_order as number | null ?? null,
     created_at: r.created_at as string,
     updated_at: r.updated_at as string,
   };
@@ -96,6 +97,7 @@ function customerToDb(c: Customer) {
     status: c.status,
     memo: c.memo,
     month_page_id: c.monthPageId,
+    display_order: c.display_order ?? null,
     created_at: c.created_at,
     updated_at: c.updated_at,
   };
@@ -233,7 +235,7 @@ export const dbTasks = {
 export const dbCustomers = {
   async fetchAll(): Promise<Customer[]> {
     if (!supabase) return [];
-    const { data, error } = await supabase.from("customers").select("*").order("created_at");
+    const { data, error } = await supabase.from("customers").select("*").order("display_order", { ascending: true, nullsFirst: false }).order("created_at");
     if (error) { console.error("dbCustomers.fetchAll", error); return []; }
     return (data ?? []).map(dbToCustomer);
   },

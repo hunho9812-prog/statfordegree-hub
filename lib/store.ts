@@ -1793,12 +1793,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
 
       reorderCustomers: (orderedIds: string[]) => {
-        set((state) => {
-          const byId = Object.fromEntries(state.customers.map((c) => [c.id, c]));
-          const reordered = orderedIds.map((id) => byId[id]).filter(Boolean) as typeof state.customers;
-          const rest = state.customers.filter((c) => !orderedIds.includes(c.id));
-          return { customers: [...reordered, ...rest] };
-        });
+        const byId = Object.fromEntries(get().customers.map((c) => [c.id, c]));
+        const reordered = orderedIds.map((id) => byId[id]).filter(Boolean) as Customer[];
+        const rest = get().customers.filter((c) => !orderedIds.includes(c.id));
+        const withOrder = reordered.map((c, i) => ({ ...c, display_order: i }));
+        set({ customers: [...withOrder, ...rest] });
+        withOrder.forEach((c) => dbCustomers.upsert(c));
       },
 
       restoreCustomer: (customer) => {

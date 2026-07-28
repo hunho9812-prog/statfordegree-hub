@@ -833,7 +833,7 @@ function MoveModal({ currentMonthPageId, onMove, onClose }: { currentMonthPageId
 
 // ─── Data row ─────────────────────────────────────────────────────────────────
 
-function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, draggable, onDragStart, onDragOver, onDrop }: {
+function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, draggable, onDragStart, onDragOver, onDrop, compact }: {
   customer: Customer;
   statuses: StatusOption[];
   allCols: AnyCol[];
@@ -844,6 +844,7 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
   onDragStart?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDrop?: () => void;
+  compact?: boolean;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
@@ -864,7 +865,7 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
       className={`border-t border-[#e9e9e7] dark:border-[#2f2f2f] hover:bg-gray-50 dark:hover:bg-[#1f1f1f] group transition-colors ${isDragOver ? "border-t-2 border-t-blue-400" : ""}`}
     >
       {allCols.map((col) => {
-        const cellCls = "px-3 py-2";
+        const cellCls = compact ? "px-1.5 py-0.5" : "px-3 py-2";
 
         // ── Unified cell rendering based on effectiveType ──────────────────
         // For builtin cols: value comes from customer[field], route col keeps TagsCell
@@ -944,8 +945,8 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
         }
       })}
       {/* Action cell */}
-      <td className="px-3 py-2 min-w-[100px]">
-        <div className="flex items-center gap-1.5">
+      <td className={`${compact ? "px-1.5 py-0.5" : "px-3 py-2"} min-w-[80px]`}>
+        <div className="flex items-center gap-1">
           <span title="드래그하여 순서 변경" className="cursor-grab active:cursor-grabbing text-[#c7c7c7] dark:text-[#555] hover:text-[#9b9a97] dark:hover:text-[#9b9a97] opacity-0 group-hover:opacity-100 transition-opacity">
             <GripVertical size={14} />
           </span>
@@ -991,6 +992,26 @@ export default function CRMPage({
 
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [compact, setCompact] = useState(false);
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+
+  // ─── Column resize ────────────────────────────────────────────────────────
+  const resizingCol = useRef<string | null>(null);
+  const resizeStartX = useRef(0);
+  const resizeStartW = useRef(0);
+
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (!resizingCol.current) return;
+      const delta = e.clientX - resizeStartX.current;
+      const newW = Math.max(40, resizeStartW.current + delta);
+      setColWidths((prev) => ({ ...prev, [resizingCol.current!]: newW }));
+    }
+    function onMouseUp() { resizingCol.current = null; document.body.style.cursor = ""; document.body.style.userSelect = ""; }
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => { document.removeEventListener("mousemove", onMouseMove); document.removeEventListener("mouseup", onMouseUp); };
+  }, []);
 
   // ─── Row drag-and-drop ────────────────────────────────────────────────────
   const dragRowId = useRef<string | null>(null);
@@ -1005,7 +1026,7 @@ export default function CRMPage({
     dragOverRowId.current = id;
   }, []);
 
-  const handleRowDrop = useCallback((pageId: string) => {
+  const handleRowDrop = useCallback((pageId: string | null) => {
     const fromId = dragRowId.current;
     const toId = dragOverRowId.current;
     if (!fromId || !toId || fromId === toId) return;
@@ -1281,26 +1302,78 @@ export default function CRMPage({
     setShowAddForm(false);
   };
 
+  const activeAssigneeFilters = assigneeFilter ? Array.from(assigneeFilter) : null;
+  const activeStatusFilters = statusFilter ? Array.from(statusFilter) : null;
+  const hasActiveFilter = assigneeFilter !== null || statusFilter !== null;
+
   const header = (
-    <div className={`flex items-center justify-between border-b border-[#e9e9e7] dark:border-[#2f2f2f] ${embedded ? "px-4 py-3" : "px-6 py-4"}`}>
-      <div>
-        {!embedded && <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">고객 관리</h1>}
-        <div className="flex items-center gap-3 text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
-          <span>총 {visibleCustomers.length}명</span>
+    <div className={`border-b border-[#e9e9e7] dark:border-[#2f2f2f]`}>
+      <div className={`flex items-center justify-between ${embedded ? "px-4 py-3" : "px-6 py-4"}`}>
+        <div>
+          {!embedded && <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">고객 관리</h1>}
+          <div className="flex items-center gap-3 text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
+            <span>총 {visibleCustomers.length}명</span>
+            {monthScoped.length !== visibleCustomers.length && <span className="text-blue-400 text-xs">(필터 적용 중)</span>}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {undoStack.length > 0 && (
+            <button onClick={handleUndo} title={`실행 취소 (Ctrl+Z) — ${undoStack.length}단계 남음`}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors">
+              ↩ 되돌리기 <span className="font-semibold text-blue-400">{undoStack.length}</span>
+            </button>
+          )}
+          <button onClick={() => setCompact((v) => !v)} title="컴팩트 모드 토글"
+            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${compact ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400" : "border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f]"}`}>
+            컴팩트
+          </button>
+          <button onClick={() => setShowAddForm(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+            <Plus size={15} /> 고객 추가
+          </button>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {undoStack.length > 0 && (
-          <button onClick={handleUndo} title={`실행 취소 (Ctrl+Z) — ${undoStack.length}단계 남음`}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors">
-            ↩ 되돌리기 <span className="font-semibold text-blue-400">{undoStack.length}</span>
-          </button>
-        )}
-        <button onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-          <Plus size={15} /> 고객 추가
-        </button>
-      </div>
+      {/* Filter bar */}
+      {hasActiveFilter && (
+        <div className={`flex items-center gap-2 flex-wrap ${embedded ? "px-4 pb-2" : "px-6 pb-3"}`}>
+          <span className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] flex items-center gap-1"><Filter size={11} /> 필터:</span>
+          {assigneeFilter !== null && (
+            <div className="flex items-center gap-1 flex-wrap">
+              {activeAssigneeFilters!.map((a) => (
+                <span key={a} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300">
+                  <AssigneeAvatar name={a} size={14} /> {a}
+                  <button onClick={() => {
+                    const next = new Set(assigneeFilter);
+                    next.delete(a);
+                    setAssigneeFilter(next.size === 0 ? new Set() : next);
+                  }} className="ml-0.5 hover:text-blue-900"><X size={10} /></button>
+                </span>
+              ))}
+              <button onClick={() => setAssigneeFilter(null)} className="text-[10px] text-gray-400 hover:text-gray-600 underline">전체</button>
+            </div>
+          )}
+          {statusFilter !== null && (
+            <div className="flex items-center gap-1 flex-wrap">
+              {activeStatusFilters!.map((s) => {
+                const opt = customerStatuses.find((x) => x.label === s);
+                return (
+                  <span key={s} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: opt?.color ?? "#f3f4f6", color: opt?.textColor ?? "#374151" }}>
+                    {s}
+                    <button onClick={() => {
+                      const next = new Set(statusFilter);
+                      next.delete(s);
+                      setStatusFilter(next.size === 0 ? new Set() : next);
+                    }} className="ml-0.5 hover:opacity-70"><X size={10} /></button>
+                  </span>
+                );
+              })}
+              <button onClick={() => setStatusFilter(null)} className="text-[10px] text-gray-400 hover:text-gray-600 underline">전체</button>
+            </div>
+          )}
+          <button onClick={() => { setAssigneeFilter(null); setStatusFilter(null); }}
+            className="text-xs text-red-400 hover:text-red-600 ml-auto">필터 초기화</button>
+        </div>
+      )}
     </div>
   );
 
@@ -1310,7 +1383,8 @@ export default function CRMPage({
         <thead className="sticky top-0 bg-[#f7f6f3] dark:bg-[#252525] z-10">
           <tr>
             {allCols.map((col, idx) => (
-              <th key={col.id} className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap">
+              <th key={col.id} style={colWidths[col.id] ? { width: colWidths[col.id], minWidth: colWidths[col.id] } : undefined}
+                className={`${compact ? "px-1.5 py-0.5" : "px-3 py-2"} text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap relative group/th`}>
                 <ColumnHeader
                   col={col}
                   allCols={allCols}
@@ -1333,10 +1407,22 @@ export default function CRMPage({
                   isFirst={idx === 0}
                   isLast={idx === allCols.length - 1}
                 />
+                {/* Resize handle */}
+                <div
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    resizingCol.current = col.id;
+                    resizeStartX.current = e.clientX;
+                    resizeStartW.current = colWidths[col.id] ?? (e.currentTarget.parentElement?.offsetWidth ?? 100);
+                    document.body.style.cursor = "col-resize";
+                    document.body.style.userSelect = "none";
+                  }}
+                  className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize opacity-0 group-hover/th:opacity-100 bg-blue-400/40 hover:bg-blue-500/60 transition-opacity"
+                />
               </th>
             ))}
             {/* + add column */}
-            <th className="px-3 py-2 text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap">
+            <th className={`${compact ? "px-1.5 py-0.5" : "px-3 py-2"} text-left text-xs font-semibold text-[#9b9a97] dark:text-[#6b6b6b] border-b border-[#e9e9e7] dark:border-[#2f2f2f] whitespace-nowrap`}>
               <button onClick={addColumn} title="새 체크박스 열 추가"
                 className="text-[#c4c3bf] hover:text-[#9b9a97] transition-colors">
                 <Plus size={13} />
@@ -1357,7 +1443,8 @@ export default function CRMPage({
               draggable
               onDragStart={() => handleRowDragStart(c.id)}
               onDragOver={(e) => handleRowDragOver(e, c.id)}
-              onDrop={() => handleRowDrop(monthPageId ?? "")}
+              onDrop={() => handleRowDrop(monthPageId)}
+              compact={compact}
             />
           ))}
           {showAddForm ? (
@@ -1369,10 +1456,11 @@ export default function CRMPage({
         <tfoot>
           <tr className="border-t-2 border-[#e9e9e7] dark:border-[#3f3f3f] bg-[#f7f6f3] dark:bg-[#232323] font-semibold sticky bottom-0">
             {allCols.map((col, idx) => {
-              if (idx === 0) return <td key={col.id} className="px-3 py-2 text-xs text-[#9b9a97] dark:text-[#6b6b6b]">합계</td>;
-              if (col.id === "_settlement") return <td key={col.id} className="px-3 py-2 text-sm text-right">{formatWon(settlementTotal)}</td>;
-              if (col.id === "_total") return <td key={col.id} className="px-3 py-2 text-sm text-right">{formatWon(totalRevenue)}</td>;
-              if (col.id === "_balance") return <td key={col.id} className="px-3 py-2 text-sm text-right">{formatWon(balanceTotal)}</td>;
+              const fp = compact ? "px-1.5 py-0.5" : "px-3 py-2";
+              if (idx === 0) return <td key={col.id} className={`${fp} text-xs text-[#9b9a97] dark:text-[#6b6b6b]`}>합계</td>;
+              if (col.id === "_settlement") return <td key={col.id} className={`${fp} text-sm text-right`}>{formatWon(settlementTotal)}</td>;
+              if (col.id === "_total") return <td key={col.id} className={`${fp} text-sm text-right`}>{formatWon(totalRevenue)}</td>;
+              if (col.id === "_balance") return <td key={col.id} className={`${fp} text-sm text-right`}>{formatWon(balanceTotal)}</td>;
               return <td key={col.id} />;
             })}
             <td />
