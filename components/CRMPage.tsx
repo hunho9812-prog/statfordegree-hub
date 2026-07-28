@@ -742,7 +742,7 @@ function ColumnHeader({
               return (
                 <label key={a} className="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] rounded font-normal">
                   <input type="checkbox" checked={checked} onChange={() => {
-                    const base = assigneeFilter ?? new Set(assignees);
+                    const base = assigneeFilter ?? new Set<string>();
                     const next = new Set(base);
                     if (next.has(a)) next.delete(a); else next.add(a);
                     onAssigneeFilter?.(next);
@@ -767,7 +767,7 @@ function ColumnHeader({
               return (
                 <label key={s.id} className="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] rounded font-normal">
                   <input type="checkbox" checked={checked} onChange={() => {
-                    const base = statusFilter ?? new Set(allStatuses?.map((x) => x.label));
+                    const base = statusFilter ?? new Set<string>();
                     const next = new Set(base);
                     if (next.has(s.label)) next.delete(s.label); else next.add(s.label);
                     onStatusFilter?.(next);
@@ -1532,9 +1532,9 @@ export default function CRMPage({
     (id === "_status"   && statusFilter !== null);
 
   const addFilter = (id: string) => {
-    if (id === "_assignee" && assigneeFilter === null) setAssigneeFilter(new Set(distinctAssignees));
-    if (id === "_route"    && tagsFilter === null)     setTagsFilter(new Set(crmTags.map((t) => t.label)));
-    if (id === "_status"   && statusFilter === null)   setStatusFilter(new Set(customerStatuses.map((s) => s.label)));
+    if (id === "_assignee" && assigneeFilter === null) setAssigneeFilter(new Set<string>());
+    if (id === "_route"    && tagsFilter === null)     setTagsFilter(new Set<string>());
+    if (id === "_status"   && statusFilter === null)   setStatusFilter(new Set<string>());
   };
 
   const [showFilterMenu, setShowFilterMenu] = useState(false);
