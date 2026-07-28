@@ -1478,18 +1478,19 @@ export default function CRMPage({
   // undo 스냅샷 캡처용 ref 동기화 (매 렌더마다 최신값 유지)
   monthScopedRef.current = monthScoped;
 
-  const distinctAssignees = useMemo(() => {
-    const fromData = new Set(monthScoped.map((c) => c.assignee).filter(Boolean));
-    // 스토어에 정의된 담당자 + 실제 데이터에 있는 담당자 합집합
-    return Array.from(new Set([...crmAssignees, ...fromData]));
-  }, [monthScoped, crmAssignees]);
+  // 필터 선택 목록: 실제 데이터에 존재하는 값만 (유령 이름 제거)
+  const distinctAssignees = useMemo(
+    () => Array.from(new Set(monthScoped.map((c) => c.assignee).filter(Boolean))),
+    [monthScoped],
+  );
 
   let visibleCustomers = monthScoped;
-  if (assigneeFilter !== null && assigneeFilter.length > 0)
+  // 필터가 활성화되면(null이 아니면) 체크된 항목만 표시 — 빈 배열 = 0건
+  if (assigneeFilter !== null)
     visibleCustomers = visibleCustomers.filter((c) => assigneeFilter.includes(c.assignee));
-  if (statusFilter !== null && statusFilter.length > 0)
+  if (statusFilter !== null)
     visibleCustomers = visibleCustomers.filter((c) => statusFilter.includes(c.status ?? ""));
-  if (tagsFilter !== null && tagsFilter.length > 0)
+  if (tagsFilter !== null)
     visibleCustomers = visibleCustomers.filter((c) => tagsFilter.includes(c.route ?? ""));
 
   if (sortConfig) {
@@ -1539,9 +1540,13 @@ export default function CRMPage({
     (id === "_status"   && statusFilter !== null);
 
   const addFilter = (id: string) => {
-    if (id === "_assignee" && assigneeFilter === null) setAssigneeFilter([]);
-    if (id === "_route"    && tagsFilter === null)     setTagsFilter([]);
-    if (id === "_status"   && statusFilter === null)   setStatusFilter([]);
+    // 처음 추가 시 현재 데이터에 있는 값 전체 선택 → 이후 체크 해제로 제외
+    if (id === "_assignee" && assigneeFilter === null)
+      setAssigneeFilter(distinctAssignees);
+    if (id === "_route" && tagsFilter === null)
+      setTagsFilter(Array.from(new Set(monthScoped.map((c) => c.route).filter(Boolean) as string[])));
+    if (id === "_status" && statusFilter === null)
+      setStatusFilter(Array.from(new Set(monthScoped.map((c) => c.status).filter(Boolean))));
   };
 
   const [showFilterMenu, setShowFilterMenu] = useState(false);
