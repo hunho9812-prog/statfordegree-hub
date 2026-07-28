@@ -2311,7 +2311,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               const localC = localById.get(supaC.id);
               return localC && localC.updated_at > supaC.updated_at ? localC : supaC;
             }),
-          ];
+          ].sort((a, b) => {
+            const ao = a.display_order ?? Infinity;
+            const bo = b.display_order ?? Infinity;
+            if (ao !== bo) return ao - bo;
+            return a.created_at.localeCompare(b.created_at);
+          });
 
           return {
             pages: Object.keys(mergedPages).length > 0 ? mergedPages : latest.pages,

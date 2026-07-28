@@ -235,7 +235,7 @@ export const dbTasks = {
 export const dbCustomers = {
   async fetchAll(): Promise<Customer[]> {
     if (!supabase) return [];
-    const { data, error } = await supabase.from("customers").select("*").order("display_order", { ascending: true, nullsFirst: false }).order("created_at");
+    const { data, error } = await supabase.from("customers").select("*").order("created_at");
     if (error) { console.error("dbCustomers.fetchAll", error); return []; }
     return (data ?? []).map(dbToCustomer);
   },
