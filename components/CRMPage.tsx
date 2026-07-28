@@ -169,58 +169,154 @@ function AnchoredDropdown({
   );
 }
 
-// ─── Filter chip ─────────────────────────────────────────────────────────────
+// ─── Column filter types ──────────────────────────────────────────────────────
 
-function FilterChip({ label, values, selected, onChange, onRemove }: {
-  label: string;
+export type ColFilterMulti    = { kind: "multiselect"; selected: string[] };
+export type ColFilterCheckbox = { kind: "checkbox";    value: "checked" | "unchecked" | null };
+export type ColFilterText     = { kind: "text";        value: string };
+export type ColFilter = ColFilterMulti | ColFilterCheckbox | ColFilterText;
+
+// ─── Filter chips ─────────────────────────────────────────────────────────────
+
+const CHIP_BTN = "flex items-center gap-1 pl-2 pr-1 py-1 text-xs rounded-l border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors";
+const CHIP_X   = "px-1.5 py-1 text-xs rounded-r border border-l-0 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 text-blue-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors";
+
+/* Multi-select chip: shows searchable checklist (담당자, Tags, Status…) */
+function FilterChipMulti({ colLabel, values, filter, onChange, onRemove }: {
+  colLabel: string;
   values: { key: string; display: React.ReactNode }[];
-  selected: string[];
-  onChange: (next: string[]) => void;
+  filter: ColFilterMulti;
+  onChange: (f: ColFilterMulti) => void;
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { selected } = filter;
+  const total = values.length;
+  const allSelected = selected.length === total;
+
+  const toggle = (key: string) => {
+    const next = selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key];
+    onChange({ ...filter, selected: next });
+  };
+
+  const visibleValues = search
+    ? values.filter((v) => String(v.key).toLowerCase().includes(search.toLowerCase()))
+    : values;
+
+  const summary = selected.length === 0
+    ? "없음"
+    : selected.length === total
+    ? "전체"
+    : selected.slice(0, 2).join(", ") + (selected.length > 2 ? ` 외 ${selected.length - 2}` : "");
+
+  return (
+    <div className="flex items-center">
+      <button ref={btnRef} onClick={() => { setOpen((o) => !o); setTimeout(() => inputRef.current?.focus(), 50); }}
+        className={CHIP_BTN}>
+        <Filter size={10} />
+        <span className="font-medium">{colLabel}:</span>
+        <span className="max-w-[120px] truncate">{summary}</span>
+        <ChevronDown size={10} className="ml-0.5 flex-shrink-0" />
+      </button>
+      <button onClick={onRemove} className={CHIP_X}><X size={10} /></button>
+      <AnchoredDropdown open={open} anchorRef={btnRef} onClose={() => { setOpen(false); setSearch(""); }} width={220}>
+        <div className="p-2">
+          {/* Search input */}
+          <div className="flex items-center gap-1 px-2 py-1 mb-1 border border-[#e9e9e7] dark:border-[#3f3f3f] rounded text-xs bg-white dark:bg-[#2f2f2f]">
+            <Filter size={10} className="text-gray-400 flex-shrink-0" />
+            <input ref={inputRef} value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="검색..." className="flex-1 outline-none bg-transparent text-xs" />
+            {search && <button onClick={() => setSearch("")}><X size={10} className="text-gray-400" /></button>}
+          </div>
+          {/* Select all / clear */}
+          <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
+            <button onClick={() => onChange({ ...filter, selected: values.map((v) => v.key) })} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
+            <button onClick={() => onChange({ ...filter, selected: [] })} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
+          </div>
+          {/* List */}
+          <div className="max-h-48 overflow-y-auto">
+            {visibleValues.length === 0 && <p className="px-1 py-1 text-xs text-gray-300">결과 없음</p>}
+            {visibleValues.map(({ key, display }) => (
+              <label key={key} className="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] rounded font-normal">
+                <input type="checkbox" checked={selected.includes(key)} onChange={() => toggle(key)} className="w-3.5 h-3.5 accent-blue-500 flex-shrink-0" />
+                <span className="flex-1 min-w-0">{display}</span>
+                {selected.includes(key) && !allSelected && <Check size={10} className="text-blue-500 flex-shrink-0" />}
+              </label>
+            ))}
+          </div>
+        </div>
+      </AnchoredDropdown>
+    </div>
+  );
+}
+
+/* Checkbox filter chip: 체크됨 / 체크 안됨 */
+function FilterChipCheckbox({ colLabel, filter, onChange, onRemove }: {
+  colLabel: string;
+  filter: ColFilterCheckbox;
+  onChange: (f: ColFilterCheckbox) => void;
   onRemove: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const selectedCount = selected.length;
-  const total = values.length;
-  const allSelected = selectedCount === total;
-
-  const toggle = (key: string) => {
-    if (selected.includes(key)) {
-      onChange(selected.filter((k) => k !== key));
-    } else {
-      onChange([...selected, key]);
-    }
-  };
-
+  const label = filter.value === "checked" ? "체크됨" : filter.value === "unchecked" ? "체크 안됨" : "전체";
   return (
     <div className="flex items-center">
-      <button ref={btnRef} onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1 pl-2 pr-1.5 py-1 text-xs rounded-l border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors">
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)} className={CHIP_BTN}>
         <Filter size={10} />
-        <span>{label} 값을 포함하는 데이터</span>
-        {selectedCount > 0 && !allSelected && (
-          <span className="ml-1 px-1 rounded-full bg-blue-500 text-white text-[10px] font-bold">{selectedCount}</span>
-        )}
-        <ChevronDown size={10} className="ml-0.5" />
+        <span className="font-medium">{colLabel}:</span>
+        <span>{label}</span>
+        <ChevronDown size={10} className="ml-0.5 flex-shrink-0" />
       </button>
-      <button onClick={onRemove}
-        className="px-1.5 py-1 text-xs rounded-r border border-l-0 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 text-blue-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors">
-        <X size={10} />
-      </button>
-      <AnchoredDropdown open={open} anchorRef={btnRef} onClose={() => setOpen(false)} width={200}>
-        <div className="p-2">
-          <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
-            <button onClick={() => onChange(values.map((v) => v.key))} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
-            <button onClick={() => onChange([])} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
-          </div>
-          {values.map(({ key, display }) => (
-            <label key={key} className="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] rounded font-normal">
-              <input type="checkbox" checked={selected.includes(key)}
-                onChange={() => toggle(key)}
-                className="w-3.5 h-3.5 accent-blue-500" />
-              {display}
-            </label>
+      <button onClick={onRemove} className={CHIP_X}><X size={10} /></button>
+      <AnchoredDropdown open={open} anchorRef={btnRef} onClose={() => setOpen(false)} width={160}>
+        <div className="py-1">
+          {([null, "checked", "unchecked"] as const).map((v) => (
+            <button key={String(v)} onClick={() => { onChange({ ...filter, value: v }); setOpen(false); }}
+              className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-[#3a3a3a]">
+              {filter.value === v && <Check size={10} className="text-blue-500" />}
+              {filter.value !== v && <span className="w-[10px]" />}
+              {v === null ? "전체 (필터 없음)" : v === "checked" ? "✓ 체크됨" : "□ 체크 안됨"}
+            </button>
           ))}
+        </div>
+      </AnchoredDropdown>
+    </div>
+  );
+}
+
+/* Text filter chip: 포함 텍스트 입력 */
+function FilterChipText({ colLabel, filter, onChange, onRemove }: {
+  colLabel: string;
+  filter: ColFilterText;
+  onChange: (f: ColFilterText) => void;
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <div className="flex items-center">
+      <button ref={btnRef} onClick={() => { setOpen((o) => !o); setTimeout(() => inputRef.current?.focus(), 50); }} className={CHIP_BTN}>
+        <Filter size={10} />
+        <span className="font-medium">{colLabel}:</span>
+        {filter.value ? <span className="max-w-[100px] truncate italic">&quot;{filter.value}&quot;</span> : <span className="text-blue-400">입력...</span>}
+        <ChevronDown size={10} className="ml-0.5 flex-shrink-0" />
+      </button>
+      <button onClick={onRemove} className={CHIP_X}><X size={10} /></button>
+      <AnchoredDropdown open={open} anchorRef={btnRef} onClose={() => setOpen(false)} width={220}>
+        <div className="p-2">
+          <p className="text-[10px] text-gray-400 mb-1">포함하는 텍스트</p>
+          <div className="flex items-center gap-1 px-2 py-1.5 border border-[#e9e9e7] dark:border-[#3f3f3f] rounded text-xs bg-white dark:bg-[#2f2f2f]">
+            <input ref={inputRef} value={filter.value}
+              onChange={(e) => onChange({ ...filter, value: e.target.value })}
+              onKeyDown={(e) => e.key === "Enter" && setOpen(false)}
+              placeholder="검색어 입력..." className="flex-1 outline-none bg-transparent text-xs" />
+            {filter.value && <button onClick={() => onChange({ ...filter, value: "" })}><X size={10} className="text-gray-400" /></button>}
+          </div>
         </div>
       </AnchoredDropdown>
     </div>
@@ -616,17 +712,16 @@ type SortDir = "asc" | "desc" | null;
 
 interface ColumnHeaderProps {
   col: AnyCol;
-  allCols: AnyCol[];           // full visible list for move
+  allCols: AnyCol[];
   sortField: string | null;
   sortDir: SortDir;
   onSort: (id: string, dir: "asc" | "desc" | null) => void;
-  // Filters
-  assignees?: string[];
-  assigneeFilter?: string[] | null;
-  onAssigneeFilter?: (next: string[] | null) => void;
-  allStatuses?: StatusOption[];
-  statusFilter?: string[] | null;
-  onStatusFilter?: (next: string[] | null) => void;
+  // Filter
+  activeFilter?: ColFilter | null;
+  onAddFilter?: (colId: string) => void;
+  onRemoveFilter?: (colId: string) => void;
+  // Values for filter sub-panel
+  filterValues?: { key: string; display: React.ReactNode }[];
   // Mutations
   onMoveLeft?: () => void;
   onMoveRight?: () => void;
@@ -644,14 +739,13 @@ interface ColumnHeaderProps {
 function ColumnHeader({
   col, allCols,
   sortField, sortDir, onSort,
-  assignees, assigneeFilter, onAssigneeFilter,
-  allStatuses, statusFilter, onStatusFilter,
+  activeFilter, onAddFilter, onRemoveFilter, filterValues,
   onMoveLeft, onMoveRight, onInsertLeft, onInsertRight,
   onEditProp, onDelete, onEditStatus, onEditAssignee, onEditTags,
   isFirst, isLast,
 }: ColumnHeaderProps) {
   const [open, setOpen] = useState(false);
-  const [subPanel, setSubPanel] = useState<"filter" | "rename" | "type" | null>(null);
+  const [subPanel, setSubPanel] = useState<"rename" | "type" | null>(null);
   const [renameVal, setRenameVal] = useState(col.label);
   const [typeVal, setTypeVal] = useState<CustomColumnType>(col.effectiveType);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -659,9 +753,7 @@ function ColumnHeader({
 
   const isActiveSort = sortField === col.id;
   const activeSortDir = isActiveSort ? sortDir : null;
-  const hasAssigneeFilter = col.id === "_assignee" && assigneeFilter !== null && assigneeFilter !== undefined && assigneeFilter.length > 0;
-  const hasStatusFilter = col.id === "_status" && statusFilter !== null && statusFilter !== undefined && statusFilter.length > 0;
-  const isFiltered = hasAssigneeFilter || hasStatusFilter;
+  const isFiltered = activeFilter != null;
 
   const close = () => { setOpen(false); setSubPanel(null); setConfirmDelete(false); };
 
@@ -735,54 +827,7 @@ function ColumnHeader({
           </div>
         )}
 
-        {/* Assignee filter */}
-        {!confirmDelete && subPanel === "filter" && col.id === "_assignee" && (
-          <div className="p-2">
-            <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
-              <button onClick={() => onAssigneeFilter?.(assignees ?? [])} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
-              <button onClick={() => onAssigneeFilter?.([])} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
-            </div>
-            {(assignees ?? []).length === 0 && <p className="px-1 py-1 text-xs text-gray-300">담당자 없음</p>}
-            {(assignees ?? []).map((a) => {
-              const checked = assigneeFilter == null ? false : assigneeFilter.includes(a);
-              return (
-                <label key={a} className="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] rounded font-normal">
-                  <input type="checkbox" checked={checked} onChange={() => {
-                    const base = assigneeFilter ?? [];
-                    const next = base.includes(a) ? base.filter((x) => x !== a) : [...base, a];
-                    onAssigneeFilter?.(next);
-                  }} className="w-3.5 h-3.5 accent-blue-500" />
-                  <AssigneeAvatar name={a} />
-                  <span className="text-[#37352f] dark:text-[#e6e6e4]">{a}</span>
-                </label>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Status filter */}
-        {!confirmDelete && subPanel === "filter" && col.id === "_status" && (
-          <div className="p-2">
-            <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
-              <button onClick={() => onStatusFilter?.(allStatuses?.map((s) => s.label) ?? [])} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
-              <button onClick={() => onStatusFilter?.([])} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
-            </div>
-            {(allStatuses ?? []).map((s) => {
-              const checked = statusFilter == null ? false : statusFilter.includes(s.label);
-              return (
-                <label key={s.id} className="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] rounded font-normal">
-                  <input type="checkbox" checked={checked} onChange={() => {
-                    const base = statusFilter ?? [];
-                    const next = base.includes(s.label) ? base.filter((x) => x !== s.label) : [...base, s.label];
-                    onStatusFilter?.(next);
-                  }} className="w-3.5 h-3.5 accent-blue-500" />
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.textColor }} />
-                  <span className="text-[#37352f] dark:text-[#e6e6e4]">{s.label}</span>
-                </label>
-              );
-            })}
-          </div>
-        )}
+        {/* (filter sub-panel removed — now handled by chips in filter bar) */}
 
         {/* Main menu */}
         {!confirmDelete && subPanel === null && (
@@ -795,13 +840,10 @@ function ColumnHeader({
                 () => { onSort(col.id, isActiveSort && activeSortDir === "desc" ? null : "desc"); close(); })}
             </div>
 
-            {(col.id === "_assignee" || col.id === "_status") && (
-              <>
-                <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
-                {mi(<><Filter size={12} className="text-gray-400 flex-shrink-0" /><span>필터</span>{isFiltered && <span className="ml-auto text-[10px] text-blue-500">적용됨</span>}</>,
-                  () => setSubPanel("filter"))}
-              </>
-            )}
+            <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
+            {isFiltered
+              ? mi(<><Filter size={12} className="text-blue-500 flex-shrink-0" /><span className="text-blue-500">필터 적용됨</span><button onClick={(e) => { e.stopPropagation(); onRemoveFilter?.(col.id); close(); }} className="ml-auto text-[10px] text-red-400 hover:text-red-600">제거</button></>, undefined)
+              : mi(<><Filter size={12} className="text-gray-400 flex-shrink-0" /><span>필터</span></>, () => { onAddFilter?.(col.id); close(); })}
 
             <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
             {mi(<><ChevronLeft size={12} className="text-gray-400 flex-shrink-0" /><span>왼쪽으로 이동</span></>,
@@ -1330,9 +1372,7 @@ export default function CRMPage({
   }, [updateCustomer, pushUndoSnapshot]);
 
   // ─── Filters & sort ───────────────────────────────────────────────────────
-  const [assigneeFilter, setAssigneeFilter] = useState<string[] | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string[] | null>(null);
-  const [tagsFilter, setTagsFilter] = useState<string[] | null>(null);
+  const [activeFilters, setActiveFilters] = useState<Record<string, ColFilter>>({});
   const [sortConfig, setSortConfig] = useState<{ field: string; dir: "asc" | "desc" } | null>(null);
 
   // ─── Unified column order ─────────────────────────────────────────────────
@@ -1478,20 +1518,45 @@ export default function CRMPage({
   // undo 스냅샷 캡처용 ref 동기화 (매 렌더마다 최신값 유지)
   monthScopedRef.current = monthScoped;
 
-  // 필터 선택 목록: crmAssignees(관리 목록) + 실제 데이터에 있는 담당자 합집합
+  // 담당자 목록: crmAssignees + 실제 데이터
   const distinctAssignees = useMemo(
     () => Array.from(new Set([...crmAssignees, ...monthScoped.map((c) => c.assignee).filter(Boolean)])),
     [monthScoped, crmAssignees],
   );
 
+  // 열 ID → 고객 값 추출 헬퍼
+  const getColVal = useCallback((c: Customer, colId: string): string => {
+    if (colId === "_assignee")        return c.assignee ?? "";
+    if (colId === "_route")           return c.route ?? "";
+    if (colId === "_status")          return c.status ?? "";
+    if (colId === "_name")            return c.name ?? "";
+    if (colId === "_memo")            return c.memo ?? "";
+    if (colId === "_alba")            return c.alba ?? "";
+    if (colId === "_settlement_amount") return String(c.settlement_amount ?? "");
+    if (colId === "_total_amount")    return String(c.total_amount ?? "");
+    if (colId === "_balance")         return String(c.balance ?? "");
+    if (colId === "_submit_date")     return c.submit_date ?? "";
+    return String(c.custom_fields?.[colId] ?? "");
+  }, []);
+
   let visibleCustomers = monthScoped;
-  // 필터가 활성화되면(null이 아니면) 체크된 항목만 표시 — 빈 배열 = 0건
-  if (assigneeFilter !== null)
-    visibleCustomers = visibleCustomers.filter((c) => assigneeFilter.includes(c.assignee));
-  if (statusFilter !== null)
-    visibleCustomers = visibleCustomers.filter((c) => statusFilter.includes(c.status ?? ""));
-  if (tagsFilter !== null)
-    visibleCustomers = visibleCustomers.filter((c) => tagsFilter.includes(c.route));
+  for (const [colId, filt] of Object.entries(activeFilters) as [string, ColFilter][]) {
+    if (filt.kind === "multiselect") {
+      if (filt.selected.length > 0)
+        visibleCustomers = visibleCustomers.filter((c) => filt.selected.includes(getColVal(c, colId)));
+    } else if (filt.kind === "checkbox") {
+      if (filt.value !== null)
+        visibleCustomers = visibleCustomers.filter((c) => {
+          const v = !!c.custom_fields?.[colId];
+          return filt.value === "checked" ? v : !v;
+        });
+    } else if (filt.kind === "text") {
+      if (filt.value.trim())
+        visibleCustomers = visibleCustomers.filter((c) =>
+          getColVal(c, colId).toLowerCase().includes(filt.value.toLowerCase())
+        );
+    }
+  }
 
   if (sortConfig) {
     const { field, dir } = sortConfig;
@@ -1525,34 +1590,101 @@ export default function CRMPage({
     setShowAddForm(false);
   };
 
-  // ─── Filter bar helpers ───────────────────────────────────────────────────
-  const hasActiveFilter = assigneeFilter !== null || statusFilter !== null || tagsFilter !== null;
+  // ─── Filter helpers ───────────────────────────────────────────────────────
+  const hasActiveFilter = Object.keys(activeFilters).length > 0;
 
-  const FILTERABLE = [
-    { id: "_assignee", label: "담당자" },
-    { id: "_route",    label: "Tags"  },
-    { id: "_status",   label: "Status"},
-  ] as const;
+  // 열 ID로 초기 ColFilter 생성
+  const buildInitFilter = useCallback((colId: string): ColFilter => {
+    const col = allCols.find((c) => c.id === colId);
+    const effectiveType = col?.effectiveType ?? "text";
 
-  const isFilterActive = (id: string) =>
-    (id === "_assignee" && assigneeFilter !== null) ||
-    (id === "_route"    && tagsFilter !== null) ||
-    (id === "_status"   && statusFilter !== null);
-
-  const addFilter = (id: string) => {
-    // 처음 추가 시 전체 선택 → 원하는 항목만 체크 해제하거나, 전체 해제 후 원하는 것만 체크
-    if (id === "_assignee" && assigneeFilter === null)
-      setAssigneeFilter([...distinctAssignees]);
-    if (id === "_route" && tagsFilter === null) {
-      const routeVals = Array.from(new Set(monthScoped.map((c) => c.route)));
-      setTagsFilter(routeVals);
+    if (colId === "_assignee") {
+      return { kind: "multiselect", selected: [...distinctAssignees] };
     }
-    if (id === "_status" && statusFilter === null)
-      setStatusFilter(Array.from(new Set(monthScoped.map((c) => c.status).filter(Boolean))));
+    if (colId === "_route") {
+      return { kind: "multiselect", selected: Array.from(new Set(monthScoped.map((c) => c.route))) };
+    }
+    if (colId === "_status") {
+      return { kind: "multiselect", selected: Array.from(new Set(monthScoped.map((c) => c.status).filter((v): v is string => !!v))) };
+    }
+    if (effectiveType === "checkbox") return { kind: "checkbox", value: null };
+    if (effectiveType === "assignee" || effectiveType === "status") {
+      const rawVals = monthScoped.map((c) => getColVal(c, colId));
+      const vals: string[] = Array.from(new Set(rawVals.filter((v) => !!v)));
+      return { kind: "multiselect", selected: vals };
+    }
+    return { kind: "text", value: "" };
+  }, [allCols, distinctAssignees, monthScoped, getColVal]);
+
+  // 열 ID로 FilterChip에 넘길 values 배열 생성
+  const buildFilterValues = useCallback((colId: string): { key: string; display: React.ReactNode }[] => {
+    if (colId === "_assignee") {
+      return distinctAssignees.map((a) => ({
+        key: a,
+        display: <span className="flex items-center gap-1.5"><AssigneeAvatar name={a} assignees={crmAssignees} size={14} />{a}</span>,
+      }));
+    }
+    if (colId === "_route") {
+      const tagMap = Object.fromEntries(crmTags.map((t) => [t.label, t]));
+      return Array.from(new Set<string>(monthScoped.map((c) => c.route))).map((r) => {
+        const t = tagMap[r];
+        return {
+          key: r,
+          display: t
+            ? <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-medium" style={{ backgroundColor: t.bg, color: t.text }}>{t.label}</span>
+            : <span className="text-xs text-gray-400">{r || "(없음)"}</span>,
+        };
+      });
+    }
+    if (colId === "_status") {
+      const statusMap = Object.fromEntries(customerStatuses.map((s) => [s.label, s]));
+      return Array.from(new Set<string>(monthScoped.map((c) => c.status).filter((v): v is string => !!v))).map((label) => {
+        const s = statusMap[label];
+        return {
+          key: label,
+          display: s
+            ? <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.textColor }} />{label}</span>
+            : <span className="text-xs">{label}</span>,
+        };
+      });
+    }
+    // custom assignee col
+    const col = allCols.find((c) => c.id === colId);
+    if (col?.effectiveType === "assignee") {
+      const vals = Array.from(new Set<string>(monthScoped.map((c) => getColVal(c, colId)).filter((v): v is string => !!v)));
+      return vals.map((v) => ({
+        key: v,
+        display: <span className="flex items-center gap-1.5"><AssigneeAvatar name={v} assignees={crmAssignees} size={14} />{v}</span>,
+      }));
+    }
+    if (col?.effectiveType === "status") {
+      const statusMap = Object.fromEntries(customerStatuses.map((s) => [s.label, s]));
+      const vals = Array.from(new Set<string>(monthScoped.map((c) => getColVal(c, colId)).filter((v): v is string => !!v)));
+      return vals.map((label) => {
+        const s = statusMap[label];
+        return {
+          key: label,
+          display: s
+            ? <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.textColor }} />{label}</span>
+            : <span className="text-xs">{label}</span>,
+        };
+      });
+    }
+    return [];
+  }, [allCols, distinctAssignees, crmAssignees, crmTags, customerStatuses, monthScoped, getColVal]);
+
+  const addFilter = (colId: string) => {
+    if (activeFilters[colId]) return; // already active
+    setActiveFilters((prev) => ({ ...prev, [colId]: buildInitFilter(colId) }));
   };
 
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
-  const filterBtnRef = useRef<HTMLButtonElement>(null);
+  const removeFilter = (colId: string) => {
+    setActiveFilters((prev) => { const n = { ...prev }; delete n[colId]; return n; });
+  };
+
+  const updateFilter = (colId: string, f: ColFilter) => {
+    setActiveFilters((prev) => ({ ...prev, [colId]: f }));
+  };
 
   const header = (
     <div className={`border-b border-[#e9e9e7] dark:border-[#2f2f2f]`}>
@@ -1582,96 +1714,42 @@ export default function CRMPage({
         </div>
       </div>
 
-      {/* Notion-style filter bar */}
-      <div className={`flex items-center gap-1.5 flex-wrap ${embedded ? "px-4 pb-2" : "px-6 pb-3"}`}>
-        {/* Assignee filter chip */}
-        {assigneeFilter !== null && (() => {
-          const allVals = distinctAssignees;
-          return (
-            <FilterChip
-              label="담당자"
-              values={allVals.map((a) => ({
-                key: a,
-                display: <span className="flex items-center gap-1.5"><AssigneeAvatar name={a} assignees={crmAssignees} size={14} />{a}</span>,
-              }))}
-              selected={assigneeFilter}
-              onChange={setAssigneeFilter}
-              onRemove={() => setAssigneeFilter(null)}
-            />
-          );
-        })()}
-
-        {/* Tags filter chip */}
-        {tagsFilter !== null && (() => {
-          const tagMap = Object.fromEntries(crmTags.map((t) => [t.label, t]));
-          const allRouteVals = Array.from(new Set(monthScoped.map((c) => c.route)));
-          return (
-            <FilterChip
-              label="Tags"
-              values={allRouteVals.map((r) => {
-                const t = tagMap[r];
-                return {
-                  key: r,
-                  display: t
-                    ? <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-medium" style={{ backgroundColor: t.bg, color: t.text }}>{t.label}</span>
-                    : <span className="text-xs text-gray-400">(없음)</span>,
-                };
-              })}
-              selected={tagsFilter}
-              onChange={setTagsFilter}
-              onRemove={() => setTagsFilter(null)}
-            />
-          );
-        })()}
-
-        {/* Status filter chip */}
-        {statusFilter !== null && (() => {
-          const statusMap = Object.fromEntries(customerStatuses.map((s) => [s.label, s]));
-          const allStatusVals = Array.from(new Set(monthScoped.map((c) => c.status).filter(Boolean)));
-          return (
-            <FilterChip
-              label="Status"
-              values={allStatusVals.map((label) => {
-                const s = statusMap[label];
-                return {
-                  key: label,
-                  display: s
-                    ? <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.textColor }} />{label}</span>
-                    : <span className="text-xs">{label}</span>,
-                };
-              })}
-              selected={statusFilter}
-              onChange={setStatusFilter}
-              onRemove={() => setStatusFilter(null)}
-            />
-          );
-        })()}
-
-        {/* + 필터 button */}
-        <button ref={filterBtnRef} onClick={() => setShowFilterMenu((o) => !o)}
-          className="flex items-center gap-1 px-2 py-1 text-xs rounded border border-dashed border-[#d0d0cc] dark:border-[#4f4f4f] text-[#9b9a97] dark:text-[#6b6b6b] hover:border-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] transition-colors">
-          <Plus size={11} /> 필터
-        </button>
-        <AnchoredDropdown open={showFilterMenu} anchorRef={filterBtnRef} onClose={() => setShowFilterMenu(false)} width={150}>
-          {FILTERABLE.map(({ id, label }) => (
-            <button key={id} onClick={() => { addFilter(id); setShowFilterMenu(false); }}
-              disabled={isFilterActive(id)}
-              className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-[#3a3a3a] disabled:opacity-40 disabled:cursor-not-allowed">
-              <Filter size={11} className="text-gray-400" /> {label}
-              {isFilterActive(id) && <Check size={10} className="ml-auto text-blue-500" />}
-            </button>
-          ))}
-          {hasActiveFilter && (
-            <>
-              <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
-              <button onClick={() => { setAssigneeFilter(null); setStatusFilter(null); setTagsFilter(null); setShowFilterMenu(false); }}
-                className="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20">
-                필터 전체 초기화
-              </button>
-            </>
-          )}
-        </AnchoredDropdown>
-      </div>
+      {/* Filter bar — one chip per active filter */}
+      {(hasActiveFilter) && (
+        <div className={`flex items-center gap-1.5 flex-wrap ${embedded ? "px-4 pb-2" : "px-6 pb-3"}`}>
+          {(Object.entries(activeFilters) as [string, ColFilter][]).map(([colId, filt]) => {
+            const col = allCols.find((c) => c.id === colId);
+            const colLabel = col?.label ?? colId;
+            if (filt.kind === "multiselect") {
+              return (
+                <FilterChipMulti key={colId} colLabel={colLabel}
+                  values={buildFilterValues(colId)}
+                  filter={filt}
+                  onChange={(f) => updateFilter(colId, f)}
+                  onRemove={() => removeFilter(colId)} />
+              );
+            }
+            if (filt.kind === "checkbox") {
+              return (
+                <FilterChipCheckbox key={colId} colLabel={colLabel}
+                  filter={filt}
+                  onChange={(f) => updateFilter(colId, f)}
+                  onRemove={() => removeFilter(colId)} />
+              );
+            }
+            return (
+              <FilterChipText key={colId} colLabel={colLabel}
+                filter={filt}
+                onChange={(f) => updateFilter(colId, f)}
+                onRemove={() => removeFilter(colId)} />
+            );
+          })}
+          <button onClick={() => setActiveFilters({})}
+            className="px-2 py-1 text-[10px] text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded transition-colors">
+            전체 초기화
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -1689,12 +1767,9 @@ export default function CRMPage({
                   sortField={sortConfig?.field ?? null}
                   sortDir={sortConfig?.dir ?? null}
                   onSort={(id, d) => setSortConfig(d ? { field: id, dir: d } : null)}
-                  assignees={distinctAssignees}
-                  assigneeFilter={assigneeFilter}
-                  onAssigneeFilter={setAssigneeFilter}
-                  allStatuses={customerStatuses}
-                  statusFilter={statusFilter}
-                  onStatusFilter={setStatusFilter}
+                  activeFilter={activeFilters[col.id] ?? null}
+                  onAddFilter={addFilter}
+                  onRemoveFilter={removeFilter}
                   onMoveLeft={() => moveCol(col.id, "left")}
                   onMoveRight={() => moveCol(col.id, "right")}
                   onInsertLeft={() => insertCol(col.id, "left")}
