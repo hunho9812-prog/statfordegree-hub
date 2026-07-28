@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 
 export interface CashReceipt {
   id: string;
+  month: string;          // "YYYY-MM"
   customer_id: string | null;
   customer_name: string;
   assignee: string;

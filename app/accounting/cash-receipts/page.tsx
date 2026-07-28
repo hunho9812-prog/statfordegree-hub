@@ -1,13 +1,11 @@
 "use client";
 
-import {
-  useState, useEffect, useCallback, useRef, useMemo,
-} from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Plus, Trash2, GripVertical, Check, X,
   ChevronUp, ChevronDown, ChevronsUpDown,
-  Filter, Search, RefreshCw, Pencil, CheckSquare, Square,
+  Filter, Search, RefreshCw, Pencil, CheckSquare, Square, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { useCashReceipts } from "@/hooks/useCashReceipts";
@@ -29,7 +27,6 @@ const DEFAULT_LABELS: Record<ColId, string> = {
 };
 
 const LABEL_STORAGE_KEY = "cash_receipts_col_labels_v1";
-
 function loadColLabels(): Record<ColId, string> {
   if (typeof window === "undefined") return DEFAULT_LABELS;
   try {
@@ -39,6 +36,21 @@ function loadColLabels(): Record<ColId, string> {
   return DEFAULT_LABELS;
 }
 
+// ── Month helpers ─────────────────────────────────────────────────────────────
+
+function getYM(d = new Date()) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+}
+function shiftYM(ym: string, delta: number) {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return getYM(d);
+}
+function fmtYM(ym: string) {
+  const [y, m] = ym.split("-").map(Number);
+  return `${y}년 ${m}월`;
+}
+
 // ── Filter types ──────────────────────────────────────────────────────────────
 
 type ColFilterMulti = { kind: "multiselect"; selected: string[] };
@@ -46,11 +58,7 @@ type ColFilterText  = { kind: "text"; value: string };
 type ColFilterBool  = { kind: "bool"; value: true | false | null };
 type ColFilter = ColFilterMulti | ColFilterText | ColFilterBool;
 
-// ── Sort ──────────────────────────────────────────────────────────────────────
-
 type SortDir = "asc" | "desc";
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(v: number) {
   return "₩" + Math.round(v).toLocaleString("ko-KR");
@@ -65,15 +73,15 @@ function getVal(row: CashReceipt, colId: ColId): string {
   return "";
 }
 
-// ── CustomerPicker (CRM autocomplete) ─────────────────────────────────────────
+// ── CustomerPicker ─────────────────────────────────────────────────────────────
 
 function CustomerPicker({
   value, onChange, onSelect, customers,
 }: {
   value: string;
   onChange: (v: string) => void;
-  onSelect: (name: string, assignee: string, id: string) => void;
-  customers: { id: string; name: string; assignee: string }[];
+  onSelect: (name: string, assignee: string, id: string, amount: number) => void;
+  customers: { id: string; name: string; assignee: string; total_amount: number }[];
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -103,21 +111,24 @@ function CustomerPicker({
         className="w-full px-2 py-1 text-sm border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg bg-white dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] outline-none focus:border-blue-400"
       />
       {open && filtered.length > 0 && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-xl w-64 overflow-hidden">
-          <div className="py-1 max-h-48 overflow-y-auto">
+        <div className="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-xl w-72 overflow-hidden">
+          <div className="py-1 max-h-52 overflow-y-auto">
             {filtered.map((c) => (
               <button
                 key={c.id}
-                onClick={() => { onSelect(c.name, c.assignee, c.id); setOpen(false); }}
+                onClick={() => { onSelect(c.name, c.assignee, c.id, c.total_amount); setOpen(false); }}
                 className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f] text-left gap-2"
               >
                 <span className="font-medium text-[#37352f] dark:text-[#e6e6e4] truncate">{c.name}</span>
-                <span className="text-xs text-[#9b9a97] flex-shrink-0">{c.assignee}</span>
+                <div className="flex items-center gap-2 flex-shrink-0 text-xs text-[#9b9a97]">
+                  <span>{c.assignee}</span>
+                  {c.total_amount > 0 && <span>{fmt(c.total_amount)}</span>}
+                </div>
               </button>
             ))}
           </div>
           <div className="border-t border-[#e9e9e7] dark:border-[#3f3f3f] px-3 py-1.5">
-            <p className="text-[10px] text-[#9b9a97]">선택하면 담당자 자동 입력</p>
+            <p className="text-[10px] text-[#9b9a97]">선택 시 담당자·비용 자동 입력</p>
           </div>
         </div>
       )}
@@ -125,14 +136,11 @@ function CustomerPicker({
   );
 }
 
-// ── FilterChip components ─────────────────────────────────────────────────────
+// ── Filter chips ──────────────────────────────────────────────────────────────
 
 function FilterChipMulti({ label, values, filter, onChange, onRemove }: {
-  label: string;
-  values: string[];
-  filter: ColFilterMulti;
-  onChange: (f: ColFilterMulti) => void;
-  onRemove: () => void;
+  label: string; values: string[]; filter: ColFilterMulti;
+  onChange: (f: ColFilterMulti) => void; onRemove: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -143,18 +151,14 @@ function FilterChipMulti({ label, values, filter, onChange, onRemove }: {
     return () => document.removeEventListener("mousedown", h);
   }, []);
   const vis = values.filter((v) => v.toLowerCase().includes(search.toLowerCase()));
-  const allSel = filter.selected.length === values.length;
   return (
     <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors",
+      <button onClick={() => setOpen((v) => !v)}
+        className={cn("flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors",
           filter.selected.length < values.length
             ? "bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/40 dark:border-blue-600 dark:text-blue-300"
             : "bg-[#f7f6f3] dark:bg-[#2f2f2f] border-[#e9e9e7] dark:border-[#3f3f3f] text-[#37352f] dark:text-[#e6e6e4]"
-        )}
-      >
+        )}>
         <Filter size={10} />{label}
         {filter.selected.length < values.length && <span className="ml-0.5">({filter.selected.length})</span>}
         <X size={10} className="ml-0.5 hover:text-red-500" onClick={(e) => { e.stopPropagation(); onRemove(); }} />
@@ -169,19 +173,17 @@ function FilterChipMulti({ label, values, filter, onChange, onRemove }: {
             </div>
           </div>
           <div className="flex gap-1 px-2 pt-1.5">
-            <button onClick={() => onChange({ kind: "multiselect", selected: [...values] })}
-              className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
+            <button onClick={() => onChange({ kind: "multiselect", selected: [...values] })} className="text-[10px] text-blue-500 hover:underline">전체</button>
             <span className="text-[#9b9a97] text-[10px]">·</span>
-            <button onClick={() => onChange({ kind: "multiselect", selected: [] })}
-              className="text-[10px] text-[#9b9a97] hover:underline">선택 해제</button>
+            <button onClick={() => onChange({ kind: "multiselect", selected: [] })} className="text-[10px] text-[#9b9a97] hover:underline">해제</button>
           </div>
           <div className="max-h-48 overflow-y-auto py-1">
             {vis.map((v) => {
               const checked = filter.selected.includes(v);
               return (
                 <button key={v} onClick={() => onChange({ kind: "multiselect", selected: checked ? filter.selected.filter((s) => s !== v) : [...filter.selected, v] })}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f] text-sm text-left">
-                  <div className={cn("w-4 h-4 rounded border flex items-center justify-center flex-shrink-0", checked ? "bg-blue-500 border-blue-500" : "border-[#d0d0cc] dark:border-[#5f5f5f]")}>
+                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f]">
+                  <div className={cn("w-4 h-4 rounded border flex items-center justify-center flex-shrink-0", checked ? "bg-blue-500 border-blue-500" : "border-[#d0d0cc]")}>
                     {checked && <Check size={10} className="text-white" />}
                   </div>
                   <span className="text-xs text-[#37352f] dark:text-[#e6e6e4] truncate">{v}</span>
@@ -220,8 +222,7 @@ function FilterChipText({ label, filter, onChange, onRemove }: {
           <div className="flex items-center gap-1.5 px-2 py-1 border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg">
             <Search size={11} className="text-[#9b9a97]" />
             <input autoFocus value={filter.value} onChange={(e) => onChange({ kind: "text", value: e.target.value })}
-              placeholder={`${label} 검색…`}
-              className="flex-1 bg-transparent text-xs outline-none text-[#37352f] dark:text-[#e6e6e4]" />
+              placeholder={`${label} 검색…`} className="flex-1 bg-transparent text-xs outline-none text-[#37352f] dark:text-[#e6e6e4]" />
           </div>
         </div>
       )}
@@ -267,57 +268,39 @@ function FilterChipBool({ label, filter, onChange, onRemove }: {
 
 // ── Column Header ─────────────────────────────────────────────────────────────
 
-function ColHeader({
-  colId, label, sortDir, onSort, hasFilter, onAddFilter, onRename,
-}: {
+function ColHeader({ colId, label, sortDir, onSort, hasFilter, onAddFilter, onRename }: {
   colId: ColId; label: string; sortDir: SortDir | null;
-  onSort: () => void; hasFilter: boolean; onAddFilter: () => void; onRename: (newLabel: string) => void;
+  onSort: () => void; hasFilter: boolean; onAddFilter: () => void; onRename: (l: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(label);
   const menuRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     function h(e: MouseEvent) { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false); }
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
-
-  const commitRename = () => {
-    const trimmed = draft.trim();
-    if (trimmed) onRename(trimmed);
-    setRenaming(false);
-    setMenuOpen(false);
-  };
-
-  if (renaming) {
-    return (
-      <div className="flex items-center gap-1">
-        <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") { setRenaming(false); setDraft(label); } }}
-          className="px-1.5 py-0.5 text-xs border border-blue-400 rounded bg-white dark:bg-[#2f2f2f] outline-none text-[#37352f] dark:text-[#e6e6e4] w-24"
-        />
-        <button onClick={commitRename} className="text-blue-500"><Check size={12} /></button>
-        <button onClick={() => { setRenaming(false); setDraft(label); }} className="text-[#9b9a97]"><X size={12} /></button>
-      </div>
-    );
-  }
-
+  const commit = () => { if (draft.trim()) onRename(draft.trim()); setRenaming(false); setMenuOpen(false); };
+  if (renaming) return (
+    <div className="flex items-center gap-1">
+      <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setRenaming(false); setDraft(label); } }}
+        className="px-1.5 py-0.5 text-xs border border-blue-400 rounded bg-white dark:bg-[#2f2f2f] outline-none text-[#37352f] dark:text-[#e6e6e4] w-24" />
+      <button onClick={commit} className="text-blue-500"><Check size={12} /></button>
+      <button onClick={() => { setRenaming(false); setDraft(label); }} className="text-[#9b9a97]"><X size={12} /></button>
+    </div>
+  );
   return (
     <div className="relative flex items-center gap-1 group" ref={menuRef}>
-      <button
-        onClick={() => setMenuOpen((v) => !v)}
-        className={cn(
-          "flex items-center gap-1 text-xs font-semibold transition-colors",
+      <button onClick={() => setMenuOpen((v) => !v)}
+        className={cn("flex items-center gap-1 text-xs font-semibold transition-colors",
           hasFilter ? "text-blue-600 dark:text-blue-400" : "text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4]"
-        )}
-      >
+        )}>
         {hasFilter && <Filter size={10} />}
         {label}
         {sortDir === "asc" ? <ChevronUp size={11} /> : sortDir === "desc" ? <ChevronDown size={11} /> : <ChevronsUpDown size={11} className="opacity-0 group-hover:opacity-100" />}
       </button>
-
       {menuOpen && (
         <div className="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-xl overflow-hidden w-40 py-1">
           <button onClick={() => { onSort(); setMenuOpen(false); }}
@@ -329,17 +312,11 @@ function ColHeader({
             <ChevronDown size={12} /> 내림차순
           </button>
           <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
-          {hasFilter ? (
-            <button onClick={() => { onAddFilter(); setMenuOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f] text-blue-500">
-              <Filter size={11} /> 필터 적용됨
-            </button>
-          ) : (
-            <button onClick={() => { onAddFilter(); setMenuOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f] text-[#37352f] dark:text-[#e6e6e4]">
-              <Filter size={11} /> 필터
-            </button>
-          )}
+          <button onClick={() => { onAddFilter(); setMenuOpen(false); }}
+            className={cn("w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f]",
+              hasFilter ? "text-blue-500" : "text-[#37352f] dark:text-[#e6e6e4]")}>
+            <Filter size={11} /> {hasFilter ? "필터 적용됨" : "필터"}
+          </button>
           <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
           <button onClick={() => { setDraft(label); setRenaming(true); }}
             className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f] text-[#37352f] dark:text-[#e6e6e4]">
@@ -351,23 +328,27 @@ function ColHeader({
   );
 }
 
-// ── EMPTY ROW ─────────────────────────────────────────────────────────────────
+// ── Grid layout ───────────────────────────────────────────────────────────────
+// drag | 이름(고정) | 담당자 | 번호 | 비용(flex) | 발급 | actions
+const GRID = "grid-cols-[28px_160px_110px_130px_1fr_90px_72px]";
 
-const EMPTY_ROW = (): Omit<CashReceipt, "id" | "display_order"> => ({
-  customer_id: null, customer_name: "", assignee: "", phone: "", amount: 0, issued: false,
+// ── Empty row ─────────────────────────────────────────────────────────────────
+
+const EMPTY_ROW = (month: string): Omit<CashReceipt, "id" | "display_order"> => ({
+  month, customer_id: null, customer_name: "", assignee: "", phone: "", amount: 0, issued: false,
 });
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function CashReceiptsPage() {
   const router = useRouter();
   const { rows, loading, reload, upsert, remove, reorder } = useCashReceipts();
   const customers = useWorkspaceStore((s) => s.customers);
-  const crmColLabels = useWorkspaceStore((s) => s.crmColLabels);
-  const crmColTypes = useWorkspaceStore((s) => s.crmColTypes);
-  const customColumns = useWorkspaceStore((s) => s.customColumns);
 
-  // Column labels (renameable)
+  // Month
+  const [month, setMonth] = useState(getYM);
+
+  // Column labels
   const [colLabels, setColLabels] = useState<Record<ColId, string>>(DEFAULT_LABELS);
   useEffect(() => { setColLabels(loadColLabels()); }, []);
   const renameCol = (colId: ColId, label: string) => {
@@ -390,25 +371,26 @@ export default function CashReceiptsPage() {
 
   // Filters
   const [filters, setFilters] = useState<Partial<Record<ColId, ColFilter>>>({});
+  const monthRows = useMemo(() => rows.filter((r) => r.month === month), [rows, month]);
   const addFilter = useCallback((colId: ColId) => {
     if (filters[colId]) return;
     if (colId === "issued") { setFilters((p) => ({ ...p, [colId]: { kind: "bool", value: null } as ColFilterBool })); return; }
     if (colId === "customer_name" || colId === "assignee") {
-      const vals = Array.from(new Set(rows.map((r) => getVal(r, colId)).filter(Boolean)));
+      const vals = Array.from(new Set(monthRows.map((r) => getVal(r, colId)).filter(Boolean)));
       setFilters((p) => ({ ...p, [colId]: { kind: "multiselect", selected: vals } as ColFilterMulti }));
       return;
     }
     setFilters((p) => ({ ...p, [colId]: { kind: "text", value: "" } as ColFilterText }));
-  }, [filters, rows]);
+  }, [filters, monthRows]);
   const removeFilter = (colId: ColId) => setFilters((p) => { const n = { ...p }; delete n[colId]; return n; });
   const updateFilter = (colId: ColId, f: ColFilter) => setFilters((p) => ({ ...p, [colId]: f }));
 
-  // Edit state
+  // Edit
   const [editId, setEditId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<Omit<CashReceipt, "id" | "display_order">>(EMPTY_ROW());
+  const [editDraft, setEditDraft] = useState<Omit<CashReceipt, "id" | "display_order">>(EMPTY_ROW(month));
 
-  // Add form
-  const [addDraft, setAddDraft] = useState<Omit<CashReceipt, "id" | "display_order">>(EMPTY_ROW());
+  // Add
+  const [addDraft, setAddDraft] = useState<Omit<CashReceipt, "id" | "display_order">>(EMPTY_ROW(month));
   const [adding, setAdding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -428,9 +410,23 @@ export default function CashReceiptsPage() {
   // Drag
   const dragIdx = useRef<number | null>(null);
 
-  // Filtered + sorted rows
+  // CRM customers: name → assignee + total_amount 연동
+  const crmCustomers = useMemo(() =>
+    customers.map((c) => ({
+      id: c.id,
+      name: c.name,
+      assignee: c.assignee ?? "",
+      total_amount: c.total_amount ?? 0,
+    })),
+    [customers]
+  );
+
+  // Months that have data (for sidebar dots)
+  const monthsWithData = useMemo(() => new Set(rows.map((r) => r.month)), [rows]);
+
+  // Visible rows (current month → filter → sort)
   const visibleRows = useMemo(() => {
-    let result = [...rows];
+    let result = [...monthRows];
     for (const [colId, filt] of Object.entries(filters) as [ColId, ColFilter][]) {
       if (!filt) continue;
       if (filt.kind === "multiselect") {
@@ -443,67 +439,32 @@ export default function CashReceiptsPage() {
     }
     if (sort) {
       result.sort((a, b) => {
-        const av = getVal(a, sort.colId);
-        const bv = getVal(b, sort.colId);
-        const cmp = sort.colId === "amount"
-          ? (a.amount - b.amount)
-          : av.localeCompare(bv, "ko");
+        const cmp = sort.colId === "amount" ? a.amount - b.amount : getVal(a, sort.colId).localeCompare(getVal(b, sort.colId), "ko");
         return sort.dir === "asc" ? cmp : -cmp;
       });
     }
     return result;
-  }, [rows, filters, sort]);
+  }, [monthRows, filters, sort]);
 
-  // CRM에서 실제 "담당자" 역할을 하는 열이 무엇인지 찾아 올바른 필드값을 읽음
-  // 우선순위: 1) 레이블이 "담당자"인 builtin 열 → 해당 Customer 필드
-  //           2) 레이블이 "담당자"인 custom 열 → custom_fields[colId]
-  //           3) fallback: c.assignee (기본 담당자 필드)
-  const getCustomerAssignee = useCallback((c: (typeof customers)[number]): string => {
-    const labels = crmColLabels ?? {};
-    const types  = crmColTypes  ?? {};
-    // builtin 열 중 "담당자" 레이블 확인
-    const builtinMap: Record<string, keyof typeof c> = {
-      _assignee: "assignee",
-      _alba: "alba",
-    };
-    for (const [colId, field] of Object.entries(builtinMap)) {
-      const label = labels[colId] ?? (colId === "_assignee" ? "담당자" : "알바");
-      if (label === "담당자") return (c[field] as string) ?? "";
-    }
-    // custom 열 중 type이 "assignee"이고 레이블이 "담당자"인 열
-    for (const col of customColumns) {
-      const colType = types[col.id] ?? col.type;
-      const colLabel = labels[col.id] ?? col.label;
-      if (colType === "assignee" && colLabel === "담당자") {
-        return String(c.custom_fields?.[col.id] ?? "");
-      }
-    }
-    // fallback: 레이블 무관하게 어떤 assignee-type 열이든 값이 있으면 사용
-    if (labels["_alba"] && c.alba) return c.alba;
-    return c.assignee ?? "";
-  }, [crmColLabels, crmColTypes, customColumns]);
-
-  const crmCustomers = useMemo(() =>
-    customers.map((c) => ({
-      id: c.id,
-      name: c.name,
-      assignee: getCustomerAssignee(c),
-    })),
-    [customers, getCustomerAssignee]
-  );
+  // When month changes, update add form month and reset adding
+  useEffect(() => {
+    setAdding(false);
+    setAddDraft(EMPTY_ROW(month));
+    setFilters({});
+  }, [month]);
 
   const handleAdd = async () => {
     if (!addDraft.customer_name.trim()) return;
     setSubmitting(true);
-    const result = await upsert({ ...addDraft, id: uuidv4(), display_order: rows.length });
+    const result = await upsert({ ...addDraft, month, id: uuidv4(), display_order: monthRows.length });
     setSubmitting(false);
-    if (result.success) { setAddDraft(EMPTY_ROW()); setAdding(false); showToast("success", "추가됐습니다."); }
+    if (result.success) { setAddDraft(EMPTY_ROW(month)); setAdding(false); showToast("success", "추가됐습니다."); }
     else showToast("error", result.error ?? "추가 실패");
   };
 
   const startEdit = (row: CashReceipt) => {
     setEditId(row.id);
-    setEditDraft({ customer_id: row.customer_id, customer_name: row.customer_name, assignee: row.assignee, phone: row.phone, amount: row.amount, issued: row.issued });
+    setEditDraft({ month: row.month, customer_id: row.customer_id, customer_name: row.customer_name, assignee: row.assignee, phone: row.phone, amount: row.amount, issued: row.issued });
   };
 
   const saveEdit = async (row: CashReceipt) => {
@@ -516,8 +477,7 @@ export default function CashReceiptsPage() {
     if (!deleteId) return;
     setDeleting(true);
     const result = await remove(deleteId);
-    setDeleting(false);
-    setDeleteId(null);
+    setDeleting(false); setDeleteId(null);
     if (result.success) showToast("success", "삭제됐습니다.");
     else showToast("error", result.error ?? "삭제 실패");
   };
@@ -535,7 +495,20 @@ export default function CashReceiptsPage() {
   };
 
   const hasActiveFilter = Object.keys(filters).length > 0;
-  const issuedCount = rows.filter((r) => r.issued).length;
+  const issuedCount = visibleRows.filter((r) => r.issued).length;
+  const totalAmount = visibleRows.reduce((s, r) => s + r.amount, 0);
+
+  // Build month list: last 6 months + months with data
+  const monthList = useMemo(() => {
+    const months = new Set<string>();
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.add(getYM(d));
+    }
+    monthsWithData.forEach((m) => months.add(m));
+    return Array.from(months).sort();
+  }, [monthsWithData]);
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f5f5f7] dark:bg-[#191919] min-h-screen">
@@ -557,9 +530,6 @@ export default function CashReceiptsPage() {
               <ArrowLeft size={14} /> 회계
             </button>
             <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">현금영수증</h1>
-            <span className="text-xs text-[#9b9a97] bg-white dark:bg-[#252525] border border-[#e9e9e7] dark:border-[#2f2f2f] px-2 py-0.5 rounded-full">
-              총 {rows.length}건 · 발급완료 {issuedCount}건
-            </span>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => reload()}
@@ -573,179 +543,210 @@ export default function CashReceiptsPage() {
           </div>
         </div>
 
-        {/* Filter bar */}
-        {hasActiveFilter && (
-          <div className="flex items-center gap-1.5 flex-wrap mb-3">
-            {(Object.entries(filters) as [ColId, ColFilter][]).map(([colId, filt]) => {
-              const label = colLabels[colId];
-              if (filt.kind === "multiselect") {
-                const vals = Array.from(new Set(rows.map((r) => getVal(r, colId)).filter(Boolean)));
-                return (
-                  <FilterChipMulti key={colId} label={label} values={vals} filter={filt}
-                    onChange={(f) => updateFilter(colId, f)} onRemove={() => removeFilter(colId)} />
-                );
-              }
-              if (filt.kind === "bool") {
-                return (
-                  <FilterChipBool key={colId} label={label} filter={filt}
-                    onChange={(f) => updateFilter(colId, f)} onRemove={() => removeFilter(colId)} />
-                );
-              }
-              return (
-                <FilterChipText key={colId} label={label} filter={filt}
-                  onChange={(f) => updateFilter(colId, f)} onRemove={() => removeFilter(colId)} />
-              );
-            })}
-            <button onClick={() => setFilters({})}
-              className="px-2.5 py-1 text-xs rounded-full border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-red-500 hover:border-red-400 transition-colors">
-              전체 초기화
-            </button>
-          </div>
-        )}
-
-        {/* Table */}
-        <div className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#2f2f2f] shadow-sm overflow-hidden">
-          {/* Col headers */}
-          <div className="grid grid-cols-[28px_1fr_120px_140px_120px_90px_72px] gap-2 items-center px-4 py-2.5 border-b border-[#e9e9e7] dark:border-[#2f2f2f] bg-[#f7f6f3] dark:bg-[#2a2a2a]">
-            <div />
-            {COL_IDS.map((colId) => (
-              <ColHeader key={colId} colId={colId} label={colLabels[colId]}
-                sortDir={sort?.colId === colId ? sort.dir : null}
-                onSort={() => cycleSort(colId)}
-                hasFilter={!!filters[colId]}
-                onAddFilter={() => addFilter(colId)}
-                onRename={(l) => renameCol(colId, l)}
-              />
-            ))}
-            <div />
-          </div>
-
-          {/* Add form row */}
-          {adding && (
-            <div className="grid grid-cols-[28px_1fr_120px_140px_120px_90px_72px] gap-2 items-center px-4 py-2 border-b border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10">
-              <div />
-              <CustomerPicker value={addDraft.customer_name}
-                onChange={(v) => setAddDraft((p) => ({ ...p, customer_name: v }))}
-                onSelect={(name, assignee, id) => setAddDraft((p) => ({ ...p, customer_name: name, assignee, customer_id: id }))}
-                customers={crmCustomers}
-              />
-              <input value={addDraft.assignee} onChange={(e) => setAddDraft((p) => ({ ...p, assignee: e.target.value }))}
-                placeholder="담당자"
-                className="px-2 py-1 text-sm border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg bg-white dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] outline-none focus:border-blue-400" />
-              <input value={addDraft.phone} onChange={(e) => setAddDraft((p) => ({ ...p, phone: e.target.value }))}
-                placeholder="번호"
-                className="px-2 py-1 text-sm border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg bg-white dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] outline-none focus:border-blue-400" />
-              <input type="number" value={addDraft.amount || ""} onChange={(e) => setAddDraft((p) => ({ ...p, amount: parseInt(e.target.value) || 0 }))}
-                placeholder="비용"
-                className="px-2 py-1 text-sm border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg bg-white dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] outline-none focus:border-blue-400" />
-              <button onClick={() => setAddDraft((p) => ({ ...p, issued: !p.issued }))}
-                className="flex items-center justify-center text-[#9b9a97]">
-                {addDraft.issued ? <CheckSquare size={18} className="text-blue-500" /> : <Square size={18} />}
-              </button>
-              <div className="flex gap-1">
-                <button onClick={handleAdd} disabled={submitting || !addDraft.customer_name.trim()}
-                  className="p-1.5 rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40">
-                  <Check size={12} />
-                </button>
-                <button onClick={() => { setAdding(false); setAddDraft(EMPTY_ROW()); }}
-                  className="p-1.5 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97]">
-                  <X size={12} />
-                </button>
+        <div className="flex gap-5">
+          {/* Month sidebar */}
+          <div className="w-36 flex-shrink-0">
+            <div className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#2f2f2f] overflow-hidden">
+              <div className="px-3 py-2.5 border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
+                <span className="text-xs font-bold text-[#37352f] dark:text-[#e6e6e4]">월별 보기</span>
               </div>
-            </div>
-          )}
-
-          {/* Data rows */}
-          {loading ? (
-            <div className="px-5 py-10 text-center text-sm text-[#9b9a97]">불러오는 중…</div>
-          ) : visibleRows.length === 0 ? (
-            <div className="px-5 py-10 text-center text-sm text-[#9b9a97]">
-              {rows.length === 0 ? "데이터가 없습니다. 추가 버튼을 눌러 시작하세요." : "필터 조건에 맞는 항목이 없습니다."}
-            </div>
-          ) : (
-            visibleRows.map((row, idx) => (
-              <div key={row.id}
-                draggable
-                onDragStart={() => onDragStart(idx)}
-                onDragOver={(e) => onDragOver(e, idx)}
-                onDragEnd={() => { dragIdx.current = null; }}
-                onDoubleClick={() => { if (editId !== row.id) startEdit(row); }}
-                className={cn(
-                  "group grid grid-cols-[28px_1fr_120px_140px_120px_90px_72px] gap-2 items-center px-4 py-2.5 border-b border-[#e9e9e7] dark:border-[#2f2f2f] last:border-0 transition-colors cursor-pointer",
-                  editId === row.id ? "bg-blue-50/50 dark:bg-blue-900/10" : "hover:bg-[#f7f6f3] dark:hover:bg-[#2a2a2a]"
-                )}
-              >
-                {/* drag handle */}
-                <div className="text-[#9b9a97] opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
-                  <GripVertical size={14} />
-                </div>
-
-                {editId === row.id ? (
-                  <>
-                    <CustomerPicker value={editDraft.customer_name}
-                      onChange={(v) => setEditDraft((p) => ({ ...p, customer_name: v }))}
-                      onSelect={(name, assignee, id) => setEditDraft((p) => ({ ...p, customer_name: name, assignee, customer_id: id }))}
-                      customers={crmCustomers}
-                    />
-                    <input value={editDraft.assignee} onChange={(e) => setEditDraft((p) => ({ ...p, assignee: e.target.value }))}
-                      className="px-2 py-1 text-sm border border-blue-400 rounded-lg bg-white dark:bg-[#2f2f2f] outline-none text-[#37352f] dark:text-[#e6e6e4]" />
-                    <input value={editDraft.phone} onChange={(e) => setEditDraft((p) => ({ ...p, phone: e.target.value }))}
-                      className="px-2 py-1 text-sm border border-blue-400 rounded-lg bg-white dark:bg-[#2f2f2f] outline-none text-[#37352f] dark:text-[#e6e6e4]" />
-                    <input type="number" value={editDraft.amount || ""}
-                      onChange={(e) => setEditDraft((p) => ({ ...p, amount: parseInt(e.target.value) || 0 }))}
-                      className="px-2 py-1 text-sm border border-blue-400 rounded-lg bg-white dark:bg-[#2f2f2f] outline-none text-[#37352f] dark:text-[#e6e6e4]" />
-                    <button onClick={() => setEditDraft((p) => ({ ...p, issued: !p.issued }))}
-                      className="flex items-center justify-center">
-                      {editDraft.issued ? <CheckSquare size={18} className="text-blue-500" /> : <Square size={18} className="text-[#9b9a97]" />}
+              <div className="py-1">
+                {monthList.map((m) => {
+                  const [y, mo] = m.split("-").map(Number);
+                  const hasData = monthsWithData.has(m);
+                  return (
+                    <button key={m} onClick={() => setMonth(m)}
+                      className={cn("w-full flex items-center justify-between px-3 py-2 text-sm transition-colors",
+                        month === m
+                          ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-semibold"
+                          : "text-[#37352f] dark:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f]"
+                      )}>
+                      <span>{y}년 {mo}월</span>
+                      {hasData && <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", month === m ? "bg-blue-400" : "bg-emerald-400")} />}
                     </button>
-                    <div className="flex gap-1">
-                      <button onClick={() => saveEdit(row)} className="p-1.5 rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Check size={12} /></button>
-                      <button onClick={() => setEditId(null)} className="p-1.5 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97]"><X size={12} /></button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4] truncate">{row.customer_name || "—"}</span>
-                    <span className="text-sm text-[#37352f] dark:text-[#e6e6e4] truncate">{row.assignee || "—"}</span>
-                    <span className="text-sm text-[#37352f] dark:text-[#e6e6e4] truncate">{row.phone || "—"}</span>
-                    <span className="text-sm text-[#37352f] dark:text-[#e6e6e4]">{row.amount ? fmt(row.amount) : "—"}</span>
-                    <div className="flex items-center justify-start">
-                      {row.issued
-                        ? <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><CheckSquare size={14} />완료</span>
-                        : <span className="flex items-center gap-1 text-xs text-[#9b9a97]"><Square size={14} />미발급</span>}
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                      <button onClick={(e) => { e.stopPropagation(); startEdit(row); }}
-                        className="p-1.5 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-blue-500 hover:border-blue-400 transition-colors">
-                        <Pencil size={12} />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); setDeleteId(row.id); }}
-                        className="p-1.5 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-red-500 hover:border-red-400 transition-colors">
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </>
-                )}
+                  );
+                })}
               </div>
-            ))
-          )}
-
-          {/* Footer summary */}
-          {rows.length > 0 && (
-            <div className="grid grid-cols-[28px_1fr_120px_140px_120px_90px_72px] gap-2 items-center px-4 py-2 border-t border-[#e9e9e7] dark:border-[#2f2f2f] bg-[#f7f6f3] dark:bg-[#2a2a2a]">
-              <div /><div /><div /><div />
-              <span className="text-xs font-bold text-[#37352f] dark:text-[#e6e6e4]">
-                {fmt(visibleRows.reduce((s, r) => s + r.amount, 0))}
-              </span>
-              <span className="text-xs text-[#9b9a97]">
-                {visibleRows.filter((r) => r.issued).length}/{visibleRows.length}
-              </span>
-              <div />
             </div>
-          )}
-        </div>
+          </div>
 
-        <p className="mt-3 text-xs text-[#9b9a97]">행을 더블클릭하거나 ✏️ 아이콘을 눌러 수정 · 드래그로 순서 변경</p>
+          {/* Main content */}
+          <div className="flex-1 min-w-0">
+            {/* Month title + stats */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <button onClick={() => setMonth(shiftYM(month, -1))}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] bg-white dark:bg-[#252525] text-[#9b9a97] hover:text-blue-500 hover:border-blue-400 transition-colors">
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-base font-bold text-[#37352f] dark:text-[#e6e6e4]">{fmtYM(month)}</span>
+                <button onClick={() => setMonth(shiftYM(month, 1))}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] bg-white dark:bg-[#252525] text-[#9b9a97] hover:text-blue-500 hover:border-blue-400 transition-colors">
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-[#9b9a97]">
+                <span>총 {visibleRows.length}건</span>
+                <span>발급완료 {issuedCount}건</span>
+                {totalAmount > 0 && <span className="font-semibold text-[#37352f] dark:text-[#e6e6e4]">{fmt(totalAmount)}</span>}
+              </div>
+            </div>
+
+            {/* Filter bar */}
+            {hasActiveFilter && (
+              <div className="flex items-center gap-1.5 flex-wrap mb-3">
+                {(Object.entries(filters) as [ColId, ColFilter][]).map(([colId, filt]) => {
+                  const label = colLabels[colId];
+                  if (filt.kind === "multiselect") {
+                    const vals = Array.from(new Set(monthRows.map((r) => getVal(r, colId)).filter(Boolean)));
+                    return <FilterChipMulti key={colId} label={label} values={vals} filter={filt} onChange={(f) => updateFilter(colId, f)} onRemove={() => removeFilter(colId)} />;
+                  }
+                  if (filt.kind === "bool") return <FilterChipBool key={colId} label={label} filter={filt} onChange={(f) => updateFilter(colId, f)} onRemove={() => removeFilter(colId)} />;
+                  return <FilterChipText key={colId} label={label} filter={filt} onChange={(f) => updateFilter(colId, f)} onRemove={() => removeFilter(colId)} />;
+                })}
+                <button onClick={() => setFilters({})}
+                  className="px-2.5 py-1 text-xs rounded-full border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-red-500 hover:border-red-400 transition-colors">
+                  전체 초기화
+                </button>
+              </div>
+            )}
+
+            {/* Table */}
+            <div className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#2f2f2f] shadow-sm overflow-hidden">
+              {/* Header */}
+              <div className={`grid ${GRID} gap-2 items-center px-4 py-2.5 border-b border-[#e9e9e7] dark:border-[#2f2f2f] bg-[#f7f6f3] dark:bg-[#2a2a2a]`}>
+                <div />
+                {COL_IDS.map((colId) => (
+                  <ColHeader key={colId} colId={colId} label={colLabels[colId]}
+                    sortDir={sort?.colId === colId ? sort.dir : null}
+                    onSort={() => cycleSort(colId)}
+                    hasFilter={!!filters[colId]}
+                    onAddFilter={() => addFilter(colId)}
+                    onRename={(l) => renameCol(colId, l)}
+                  />
+                ))}
+                <div />
+              </div>
+
+              {/* Add row */}
+              {adding && (
+                <div className={`grid ${GRID} gap-2 items-center px-4 py-2 border-b border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10`}>
+                  <div />
+                  <CustomerPicker value={addDraft.customer_name}
+                    onChange={(v) => setAddDraft((p) => ({ ...p, customer_name: v }))}
+                    onSelect={(name, assignee, id, total_amount) =>
+                      setAddDraft((p) => ({ ...p, customer_name: name, assignee, customer_id: id, amount: total_amount || p.amount }))}
+                    customers={crmCustomers}
+                  />
+                  <input value={addDraft.assignee} onChange={(e) => setAddDraft((p) => ({ ...p, assignee: e.target.value }))}
+                    placeholder="담당자"
+                    className="px-2 py-1 text-sm border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg bg-white dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] outline-none focus:border-blue-400" />
+                  <input value={addDraft.phone} onChange={(e) => setAddDraft((p) => ({ ...p, phone: e.target.value }))}
+                    placeholder="번호"
+                    className="px-2 py-1 text-sm border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg bg-white dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] outline-none focus:border-blue-400" />
+                  <input type="number" value={addDraft.amount || ""} onChange={(e) => setAddDraft((p) => ({ ...p, amount: parseInt(e.target.value) || 0 }))}
+                    placeholder="비용"
+                    className="px-2 py-1 text-sm border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg bg-white dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] outline-none focus:border-blue-400" />
+                  <button onClick={() => setAddDraft((p) => ({ ...p, issued: !p.issued }))}>
+                    {addDraft.issued ? <CheckSquare size={18} className="text-blue-500" /> : <Square size={18} className="text-[#9b9a97]" />}
+                  </button>
+                  <div className="flex gap-1">
+                    <button onClick={handleAdd} disabled={submitting || !addDraft.customer_name.trim()}
+                      className="p-1.5 rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40"><Check size={12} /></button>
+                    <button onClick={() => { setAdding(false); setAddDraft(EMPTY_ROW(month)); }}
+                      className="p-1.5 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97]"><X size={12} /></button>
+                  </div>
+                </div>
+              )}
+
+              {/* Rows */}
+              {loading ? (
+                <div className="px-5 py-10 text-center text-sm text-[#9b9a97]">불러오는 중…</div>
+              ) : visibleRows.length === 0 ? (
+                <div className="px-5 py-10 text-center text-sm text-[#9b9a97]">
+                  {monthRows.length === 0 ? `${fmtYM(month)} 데이터가 없습니다.` : "필터 조건에 맞는 항목이 없습니다."}
+                </div>
+              ) : (
+                visibleRows.map((row, idx) => (
+                  <div key={row.id}
+                    draggable
+                    onDragStart={() => onDragStart(idx)}
+                    onDragOver={(e) => onDragOver(e, idx)}
+                    onDragEnd={() => { dragIdx.current = null; }}
+                    onDoubleClick={() => { if (editId !== row.id) startEdit(row); }}
+                    className={cn(
+                      `group grid ${GRID} gap-2 items-center px-4 py-2.5 border-b border-[#e9e9e7] dark:border-[#2f2f2f] last:border-0 transition-colors cursor-pointer`,
+                      editId === row.id ? "bg-blue-50/50 dark:bg-blue-900/10" : "hover:bg-[#f7f6f3] dark:hover:bg-[#2a2a2a]"
+                    )}
+                  >
+                    <div className="text-[#9b9a97] opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
+                      <GripVertical size={14} />
+                    </div>
+
+                    {editId === row.id ? (
+                      <>
+                        <CustomerPicker value={editDraft.customer_name}
+                          onChange={(v) => setEditDraft((p) => ({ ...p, customer_name: v }))}
+                          onSelect={(name, assignee, id, total_amount) =>
+                            setEditDraft((p) => ({ ...p, customer_name: name, assignee, customer_id: id, amount: total_amount || p.amount }))}
+                          customers={crmCustomers}
+                        />
+                        <input value={editDraft.assignee} onChange={(e) => setEditDraft((p) => ({ ...p, assignee: e.target.value }))}
+                          className="px-2 py-1 text-sm border border-blue-400 rounded-lg bg-white dark:bg-[#2f2f2f] outline-none text-[#37352f] dark:text-[#e6e6e4]" />
+                        <input value={editDraft.phone} onChange={(e) => setEditDraft((p) => ({ ...p, phone: e.target.value }))}
+                          className="px-2 py-1 text-sm border border-blue-400 rounded-lg bg-white dark:bg-[#2f2f2f] outline-none text-[#37352f] dark:text-[#e6e6e4]" />
+                        <input type="number" value={editDraft.amount || ""}
+                          onChange={(e) => setEditDraft((p) => ({ ...p, amount: parseInt(e.target.value) || 0 }))}
+                          className="px-2 py-1 text-sm border border-blue-400 rounded-lg bg-white dark:bg-[#2f2f2f] outline-none text-[#37352f] dark:text-[#e6e6e4]" />
+                        <button onClick={() => setEditDraft((p) => ({ ...p, issued: !p.issued }))}>
+                          {editDraft.issued ? <CheckSquare size={18} className="text-blue-500" /> : <Square size={18} className="text-[#9b9a97]" />}
+                        </button>
+                        <div className="flex gap-1">
+                          <button onClick={() => saveEdit(row)} className="p-1.5 rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Check size={12} /></button>
+                          <button onClick={() => setEditId(null)} className="p-1.5 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97]"><X size={12} /></button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4] truncate">{row.customer_name || "—"}</span>
+                        <span className="text-sm text-[#37352f] dark:text-[#e6e6e4] truncate">{row.assignee || "—"}</span>
+                        <span className="text-sm text-[#37352f] dark:text-[#e6e6e4] truncate">{row.phone || "—"}</span>
+                        <span className="text-sm text-[#37352f] dark:text-[#e6e6e4]">{row.amount ? fmt(row.amount) : "—"}</span>
+                        <div>
+                          {row.issued
+                            ? <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><CheckSquare size={14} />완료</span>
+                            : <span className="flex items-center gap-1 text-xs text-[#9b9a97]"><Square size={14} />미발급</span>}
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                          <button onClick={(e) => { e.stopPropagation(); startEdit(row); }}
+                            className="p-1.5 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-blue-500 hover:border-blue-400 transition-colors">
+                            <Pencil size={12} />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); setDeleteId(row.id); }}
+                            className="p-1.5 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-red-500 hover:border-red-400 transition-colors">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
+
+              {/* Footer */}
+              {visibleRows.length > 0 && (
+                <div className={`grid ${GRID} gap-2 items-center px-4 py-2 border-t border-[#e9e9e7] dark:border-[#2f2f2f] bg-[#f7f6f3] dark:bg-[#2a2a2a]`}>
+                  <div /><div /><div /><div />
+                  <span className="text-xs font-bold text-[#37352f] dark:text-[#e6e6e4]">{fmt(totalAmount)}</span>
+                  <span className="text-xs text-[#9b9a97]">{issuedCount}/{visibleRows.length}</span>
+                  <div />
+                </div>
+              )}
+            </div>
+
+            <p className="mt-2 text-xs text-[#9b9a97]">행 더블클릭 또는 ✏️ 아이콘으로 수정 · 드래그로 순서 변경</p>
+          </div>
+        </div>
       </div>
 
       {/* Delete modal */}
@@ -757,9 +758,7 @@ export default function CashReceiptsPage() {
               <h2 className="font-bold text-[#37352f] dark:text-[#e6e6e4]">항목 삭제</h2>
             </div>
             <p className="text-sm text-[#9b9a97] mb-5">
-              <span className="font-semibold text-[#37352f] dark:text-[#e6e6e4]">
-                {rows.find((r) => r.id === deleteId)?.customer_name}
-              </span> 항목을 삭제할까요?
+              <span className="font-semibold text-[#37352f] dark:text-[#e6e6e4]">{rows.find((r) => r.id === deleteId)?.customer_name}</span> 항목을 삭제할까요?
             </p>
             <div className="flex gap-2">
               <button onClick={() => setDeleteId(null)} disabled={deleting}
