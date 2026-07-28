@@ -142,14 +142,17 @@ export default function FluentoLedgerPage() {
       setSaveStatus("unsaved");
       showToast({ type: "error", msg: result.error ?? "저장에 실패했습니다." });
     }
-  }, [month, data, profit, upsert, showToast]);
+  }, [month, data, upsert, showToast]);
+
+  const handleSaveRef = useRef(handleSave);
+  useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
 
   useEffect(() => {
     if (saveStatus !== "unsaved") return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => handleSave(), 3000);
+    saveTimer.current = setTimeout(() => handleSaveRef.current(), 3000);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [saveStatus, handleSave]);
+  }, [saveStatus]);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -285,10 +288,16 @@ export default function FluentoLedgerPage() {
                 <ReadonlyMoney label="부가세 (10%)" value={vat} accent="text-orange-500" />
                 <MoneyInput label="사업비용" value={data.bizCost} onChange={update("bizCost")} />
                 <MoneyInput label="인건비" value={data.laborCost} onChange={update("laborCost")} />
-                <ReadonlyMoney label="영업이익" value={operatingProfit} accent={operatingProfit < 0 ? "text-red-500" : "text-green-600 dark:text-green-400"} />
-                <div className="border-t border-dashed border-[#e9e9e7] dark:border-[#3f3f3f] pt-3">
-                  <MoneyInput label="영업외이익" value={data.nonOpIncome} onChange={update("nonOpIncome")} allowNegative />
+              </div>
+              <div className={`flex items-center justify-between px-5 py-2.5 border-y border-[#e9e9e7] dark:border-[#3f3f3f] ${operatingProfit < 0 ? "bg-red-50 dark:bg-red-950/20" : "bg-slate-50 dark:bg-slate-900/20"}`}>
+                <div>
+                  <span className="text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">영업이익</span>
+                  <span className="ml-2 text-xs text-[#9b9a97]">= 매출 − 부가세 − 사업비용 − 인건비</span>
                 </div>
+                <span className={`text-base font-bold ${operatingProfit < 0 ? "text-red-500" : "text-slate-600 dark:text-slate-300"}`}>{fmt(operatingProfit)}</span>
+              </div>
+              <div className="px-5 py-4">
+                <MoneyInput label="영업외이익" value={data.nonOpIncome} onChange={update("nonOpIncome")} allowNegative />
               </div>
               <div className={`flex items-center justify-between px-5 py-3 ${profit < 0 ? "bg-red-50 dark:bg-red-950/30 border-l-4 border-red-500" : "bg-green-50 dark:bg-green-950/20 border-l-4 border-green-400"}`}>
                 <div>
