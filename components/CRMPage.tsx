@@ -171,18 +171,26 @@ function AnchoredDropdown({
 
 // ─── Filter chip ─────────────────────────────────────────────────────────────
 
-function FilterChip({ label, values, selectedValues, onChange, onRemove }: {
+function FilterChip({ label, values, selected, onChange, onRemove }: {
   label: string;
   values: { key: string; display: React.ReactNode }[];
-  selectedValues: Set<string>;
-  onChange: (next: Set<string>) => void;
+  selected: string[];
+  onChange: (next: string[]) => void;
   onRemove: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const selected = selectedValues.size;
+  const selectedCount = selected.length;
   const total = values.length;
-  const allSelected = selected === total;
+  const allSelected = selectedCount === total;
+
+  const toggle = (key: string) => {
+    if (selected.includes(key)) {
+      onChange(selected.filter((k) => k !== key));
+    } else {
+      onChange([...selected, key]);
+    }
+  };
 
   return (
     <div className="flex items-center">
@@ -190,7 +198,9 @@ function FilterChip({ label, values, selectedValues, onChange, onRemove }: {
         className="flex items-center gap-1 pl-2 pr-1.5 py-1 text-xs rounded-l border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors">
         <Filter size={10} />
         <span>{label} 값을 포함하는 데이터</span>
-        {!allSelected && <span className="ml-1 px-1 rounded-full bg-blue-500 text-white text-[10px] font-bold">{selected}</span>}
+        {selectedCount > 0 && !allSelected && (
+          <span className="ml-1 px-1 rounded-full bg-blue-500 text-white text-[10px] font-bold">{selectedCount}</span>
+        )}
         <ChevronDown size={10} className="ml-0.5" />
       </button>
       <button onClick={onRemove}
@@ -200,17 +210,13 @@ function FilterChip({ label, values, selectedValues, onChange, onRemove }: {
       <AnchoredDropdown open={open} anchorRef={btnRef} onClose={() => setOpen(false)} width={200}>
         <div className="p-2">
           <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
-            <button onClick={() => onChange(new Set(values.map((v) => v.key)))} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
-            <button onClick={() => onChange(new Set())} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
+            <button onClick={() => onChange(values.map((v) => v.key))} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
+            <button onClick={() => onChange([])} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
           </div>
           {values.map(({ key, display }) => (
             <label key={key} className="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] rounded font-normal">
-              <input type="checkbox" checked={selectedValues.has(key)}
-                onChange={() => {
-                  const next = new Set(selectedValues);
-                  if (next.has(key)) next.delete(key); else next.add(key);
-                  onChange(next);
-                }}
+              <input type="checkbox" checked={selected.includes(key)}
+                onChange={() => toggle(key)}
                 className="w-3.5 h-3.5 accent-blue-500" />
               {display}
             </label>
@@ -616,11 +622,11 @@ interface ColumnHeaderProps {
   onSort: (id: string, dir: "asc" | "desc" | null) => void;
   // Filters
   assignees?: string[];
-  assigneeFilter?: Set<string> | null;
-  onAssigneeFilter?: (next: Set<string> | null) => void;
+  assigneeFilter?: string[] | null;
+  onAssigneeFilter?: (next: string[] | null) => void;
   allStatuses?: StatusOption[];
-  statusFilter?: Set<string> | null;
-  onStatusFilter?: (next: Set<string> | null) => void;
+  statusFilter?: string[] | null;
+  onStatusFilter?: (next: string[] | null) => void;
   // Mutations
   onMoveLeft?: () => void;
   onMoveRight?: () => void;
@@ -653,8 +659,8 @@ function ColumnHeader({
 
   const isActiveSort = sortField === col.id;
   const activeSortDir = isActiveSort ? sortDir : null;
-  const hasAssigneeFilter = col.id === "_assignee" && assigneeFilter !== null && assigneeFilter !== undefined && assignees !== undefined && assigneeFilter.size < assignees.length;
-  const hasStatusFilter = col.id === "_status" && statusFilter !== null && statusFilter !== undefined && allStatuses !== undefined && statusFilter.size < allStatuses.length;
+  const hasAssigneeFilter = col.id === "_assignee" && assigneeFilter !== null && assigneeFilter !== undefined && assigneeFilter.length > 0;
+  const hasStatusFilter = col.id === "_status" && statusFilter !== null && statusFilter !== undefined && statusFilter.length > 0;
   const isFiltered = hasAssigneeFilter || hasStatusFilter;
 
   const close = () => { setOpen(false); setSubPanel(null); setConfirmDelete(false); };
@@ -733,18 +739,17 @@ function ColumnHeader({
         {!confirmDelete && subPanel === "filter" && col.id === "_assignee" && (
           <div className="p-2">
             <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
-              <button onClick={() => onAssigneeFilter?.(null)} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
-              <button onClick={() => onAssigneeFilter?.(new Set())} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
+              <button onClick={() => onAssigneeFilter?.(assignees ?? [])} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
+              <button onClick={() => onAssigneeFilter?.([])} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
             </div>
             {(assignees ?? []).length === 0 && <p className="px-1 py-1 text-xs text-gray-300">담당자 없음</p>}
             {(assignees ?? []).map((a) => {
-              const checked = assigneeFilter == null ? true : assigneeFilter.has(a);
+              const checked = assigneeFilter == null ? false : assigneeFilter.includes(a);
               return (
                 <label key={a} className="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] rounded font-normal">
                   <input type="checkbox" checked={checked} onChange={() => {
-                    const base = assigneeFilter ?? new Set<string>();
-                    const next = new Set(base);
-                    if (next.has(a)) next.delete(a); else next.add(a);
+                    const base = assigneeFilter ?? [];
+                    const next = base.includes(a) ? base.filter((x) => x !== a) : [...base, a];
                     onAssigneeFilter?.(next);
                   }} className="w-3.5 h-3.5 accent-blue-500" />
                   <AssigneeAvatar name={a} />
@@ -759,17 +764,16 @@ function ColumnHeader({
         {!confirmDelete && subPanel === "filter" && col.id === "_status" && (
           <div className="p-2">
             <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
-              <button onClick={() => onStatusFilter?.(null)} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
-              <button onClick={() => onStatusFilter?.(new Set())} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
+              <button onClick={() => onStatusFilter?.(allStatuses?.map((s) => s.label) ?? [])} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
+              <button onClick={() => onStatusFilter?.([])} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
             </div>
             {(allStatuses ?? []).map((s) => {
-              const checked = statusFilter == null ? true : statusFilter.has(s.label);
+              const checked = statusFilter == null ? false : statusFilter.includes(s.label);
               return (
                 <label key={s.id} className="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] rounded font-normal">
                   <input type="checkbox" checked={checked} onChange={() => {
-                    const base = statusFilter ?? new Set<string>();
-                    const next = new Set(base);
-                    if (next.has(s.label)) next.delete(s.label); else next.add(s.label);
+                    const base = statusFilter ?? [];
+                    const next = base.includes(s.label) ? base.filter((x) => x !== s.label) : [...base, s.label];
                     onStatusFilter?.(next);
                   }} className="w-3.5 h-3.5 accent-blue-500" />
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.textColor }} />
@@ -1326,9 +1330,9 @@ export default function CRMPage({
   }, [updateCustomer, pushUndoSnapshot]);
 
   // ─── Filters & sort ───────────────────────────────────────────────────────
-  const [assigneeFilter, setAssigneeFilter] = useState<Set<string> | null>(null);
-  const [statusFilter, setStatusFilter] = useState<Set<string> | null>(null);
-  const [tagsFilter, setTagsFilter] = useState<Set<string> | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = useState<string[] | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string[] | null>(null);
+  const [tagsFilter, setTagsFilter] = useState<string[] | null>(null);
   const [sortConfig, setSortConfig] = useState<{ field: string; dir: "asc" | "desc" } | null>(null);
 
   // ─── Unified column order ─────────────────────────────────────────────────
@@ -1481,9 +1485,12 @@ export default function CRMPage({
   }, [monthScoped, crmAssignees]);
 
   let visibleCustomers = monthScoped;
-  if (assigneeFilter !== null) visibleCustomers = visibleCustomers.filter((c) => assigneeFilter.has(c.assignee));
-  if (statusFilter !== null) visibleCustomers = visibleCustomers.filter((c) => statusFilter.has(c.status ?? ""));
-  if (tagsFilter !== null) visibleCustomers = visibleCustomers.filter((c) => tagsFilter.has(c.route ?? ""));
+  if (assigneeFilter !== null && assigneeFilter.length > 0)
+    visibleCustomers = visibleCustomers.filter((c) => assigneeFilter.includes(c.assignee));
+  if (statusFilter !== null && statusFilter.length > 0)
+    visibleCustomers = visibleCustomers.filter((c) => statusFilter.includes(c.status ?? ""));
+  if (tagsFilter !== null && tagsFilter.length > 0)
+    visibleCustomers = visibleCustomers.filter((c) => tagsFilter.includes(c.route ?? ""));
 
   if (sortConfig) {
     const { field, dir } = sortConfig;
@@ -1532,9 +1539,9 @@ export default function CRMPage({
     (id === "_status"   && statusFilter !== null);
 
   const addFilter = (id: string) => {
-    if (id === "_assignee" && assigneeFilter === null) setAssigneeFilter(new Set<string>());
-    if (id === "_route"    && tagsFilter === null)     setTagsFilter(new Set<string>());
-    if (id === "_status"   && statusFilter === null)   setStatusFilter(new Set<string>());
+    if (id === "_assignee" && assigneeFilter === null) setAssigneeFilter([]);
+    if (id === "_route"    && tagsFilter === null)     setTagsFilter([]);
+    if (id === "_status"   && statusFilter === null)   setStatusFilter([]);
   };
 
   const [showFilterMenu, setShowFilterMenu] = useState(false);
@@ -1580,7 +1587,7 @@ export default function CRMPage({
                 key: a,
                 display: <span className="flex items-center gap-1.5"><AssigneeAvatar name={a} assignees={crmAssignees} size={14} />{a}</span>,
               }))}
-              selectedValues={assigneeFilter}
+              selected={assigneeFilter}
               onChange={setAssigneeFilter}
               onRemove={() => setAssigneeFilter(null)}
             />
@@ -1597,7 +1604,7 @@ export default function CRMPage({
                 key: t.label,
                 display: <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-medium" style={{ backgroundColor: t.bg, color: t.text }}>{t.label}</span>,
               }))}
-              selectedValues={tagsFilter}
+              selected={tagsFilter}
               onChange={setTagsFilter}
               onRemove={() => setTagsFilter(null)}
             />
@@ -1614,7 +1621,7 @@ export default function CRMPage({
                 key: s.label,
                 display: <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.textColor }} />{s.label}</span>,
               }))}
-              selectedValues={statusFilter}
+              selected={statusFilter}
               onChange={setStatusFilter}
               onRemove={() => setStatusFilter(null)}
             />
