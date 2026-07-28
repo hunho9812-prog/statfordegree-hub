@@ -363,6 +363,9 @@ export default function CashReceiptsPage() {
   const router = useRouter();
   const { rows, loading, reload, upsert, remove, reorder } = useCashReceipts();
   const customers = useWorkspaceStore((s) => s.customers);
+  const crmColLabels = useWorkspaceStore((s) => s.crmColLabels);
+  const crmColTypes = useWorkspaceStore((s) => s.crmColTypes);
+  const customColumns = useWorkspaceStore((s) => s.customColumns);
 
   // Column labels (renameable)
   const [colLabels, setColLabels] = useState<Record<ColId, string>>(DEFAULT_LABELS);
@@ -451,9 +454,42 @@ export default function CashReceiptsPage() {
     return result;
   }, [rows, filters, sort]);
 
+  // CRM에서 실제 "담당자" 역할을 하는 열이 무엇인지 찾아 올바른 필드값을 읽음
+  // 우선순위: 1) 레이블이 "담당자"인 builtin 열 → 해당 Customer 필드
+  //           2) 레이블이 "담당자"인 custom 열 → custom_fields[colId]
+  //           3) fallback: c.assignee (기본 담당자 필드)
+  const getCustomerAssignee = useCallback((c: (typeof customers)[number]): string => {
+    const labels = crmColLabels ?? {};
+    const types  = crmColTypes  ?? {};
+    // builtin 열 중 "담당자" 레이블 확인
+    const builtinMap: Record<string, keyof typeof c> = {
+      _assignee: "assignee",
+      _alba: "alba",
+    };
+    for (const [colId, field] of Object.entries(builtinMap)) {
+      const label = labels[colId] ?? (colId === "_assignee" ? "담당자" : "알바");
+      if (label === "담당자") return (c[field] as string) ?? "";
+    }
+    // custom 열 중 type이 "assignee"이고 레이블이 "담당자"인 열
+    for (const col of customColumns) {
+      const colType = types[col.id] ?? col.type;
+      const colLabel = labels[col.id] ?? col.label;
+      if (colType === "assignee" && colLabel === "담당자") {
+        return String(c.custom_fields?.[col.id] ?? "");
+      }
+    }
+    // fallback: 레이블 무관하게 어떤 assignee-type 열이든 값이 있으면 사용
+    if (labels["_alba"] && c.alba) return c.alba;
+    return c.assignee ?? "";
+  }, [crmColLabels, crmColTypes, customColumns]);
+
   const crmCustomers = useMemo(() =>
-    customers.map((c) => ({ id: c.id, name: c.name, assignee: c.assignee ?? "" })),
-    [customers]
+    customers.map((c) => ({
+      id: c.id,
+      name: c.name,
+      assignee: getCustomerAssignee(c),
+    })),
+    [customers, getCustomerAssignee]
   );
 
   const handleAdd = async () => {
