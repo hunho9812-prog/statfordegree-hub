@@ -856,7 +856,7 @@ function ColumnHeader({
 // ─── Add customer row ─────────────────────────────────────────────────────────
 
 const EMPTY_FORM = {
-  name: "", assignee: ASSIGNEES[0], route: "" as CustomerRoute,
+  name: "", assignee: "", route: "" as CustomerRoute,
   settlement_amount: null as number | null, alba: "",
   total_amount: null as number | null, balance: null as number | null,
   custom_fields: {} as Record<string, boolean | string | null>,
