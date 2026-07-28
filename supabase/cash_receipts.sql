@@ -1,7 +1,7 @@
 -- 현금영수증 테이블
 create table if not exists public.cash_receipts (
   id              uuid primary key default gen_random_uuid(),
-  customer_id     uuid references public.customers(id) on delete set null,
+  customer_id     text references public.customers(id) on delete set null,
   customer_name   text not null default '',
   assignee        text not null default '',
   phone           text not null default '',
