@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useWorkspaceStore } from "@/lib/store";
-import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColumnDef, CustomColumnType } from "@/lib/types";
+import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColumnDef, CustomColumnType, CrmTag } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import {
   Plus, Trash2, Settings, X, Check, GripVertical, ArrowRightLeft,
@@ -11,19 +11,33 @@ import {
   ChevronLeft, ChevronRight,
 } from "lucide-react";
 
-const ASSIGNEES = ["김은호", "김세윤", "김현호", "오승준"];
+// 담당자 아바타 색상 팔레트 (인덱스 순환)
+const ASSIGNEE_PALETTE = [
+  { bg: "#fde68a", text: "#78350f" },
+  { bg: "#ddd6fe", text: "#5b21b6" },
+  { bg: "#a7f3d0", text: "#065f46" },
+  { bg: "#fecaca", text: "#991b1b" },
+  { bg: "#bfdbfe", text: "#1e40af" },
+  { bg: "#fcd34d", text: "#92400e" },
+  { bg: "#d9f99d", text: "#3f6212" },
+  { bg: "#fbcfe8", text: "#9d174d" },
+];
 
-const ASSIGNEE_STYLES: Record<string, { bg: string; text: string }> = {
-  "김은호": { bg: "#fde68a", text: "#78350f" },
-  "김세윤": { bg: "#ddd6fe", text: "#5b21b6" },
-  "김현호": { bg: "#a7f3d0", text: "#065f46" },
-  "오승준": { bg: "#fecaca", text: "#991b1b" },
-};
+function getAssigneeStyle(name: string, assignees: string[]) {
+  const idx = assignees.indexOf(name);
+  return ASSIGNEE_PALETTE[idx >= 0 ? idx % ASSIGNEE_PALETTE.length : 0];
+}
 
-const ROUTE_STYLES: Record<string, { bg: string; text: string }> = {
-  "크몽": { bg: "#eef2ff", text: "#4338ca" },
-  "메일": { bg: "#eff6ff", text: "#1d4ed8" },
-};
+const TAG_COLOR_PRESETS: CrmTag[] = [
+  { label: "", bg: "#eef2ff", text: "#4338ca" },
+  { label: "", bg: "#eff6ff", text: "#1d4ed8" },
+  { label: "", bg: "#f0fdf4", text: "#166534" },
+  { label: "", bg: "#fff7ed", text: "#9a3412" },
+  { label: "", bg: "#fef9c3", text: "#854d0e" },
+  { label: "", bg: "#fdf2f8", text: "#9d174d" },
+  { label: "", bg: "#fef2f2", text: "#991b1b" },
+  { label: "", bg: "#f9fafb", text: "#374151" },
+];
 
 // ─── Custom column type metadata ─────────────────────────────────────────────
 
@@ -155,10 +169,62 @@ function AnchoredDropdown({
   );
 }
 
+// ─── Filter chip ─────────────────────────────────────────────────────────────
+
+function FilterChip({ label, values, selectedValues, onChange, onRemove }: {
+  label: string;
+  values: { key: string; display: React.ReactNode }[];
+  selectedValues: Set<string>;
+  onChange: (next: Set<string>) => void;
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const selected = selectedValues.size;
+  const total = values.length;
+  const allSelected = selected === total;
+
+  return (
+    <div className="flex items-center">
+      <button ref={btnRef} onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1 pl-2 pr-1.5 py-1 text-xs rounded-l border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors">
+        <Filter size={10} />
+        <span>{label} 값을 포함하는 데이터</span>
+        {!allSelected && <span className="ml-1 px-1 rounded-full bg-blue-500 text-white text-[10px] font-bold">{selected}</span>}
+        <ChevronDown size={10} className="ml-0.5" />
+      </button>
+      <button onClick={onRemove}
+        className="px-1.5 py-1 text-xs rounded-r border border-l-0 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 text-blue-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors">
+        <X size={10} />
+      </button>
+      <AnchoredDropdown open={open} anchorRef={btnRef} onClose={() => setOpen(false)} width={200}>
+        <div className="p-2">
+          <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
+            <button onClick={() => onChange(new Set(values.map((v) => v.key)))} className="text-[10px] text-blue-500 hover:underline">전체 선택</button>
+            <button onClick={() => onChange(new Set())} className="text-[10px] text-gray-400 hover:underline">선택 해제</button>
+          </div>
+          {values.map(({ key, display }) => (
+            <label key={key} className="flex items-center gap-2 px-1 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#3a3a3a] rounded font-normal">
+              <input type="checkbox" checked={selectedValues.has(key)}
+                onChange={() => {
+                  const next = new Set(selectedValues);
+                  if (next.has(key)) next.delete(key); else next.add(key);
+                  onChange(next);
+                }}
+                className="w-3.5 h-3.5 accent-blue-500" />
+              {display}
+            </label>
+          ))}
+        </div>
+      </AnchoredDropdown>
+    </div>
+  );
+}
+
 // ─── Assignee avatar ──────────────────────────────────────────────────────────
 
-function AssigneeAvatar({ name, size = 18 }: { name: string; size?: number }) {
-  const style = ASSIGNEE_STYLES[name] ?? { bg: "#e5e7eb", text: "#374151" };
+function AssigneeAvatar({ name, size = 18, assignees = [] }: { name: string; size?: number; assignees?: string[] }) {
+  const style = getAssigneeStyle(name, assignees);
   return (
     <span
       className="rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-semibold"
@@ -169,20 +235,20 @@ function AssigneeAvatar({ name, size = 18 }: { name: string; size?: number }) {
   );
 }
 
-function AssigneeCell({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function AssigneeCell({ value, onChange, assignees }: { value: string; onChange: (v: string) => void; assignees: string[] }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   return (
     <>
       <button ref={btnRef} onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 text-left w-full">
-        <AssigneeAvatar name={value} />
+        <AssigneeAvatar name={value} assignees={assignees} />
         <span className="text-xs text-[#37352f] dark:text-[#e6e6e4] truncate">{value || "—"}</span>
       </button>
       <AnchoredDropdown open={open} anchorRef={btnRef} onClose={() => setOpen(false)} width={140}>
-        {ASSIGNEES.map((a) => (
+        {assignees.map((a) => (
           <button key={a} onClick={() => { onChange(a); setOpen(false); }}
             className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-[#3a3a3a]">
-            <AssigneeAvatar name={a} />
+            <AssigneeAvatar name={a} assignees={assignees} />
             <span className="text-[#37352f] dark:text-[#e6e6e4]">{a}</span>
           </button>
         ))}
@@ -191,24 +257,24 @@ function AssigneeCell({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
-function TagsCell({ value, onChange }: { value: CustomerRoute; onChange: (v: CustomerRoute) => void }) {
+function TagsCell({ value, onChange, tags }: { value: CustomerRoute; onChange: (v: CustomerRoute) => void; tags: CrmTag[] }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const style = value ? ROUTE_STYLES[value] : null;
+  const tagDef = tags.find((t) => t.label === value);
   return (
     <>
       <button ref={btnRef} onClick={() => setOpen((o) => !o)} className="text-left">
-        {style ? (
-          <span className="inline-block px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: style.bg, color: style.text }}>{value}</span>
+        {tagDef ? (
+          <span className="inline-block px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: tagDef.bg, color: tagDef.text }}>{value}</span>
         ) : (
           <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
         )}
       </button>
       <AnchoredDropdown open={open} anchorRef={btnRef} onClose={() => setOpen(false)} width={120}>
         <button onClick={() => { onChange(""); setOpen(false); }} className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]">—</button>
-        {(["크몽", "메일"] as CustomerRoute[]).map((r) => (
-          <button key={r} onClick={() => { onChange(r); setOpen(false); }} className="w-full text-left px-3 py-1 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]">
-            <span className="inline-block px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: ROUTE_STYLES[r].bg, color: ROUTE_STYLES[r].text }}>{r}</span>
+        {tags.map((t) => (
+          <button key={t.label} onClick={() => { onChange(t.label as CustomerRoute); setOpen(false); }} className="w-full text-left px-3 py-1 hover:bg-gray-50 dark:hover:bg-[#3a3a3a]">
+            <span className="inline-block px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: t.bg, color: t.text }}>{t.label}</span>
           </button>
         ))}
       </AnchoredDropdown>
@@ -416,6 +482,128 @@ function StatusEditor({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Assignee editor ─────────────────────────────────────────────────────────
+
+function AssigneeEditor({ assignees, onSave, onClose }: {
+  assignees: string[];
+  onSave: (names: string[]) => void;
+  onClose: () => void;
+}) {
+  const [list, setList] = useState(assignees);
+  const [newName, setNewName] = useState("");
+  const add = () => {
+    const t = newName.trim();
+    if (!t || list.includes(t)) return;
+    setList((l) => [...l, t]);
+    setNewName("");
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white dark:bg-[#252525] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-2xl w-[360px] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
+          <h3 className="font-semibold text-[#37352f] dark:text-[#e6e6e4]">담당자 옵션 편집</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={18} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 max-h-60 space-y-1">
+          {list.map((name, idx) => (
+            <div key={name} className="flex items-center justify-between px-3 py-2 rounded bg-gray-50 dark:bg-[#2a2a2a] group">
+              <div className="flex items-center gap-2">
+                <AssigneeAvatar name={name} assignees={list} size={20} />
+                <span className="text-sm text-[#37352f] dark:text-[#e6e6e4]">{name}</span>
+              </div>
+              <button onClick={() => setList((l) => l.filter((_, i) => i !== idx))}
+                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity"><Trash2 size={14} /></button>
+            </div>
+          ))}
+          {list.length === 0 && <p className="text-xs text-gray-300 dark:text-gray-600 px-2">담당자 없음</p>}
+        </div>
+        <div className="border-t border-[#e9e9e7] dark:border-[#3f3f3f] p-4 space-y-3">
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">새 담당자 추가</p>
+          <div className="flex gap-2">
+            <input value={newName} onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && add()}
+              placeholder="이름 입력" className="input-style flex-1 text-sm" />
+            <button onClick={add} disabled={!newName.trim()}
+              className="px-3 py-1.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-40"><Plus size={14} /></button>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="flex-1 py-2 text-sm rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f]">취소</button>
+            <button onClick={() => { onSave(list); onClose(); }} className="flex-1 py-2 text-sm rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600">저장</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tags editor ──────────────────────────────────────────────────────────────
+
+function TagsEditor({ tags, onSave, onClose }: {
+  tags: CrmTag[];
+  onSave: (tags: CrmTag[]) => void;
+  onClose: () => void;
+}) {
+  const [list, setList] = useState(tags);
+  const [newLabel, setNewLabel] = useState("");
+  const [newColor, setNewColor] = useState(TAG_COLOR_PRESETS[0]);
+
+  const add = () => {
+    const t = newLabel.trim();
+    if (!t || list.find((x) => x.label === t)) return;
+    setList((l) => [...l, { label: t, bg: newColor.bg, text: newColor.text }]);
+    setNewLabel("");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white dark:bg-[#252525] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-2xl w-[400px] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e9e9e7] dark:border-[#3f3f3f]">
+          <h3 className="font-semibold text-[#37352f] dark:text-[#e6e6e4]">Tags 옵션 편집</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={18} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 max-h-60 space-y-1">
+          {list.map((tag, idx) => (
+            <div key={tag.label} className="flex items-center justify-between px-3 py-2 rounded bg-gray-50 dark:bg-[#2a2a2a] group">
+              <span className="inline-block px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: tag.bg, color: tag.text }}>{tag.label}</span>
+              <button onClick={() => setList((l) => l.filter((_, i) => i !== idx))}
+                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity"><Trash2 size={14} /></button>
+            </div>
+          ))}
+          {list.length === 0 && <p className="text-xs text-gray-300 dark:text-gray-600 px-2">태그 없음</p>}
+        </div>
+        <div className="border-t border-[#e9e9e7] dark:border-[#3f3f3f] p-4 space-y-3">
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">새 태그 추가</p>
+          <div className="flex gap-2">
+            <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && add()}
+              placeholder="태그 이름" className="input-style flex-1 text-sm" />
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            {TAG_COLOR_PRESETS.map((p, i) => (
+              <button key={i} onClick={() => setNewColor(p)}
+                className={`w-6 h-6 rounded-full border-2 ${newColor.bg === p.bg ? "border-blue-500 scale-110" : "border-transparent"} transition-transform`}
+                style={{ backgroundColor: p.bg }} />
+            ))}
+          </div>
+          {newLabel.trim() && (
+            <span className="inline-block px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: newColor.bg, color: newColor.text }}>{newLabel}</span>
+          )}
+          <div className="flex gap-2">
+            <button onClick={add} disabled={!newLabel.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-40">
+              <Plus size={14} /> 추가
+            </button>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className="flex-1 py-2 text-sm rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f]">취소</button>
+            <button onClick={() => { onSave(list); onClose(); }} className="flex-1 py-2 text-sm rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600">저장</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Notion-style unified column header ──────────────────────────────────────
 
 type SortDir = "asc" | "desc" | null;
@@ -441,6 +629,8 @@ interface ColumnHeaderProps {
   onEditProp?: (label: string, type?: CustomColumnType) => void;
   onDelete?: () => void;
   onEditStatus?: () => void;
+  onEditAssignee?: () => void;
+  onEditTags?: () => void;
   isFirst: boolean;
   isLast: boolean;
 }
@@ -451,7 +641,7 @@ function ColumnHeader({
   assignees, assigneeFilter, onAssigneeFilter,
   allStatuses, statusFilter, onStatusFilter,
   onMoveLeft, onMoveRight, onInsertLeft, onInsertRight,
-  onEditProp, onDelete, onEditStatus,
+  onEditProp, onDelete, onEditStatus, onEditAssignee, onEditTags,
   isFirst, isLast,
 }: ColumnHeaderProps) {
   const [open, setOpen] = useState(false);
@@ -642,6 +832,20 @@ function ColumnHeader({
                   () => { onEditStatus?.(); close(); })}
               </>
             )}
+            {col.id === "_assignee" && (
+              <>
+                <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
+                {mi(<><Settings size={12} className="text-gray-400 flex-shrink-0" /><span>담당자 옵션 편집</span></>,
+                  () => { onEditAssignee?.(); close(); })}
+              </>
+            )}
+            {col.id === "_route" && (
+              <>
+                <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
+                {mi(<><Settings size={12} className="text-gray-400 flex-shrink-0" /><span>Tags 옵션 편집</span></>,
+                  () => { onEditTags?.(); close(); })}
+              </>
+            )}
           </>
         )}
       </AnchoredDropdown>
@@ -659,13 +863,15 @@ const EMPTY_FORM = {
   submit_date: "", status: "", memo: "", monthPageId: null as string | null,
 };
 
-function AddCustomerRow({ statuses, allCols, onSave, onCancel }: {
+function AddCustomerRow({ statuses, allCols, onSave, onCancel, assignees, tags }: {
   statuses: StatusOption[];
   allCols: AnyCol[];
   onSave: (c: Omit<Customer, "id" | "created_at" | "updated_at">) => void;
   onCancel: () => void;
+  assignees: string[];
+  tags: CrmTag[];
 }) {
-  const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [form, setForm] = useState({ ...EMPTY_FORM, assignee: assignees[0] ?? EMPTY_FORM.assignee });
   const nameRef = useRef<HTMLInputElement>(null);
   useEffect(() => { nameRef.current?.focus(); }, []);
 
@@ -687,12 +893,12 @@ function AddCustomerRow({ statuses, allCols, onSave, onCancel }: {
           );
           if (col.id === "_assignee") return (
             <td key={col.id} className="px-3 py-2">
-              <AssigneeCell value={form.assignee} onChange={(v) => set("assignee", v)} />
+              <AssigneeCell value={form.assignee} onChange={(v) => set("assignee", v)} assignees={assignees} />
             </td>
           );
           if (col.id === "_route") return (
             <td key={col.id} className="px-3 py-2">
-              <TagsCell value={form.route} onChange={(v) => set("route", v)} />
+              <TagsCell value={form.route} onChange={(v) => set("route", v)} tags={tags} />
             </td>
           );
           if (col.id === "_alba") return (
@@ -833,7 +1039,7 @@ function MoveModal({ currentMonthPageId, onMove, onClose }: { currentMonthPageId
 
 // ─── Data row ─────────────────────────────────────────────────────────────────
 
-function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, draggable, onDragStart, onDragOver, onDrop, compact }: {
+function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, draggable, onDragStart, onDragOver, onDrop, compact, assignees, tags }: {
   customer: Customer;
   statuses: StatusOption[];
   allCols: AnyCol[];
@@ -845,6 +1051,8 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
   onDragOver?: (e: React.DragEvent) => void;
   onDrop?: () => void;
   compact?: boolean;
+  assignees: string[];
+  tags: CrmTag[];
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
@@ -874,7 +1082,7 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
         // Special case: _route uses a dedicated dropdown (not overridable)
         if (col.id === "_route") return (
           <td key={col.id} className={`${cellCls} min-w-[80px]`}>
-            <TagsCell value={customer.route} onChange={(v) => onUpdate({ route: v })} />
+            <TagsCell value={customer.route} onChange={(v) => onUpdate({ route: v })} tags={tags} />
           </td>
         );
 
@@ -921,7 +1129,7 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
           case "assignee":
             return (
               <td key={col.id} className={`${cellCls} min-w-[90px]`}>
-                <AssigneeCell value={rawStr} onChange={(v) => setVal(v)} />
+                <AssigneeCell value={rawStr} onChange={(v) => setVal(v)} assignees={assignees} />
               </td>
             );
           case "status":
@@ -988,9 +1196,12 @@ export default function CRMPage({
     upsertCustomColumn, deleteCustomColumn, reorderCustomColumns,
     crmColOrder, crmColLabels, crmHiddenCols, crmColTypes,
     setCrmColOrder, setCrmColLabel, setCrmHiddenCols, setCrmColType,
+    crmAssignees, crmTags, setCrmAssignees, setCrmTags,
   } = useWorkspaceStore();
 
   const [showStatusEditor, setShowStatusEditor] = useState(false);
+  const [showAssigneeEditor, setShowAssigneeEditor] = useState(false);
+  const [showTagsEditor, setShowTagsEditor] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [compact, setCompact] = useState(false);
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -1117,6 +1328,7 @@ export default function CRMPage({
   // ─── Filters & sort ───────────────────────────────────────────────────────
   const [assigneeFilter, setAssigneeFilter] = useState<Set<string> | null>(null);
   const [statusFilter, setStatusFilter] = useState<Set<string> | null>(null);
+  const [tagsFilter, setTagsFilter] = useState<Set<string> | null>(null);
   const [sortConfig, setSortConfig] = useState<{ field: string; dir: "asc" | "desc" } | null>(null);
 
   // ─── Unified column order ─────────────────────────────────────────────────
@@ -1262,13 +1474,16 @@ export default function CRMPage({
   // undo 스냅샷 캡처용 ref 동기화 (매 렌더마다 최신값 유지)
   monthScopedRef.current = monthScoped;
 
-  const distinctAssignees = useMemo(() =>
-    Array.from(new Set(monthScoped.map((c) => c.assignee).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko")),
-    [monthScoped]);
+  const distinctAssignees = useMemo(() => {
+    const fromData = new Set(monthScoped.map((c) => c.assignee).filter(Boolean));
+    // 스토어에 정의된 담당자 + 실제 데이터에 있는 담당자 합집합
+    return Array.from(new Set([...crmAssignees, ...fromData]));
+  }, [monthScoped, crmAssignees]);
 
   let visibleCustomers = monthScoped;
   if (assigneeFilter !== null) visibleCustomers = visibleCustomers.filter((c) => assigneeFilter.has(c.assignee));
   if (statusFilter !== null) visibleCustomers = visibleCustomers.filter((c) => statusFilter.has(c.status ?? ""));
+  if (tagsFilter !== null) visibleCustomers = visibleCustomers.filter((c) => tagsFilter.has(c.route ?? ""));
 
   if (sortConfig) {
     const { field, dir } = sortConfig;
@@ -1302,9 +1517,28 @@ export default function CRMPage({
     setShowAddForm(false);
   };
 
-  const activeAssigneeFilters = assigneeFilter ? Array.from(assigneeFilter) : null;
-  const activeStatusFilters = statusFilter ? Array.from(statusFilter) : null;
-  const hasActiveFilter = assigneeFilter !== null || statusFilter !== null;
+  // ─── Filter bar helpers ───────────────────────────────────────────────────
+  const hasActiveFilter = assigneeFilter !== null || statusFilter !== null || tagsFilter !== null;
+
+  const FILTERABLE = [
+    { id: "_assignee", label: "담당자" },
+    { id: "_route",    label: "Tags"  },
+    { id: "_status",   label: "Status"},
+  ] as const;
+
+  const isFilterActive = (id: string) =>
+    (id === "_assignee" && assigneeFilter !== null) ||
+    (id === "_route"    && tagsFilter !== null) ||
+    (id === "_status"   && statusFilter !== null);
+
+  const addFilter = (id: string) => {
+    if (id === "_assignee" && assigneeFilter === null) setAssigneeFilter(new Set(distinctAssignees));
+    if (id === "_route"    && tagsFilter === null)     setTagsFilter(new Set(crmTags.map((t) => t.label)));
+    if (id === "_status"   && statusFilter === null)   setStatusFilter(new Set(customerStatuses.map((s) => s.label)));
+  };
+
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const filterBtnRef = useRef<HTMLButtonElement>(null);
 
   const header = (
     <div className={`border-b border-[#e9e9e7] dark:border-[#2f2f2f]`}>
@@ -1333,47 +1567,85 @@ export default function CRMPage({
           </button>
         </div>
       </div>
-      {/* Filter bar */}
-      {hasActiveFilter && (
-        <div className={`flex items-center gap-2 flex-wrap ${embedded ? "px-4 pb-2" : "px-6 pb-3"}`}>
-          <span className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] flex items-center gap-1"><Filter size={11} /> 필터:</span>
-          {assigneeFilter !== null && (
-            <div className="flex items-center gap-1 flex-wrap">
-              {activeAssigneeFilters!.map((a) => (
-                <span key={a} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300">
-                  <AssigneeAvatar name={a} size={14} /> {a}
-                  <button onClick={() => {
-                    const next = new Set(assigneeFilter);
-                    next.delete(a);
-                    setAssigneeFilter(next.size === 0 ? new Set() : next);
-                  }} className="ml-0.5 hover:text-blue-900"><X size={10} /></button>
-                </span>
-              ))}
-              <button onClick={() => setAssigneeFilter(null)} className="text-[10px] text-gray-400 hover:text-gray-600 underline">전체</button>
-            </div>
+
+      {/* Notion-style filter bar */}
+      <div className={`flex items-center gap-1.5 flex-wrap ${embedded ? "px-4 pb-2" : "px-6 pb-3"}`}>
+        {/* Assignee filter chip */}
+        {assigneeFilter !== null && (() => {
+          const allVals = distinctAssignees;
+          return (
+            <FilterChip
+              label="담당자"
+              values={allVals.map((a) => ({
+                key: a,
+                display: <span className="flex items-center gap-1.5"><AssigneeAvatar name={a} assignees={crmAssignees} size={14} />{a}</span>,
+              }))}
+              selectedValues={assigneeFilter}
+              onChange={setAssigneeFilter}
+              onRemove={() => setAssigneeFilter(null)}
+            />
+          );
+        })()}
+
+        {/* Tags filter chip */}
+        {tagsFilter !== null && (() => {
+          const allTags = crmTags;
+          return (
+            <FilterChip
+              label="Tags"
+              values={allTags.map((t) => ({
+                key: t.label,
+                display: <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-medium" style={{ backgroundColor: t.bg, color: t.text }}>{t.label}</span>,
+              }))}
+              selectedValues={tagsFilter}
+              onChange={setTagsFilter}
+              onRemove={() => setTagsFilter(null)}
+            />
+          );
+        })()}
+
+        {/* Status filter chip */}
+        {statusFilter !== null && (() => {
+          const allStatuses = customerStatuses;
+          return (
+            <FilterChip
+              label="Status"
+              values={allStatuses.map((s) => ({
+                key: s.label,
+                display: <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.textColor }} />{s.label}</span>,
+              }))}
+              selectedValues={statusFilter}
+              onChange={setStatusFilter}
+              onRemove={() => setStatusFilter(null)}
+            />
+          );
+        })()}
+
+        {/* + 필터 button */}
+        <button ref={filterBtnRef} onClick={() => setShowFilterMenu((o) => !o)}
+          className="flex items-center gap-1 px-2 py-1 text-xs rounded border border-dashed border-[#d0d0cc] dark:border-[#4f4f4f] text-[#9b9a97] dark:text-[#6b6b6b] hover:border-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] transition-colors">
+          <Plus size={11} /> 필터
+        </button>
+        <AnchoredDropdown open={showFilterMenu} anchorRef={filterBtnRef} onClose={() => setShowFilterMenu(false)} width={150}>
+          {FILTERABLE.map(({ id, label }) => (
+            <button key={id} onClick={() => { addFilter(id); setShowFilterMenu(false); }}
+              disabled={isFilterActive(id)}
+              className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-[#3a3a3a] disabled:opacity-40 disabled:cursor-not-allowed">
+              <Filter size={11} className="text-gray-400" /> {label}
+              {isFilterActive(id) && <Check size={10} className="ml-auto text-blue-500" />}
+            </button>
+          ))}
+          {hasActiveFilter && (
+            <>
+              <div className="h-px bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-2 my-1" />
+              <button onClick={() => { setAssigneeFilter(null); setStatusFilter(null); setTagsFilter(null); setShowFilterMenu(false); }}
+                className="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20">
+                필터 전체 초기화
+              </button>
+            </>
           )}
-          {statusFilter !== null && (
-            <div className="flex items-center gap-1 flex-wrap">
-              {activeStatusFilters!.map((s) => {
-                const opt = customerStatuses.find((x) => x.label === s);
-                return (
-                  <span key={s} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: opt?.color ?? "#f3f4f6", color: opt?.textColor ?? "#374151" }}>
-                    {s}
-                    <button onClick={() => {
-                      const next = new Set(statusFilter);
-                      next.delete(s);
-                      setStatusFilter(next.size === 0 ? new Set() : next);
-                    }} className="ml-0.5 hover:opacity-70"><X size={10} /></button>
-                  </span>
-                );
-              })}
-              <button onClick={() => setStatusFilter(null)} className="text-[10px] text-gray-400 hover:text-gray-600 underline">전체</button>
-            </div>
-          )}
-          <button onClick={() => { setAssigneeFilter(null); setStatusFilter(null); }}
-            className="text-xs text-red-400 hover:text-red-600 ml-auto">필터 초기화</button>
-        </div>
-      )}
+        </AnchoredDropdown>
+      </div>
     </div>
   );
 
@@ -1404,6 +1676,8 @@ export default function CRMPage({
                   onEditProp={(label, type) => editColProp(col.id, label, type)}
                   onDelete={() => deleteCol(col)}
                   onEditStatus={() => setShowStatusEditor(true)}
+                  onEditAssignee={() => setShowAssigneeEditor(true)}
+                  onEditTags={() => setShowTagsEditor(true)}
                   isFirst={idx === 0}
                   isLast={idx === allCols.length - 1}
                 />
@@ -1445,10 +1719,12 @@ export default function CRMPage({
               onDragOver={(e) => handleRowDragOver(e, c.id)}
               onDrop={() => handleRowDrop(monthPageId)}
               compact={compact}
+              assignees={crmAssignees}
+              tags={crmTags}
             />
           ))}
           {showAddForm ? (
-            <AddCustomerRow statuses={customerStatuses} allCols={allCols} onSave={handleCreateCustomer} onCancel={() => setShowAddForm(false)} />
+            <AddCustomerRow statuses={customerStatuses} allCols={allCols} onSave={handleCreateCustomer} onCancel={() => setShowAddForm(false)} assignees={crmAssignees} tags={crmTags} />
           ) : (
             <AddTriggerRow onAdd={() => setShowAddForm(true)} colSpan={totalColSpan} />
           )}
@@ -1478,6 +1754,8 @@ export default function CRMPage({
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#191919]">{header}{table}</div>
       )}
       {showStatusEditor && <StatusEditor onClose={() => setShowStatusEditor(false)} />}
+      {showAssigneeEditor && <AssigneeEditor assignees={crmAssignees} onSave={setCrmAssignees} onClose={() => setShowAssigneeEditor(false)} />}
+      {showTagsEditor && <TagsEditor tags={crmTags} onSave={setCrmTags} onClose={() => setShowTagsEditor(false)} />}
     </>
   );
 }

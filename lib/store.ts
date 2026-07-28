@@ -1320,6 +1320,11 @@ const freshState = {
   crmColLabels: {} as Record<string, string>,
   crmHiddenCols: [] as string[],
   crmColTypes: {} as Record<string, CustomColumnType>,
+  crmAssignees: ["김은호", "김세윤", "김현호", "오승준"],
+  crmTags: [
+    { label: "크몽", bg: "#eef2ff", text: "#4338ca" },
+    { label: "메일", bg: "#eff6ff", text: "#1d4ed8" },
+  ],
 };
 
 // ── 일회성 localStorage → Supabase 마이그레이션 ──────────────────────────────
@@ -1889,6 +1894,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           return { crmColTypes: next };
         });
       },
+
+      setCrmAssignees: (names) => set({ crmAssignees: names }),
+      setCrmTags: (tags) => set({ crmTags: tags }),
 
       // ── Manual tree actions ────────────────────────────────────────────────
 

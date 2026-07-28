@@ -95,6 +95,14 @@ export interface MonthlyCost {
   expense: number;    // 사업비용
 }
 
+// ─── CRM dynamic options ─────────────────────────────────────────────────────
+
+export interface CrmTag {
+  label: string;
+  bg: string;
+  text: string;
+}
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export interface WorkspaceState {
@@ -130,10 +138,14 @@ export interface WorkspaceState {
   crmColLabels: Record<string, string>; // label overrides by col id
   crmHiddenCols: string[]; // hidden builtin col ids
   crmColTypes: Record<string, CustomColumnType>; // type overrides for all columns (including builtin)
+  crmAssignees: string[];
+  crmTags: CrmTag[];
   setCrmColOrder: (order: string[]) => void;
   setCrmColLabel: (id: string, label: string) => void;
   setCrmHiddenCols: (cols: string[]) => void;
   setCrmColType: (id: string, type: CustomColumnType) => void;
+  setCrmAssignees: (names: string[]) => void;
+  setCrmTags: (tags: CrmTag[]) => void;
   addManualNode: (pageId: string, parentId: string | null, afterId?: string) => string;
   updateManualNode: (pageId: string, nodeId: string, updates: Partial<Pick<ManualNode, "text" | "isExpanded" | "isPinned">>) => void;
   deleteManualNode: (pageId: string, nodeId: string) => void;
