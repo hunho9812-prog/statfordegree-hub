@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 const CARDS = [
-  { emoji: "📊", iconBg: "from-indigo-400 to-blue-600",   title: "통계",    href: "/accounting/stats" },
-  { emoji: "🔄", iconBg: "from-blue-400 to-indigo-500",   title: "자동이체", href: "/accounting/transfer" },
-  { emoji: "👷", iconBg: "from-cyan-400 to-sky-500",      title: "인건비",  href: "/accounting/payroll" },
-  { emoji: "📒", iconBg: "from-green-400 to-emerald-500", title: "장부",    href: "/accounting/ledger" },
+  { emoji: "📊", iconBg: "from-indigo-400 to-blue-600",   title: "통계",      href: "/accounting/stats" },
+  { emoji: "🔄", iconBg: "from-blue-400 to-indigo-500",   title: "자동이체",   href: "/accounting/transfer" },
+  { emoji: "👷", iconBg: "from-cyan-400 to-sky-500",      title: "인건비",    href: "/accounting/payroll" },
+  { emoji: "📒", iconBg: "from-green-400 to-emerald-500", title: "장부",      href: "/accounting/ledger" },
+  { emoji: "🧾", iconBg: "from-orange-400 to-amber-500",  title: "현금영수증", href: "/accounting/cash-receipts" },
 ];
 
 export default function AccountingPage() {
@@ -28,7 +29,7 @@ export default function AccountingPage() {
       </div>
 
       <div className="flex items-center justify-center px-8 py-8">
-        <div className="w-full max-w-xl grid grid-cols-2 gap-4">
+        <div className="w-full max-w-2xl grid grid-cols-2 sm:grid-cols-3 gap-4">
           {CARDS.map((card) => (
             <button
               key={card.href}
