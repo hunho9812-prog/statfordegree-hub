@@ -22,14 +22,14 @@ function shiftYM(ym: string, delta: number) {
   return getYM(d);
 }
 
-function MoneyInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function MoneyInput({ label, value, onChange, allowNegative }: { label: string; value: string; onChange: (v: string) => void; allowNegative?: boolean }) {
   return (
     <div className="flex items-center gap-4">
-      <span className="w-28 flex-shrink-0 text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">{label}</span>
+      <span className="w-32 flex-shrink-0 text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">{label}</span>
       <div className="flex items-center border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg bg-[#f7f6f3] dark:bg-[#2f2f2f] overflow-hidden max-w-72 w-full focus-within:border-green-400 transition-colors">
         <span className="px-3 text-[#9b9a97] text-sm font-semibold">₩</span>
         <input
-          type="number" min="0" step="1" value={value} onChange={(e) => onChange(e.target.value)}
+          type="number" min={allowNegative ? undefined : "0"} step="1" value={value} onChange={(e) => onChange(e.target.value)}
           placeholder="0"
           className="flex-1 bg-transparent outline-none py-2 pr-3 text-sm text-[#37352f] dark:text-[#e6e6e4]"
         />
@@ -38,9 +38,26 @@ function MoneyInput({ label, value, onChange }: { label: string; value: string; 
   );
 }
 
-type DataState = { sales: string; bizCost: string; laborCost: string };
+function ReadonlyMoney({ label, value, accent }: { label: string; value: number; accent?: string }) {
+  const abs = Math.abs(Math.round(value));
+  const sign = value < 0 ? "-" : "";
+  const display = sign + "₩" + abs.toLocaleString("ko-KR");
+  return (
+    <div className="flex items-center gap-4">
+      <span className="w-32 flex-shrink-0 text-sm font-semibold text-[#37352f] dark:text-[#e6e6e4]">{label}</span>
+      <div className="flex items-center border border-dashed border-[#d0d0cc] dark:border-[#4a4a4a] rounded-lg bg-[#f0f0ed] dark:bg-[#272727] overflow-hidden max-w-72 w-full px-3 py-2 gap-2">
+        <span className="text-[10px] text-[#9b9a97] border border-[#d0d0cc] dark:border-[#4a4a4a] rounded px-1">자동</span>
+        <span className={`text-sm font-bold ${accent ?? "text-[#37352f] dark:text-[#e6e6e4]"}`}>{display}</span>
+      </div>
+    </div>
+  );
+}
+
+function calcVat(sales: number) { return Math.floor(sales * 0.1 / 10) * 10; }
+
+type DataState = { sales: string; bizCost: string; laborCost: string; nonOpIncome: string };
 type Toast = { type: "success" | "error"; msg: string };
-const EMPTY: DataState = { sales: "", bizCost: "", laborCost: "" };
+const EMPTY: DataState = { sales: "", bizCost: "", laborCost: "", nonOpIncome: "" };
 
 export default function FluentoLedgerPage() {
   const router = useRouter();
@@ -76,6 +93,7 @@ export default function FluentoLedgerPage() {
         sales: entry.sales ? String(entry.sales) : "",
         bizCost: entry.businessCost ? String(entry.businessCost) : "",
         laborCost: entry.laborCost ? String(entry.laborCost) : "",
+        nonOpIncome: entry.nonOperatingIncome ? String(entry.nonOperatingIncome) : "",
       });
     } else {
       setData(EMPTY);
@@ -90,8 +108,10 @@ export default function FluentoLedgerPage() {
   }, []);
 
   const g = (k: keyof DataState) => parseFloat(data[k]) || 0;
-  const sales = g("sales"), bizCost = g("bizCost"), laborCost = g("laborCost");
-  const profit = sales - bizCost - laborCost;
+  const sales = g("sales"), bizCost = g("bizCost"), laborCost = g("laborCost"), nonOpIncome = g("nonOpIncome");
+  const vat = calcVat(sales);
+  const operatingProfit = sales - vat - bizCost - laborCost;
+  const profit = operatingProfit + nonOpIncome;
 
   const update = useCallback((key: keyof DataState) => (v: string) => {
     setData((prev) => ({ ...prev, [key]: v }));
@@ -101,12 +121,19 @@ export default function FluentoLedgerPage() {
   const handleSave = useCallback(async () => {
     setSaveStatus("saving");
     const [yr, mo] = month.split("-").map(Number);
+    const s = Math.round(parseFloat(data.sales) || 0);
+    const b = Math.round(parseFloat(data.bizCost) || 0);
+    const l = Math.round(parseFloat(data.laborCost) || 0);
+    const n = Math.round(parseFloat(data.nonOpIncome) || 0);
+    const v = calcVat(s);
+    const op = s - v - b - l;
     const result = await upsert({
       year: yr, month: mo,
-      sales: parseFloat(data.sales) || 0,
-      businessCost: parseFloat(data.bizCost) || 0,
-      laborCost: parseFloat(data.laborCost) || 0,
-      profit,
+      sales: s,
+      businessCost: b,
+      laborCost: l,
+      nonOperatingIncome: n,
+      profit: op + n,
     });
     if (result.success) {
       setSaveStatus("saved");
@@ -255,13 +282,18 @@ export default function FluentoLedgerPage() {
               </div>
               <div className="px-5 py-4 flex flex-col gap-3">
                 <MoneyInput label="매출" value={data.sales} onChange={update("sales")} />
+                <ReadonlyMoney label="부가세 (10%)" value={vat} accent="text-orange-500" />
                 <MoneyInput label="사업비용" value={data.bizCost} onChange={update("bizCost")} />
                 <MoneyInput label="인건비" value={data.laborCost} onChange={update("laborCost")} />
+                <ReadonlyMoney label="영업이익" value={operatingProfit} accent={operatingProfit < 0 ? "text-red-500" : "text-green-600 dark:text-green-400"} />
+                <div className="border-t border-dashed border-[#e9e9e7] dark:border-[#3f3f3f] pt-3">
+                  <MoneyInput label="영업외이익" value={data.nonOpIncome} onChange={update("nonOpIncome")} allowNegative />
+                </div>
               </div>
               <div className={`flex items-center justify-between px-5 py-3 ${profit < 0 ? "bg-red-50 dark:bg-red-950/30 border-l-4 border-red-500" : "bg-green-50 dark:bg-green-950/20 border-l-4 border-green-400"}`}>
                 <div>
                   <span className="text-sm font-bold text-[#37352f] dark:text-[#e6e6e4]">순이익</span>
-                  <span className="ml-2 text-xs text-[#9b9a97]">= 매출 − 사업비용 − 인건비</span>
+                  <span className="ml-2 text-xs text-[#9b9a97]">= 영업이익 + 영업외이익</span>
                 </div>
                 <span className={`text-lg font-extrabold ${profit < 0 ? "text-red-500" : "text-green-600 dark:text-green-400"}`}>{fmt(profit)}</span>
               </div>

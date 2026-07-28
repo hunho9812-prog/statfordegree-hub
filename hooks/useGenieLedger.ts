@@ -9,6 +9,7 @@ export interface GenieLedgerEntry {
   sales: number;
   laborCost: number;
   businessCost: number;
+  nonOperatingIncome: number;
   profit: number;
 }
 
@@ -19,6 +20,7 @@ interface GenieLedgerRow {
   sales: number;
   labor_cost: number;
   business_cost: number;
+  non_operating_income: number;
   profit: number;
 }
 
@@ -29,6 +31,7 @@ function rowToEntry(r: GenieLedgerRow): GenieLedgerEntry {
     sales: r.sales,
     laborCost: r.labor_cost,
     businessCost: r.business_cost,
+    nonOperatingIncome: r.non_operating_income ?? 0,
     profit: r.profit,
   };
 }
@@ -69,6 +72,7 @@ export function useGenieLedger() {
         sales: entry.sales,
         labor_cost: entry.laborCost,
         business_cost: entry.businessCost,
+        non_operating_income: entry.nonOperatingIncome,
         profit: entry.profit,
         updated_at: new Date().toISOString(),
       },
