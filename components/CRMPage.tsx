@@ -1491,7 +1491,7 @@ export default function CRMPage({
   if (statusFilter !== null)
     visibleCustomers = visibleCustomers.filter((c) => statusFilter.includes(c.status ?? ""));
   if (tagsFilter !== null)
-    visibleCustomers = visibleCustomers.filter((c) => tagsFilter.includes(c.route ?? ""));
+    visibleCustomers = visibleCustomers.filter((c) => tagsFilter.includes(c.route));
 
   if (sortConfig) {
     const { field, dir } = sortConfig;
@@ -1543,10 +1543,12 @@ export default function CRMPage({
     // 처음 추가 시 전체 선택 → 원하는 항목만 체크 해제하거나, 전체 해제 후 원하는 것만 체크
     if (id === "_assignee" && assigneeFilter === null)
       setAssigneeFilter([...distinctAssignees]);
-    if (id === "_route" && tagsFilter === null)
-      setTagsFilter(crmTags.map((t) => t.label));
+    if (id === "_route" && tagsFilter === null) {
+      const routeVals = Array.from(new Set(monthScoped.map((c) => c.route)));
+      setTagsFilter(routeVals);
+    }
     if (id === "_status" && statusFilter === null)
-      setStatusFilter(customerStatuses.map((s) => s.label));
+      setStatusFilter(Array.from(new Set(monthScoped.map((c) => c.status).filter(Boolean))));
   };
 
   const [showFilterMenu, setShowFilterMenu] = useState(false);
@@ -1601,14 +1603,20 @@ export default function CRMPage({
 
         {/* Tags filter chip */}
         {tagsFilter !== null && (() => {
-          const allTags = crmTags;
+          const tagMap = Object.fromEntries(crmTags.map((t) => [t.label, t]));
+          const allRouteVals = Array.from(new Set(monthScoped.map((c) => c.route)));
           return (
             <FilterChip
               label="Tags"
-              values={allTags.map((t) => ({
-                key: t.label,
-                display: <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-medium" style={{ backgroundColor: t.bg, color: t.text }}>{t.label}</span>,
-              }))}
+              values={allRouteVals.map((r) => {
+                const t = tagMap[r];
+                return {
+                  key: r,
+                  display: t
+                    ? <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-medium" style={{ backgroundColor: t.bg, color: t.text }}>{t.label}</span>
+                    : <span className="text-xs text-gray-400">(없음)</span>,
+                };
+              })}
               selected={tagsFilter}
               onChange={setTagsFilter}
               onRemove={() => setTagsFilter(null)}
@@ -1618,14 +1626,20 @@ export default function CRMPage({
 
         {/* Status filter chip */}
         {statusFilter !== null && (() => {
-          const allStatuses = customerStatuses;
+          const statusMap = Object.fromEntries(customerStatuses.map((s) => [s.label, s]));
+          const allStatusVals = Array.from(new Set(monthScoped.map((c) => c.status).filter(Boolean)));
           return (
             <FilterChip
               label="Status"
-              values={allStatuses.map((s) => ({
-                key: s.label,
-                display: <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.textColor }} />{s.label}</span>,
-              }))}
+              values={allStatusVals.map((label) => {
+                const s = statusMap[label];
+                return {
+                  key: label,
+                  display: s
+                    ? <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.textColor }} />{label}</span>
+                    : <span className="text-xs">{label}</span>,
+                };
+              })}
               selected={statusFilter}
               onChange={setStatusFilter}
               onRemove={() => setStatusFilter(null)}
