@@ -948,7 +948,7 @@ function AddCustomerRow({ statuses, allCols, onSave, onCancel, assignees, tags }
           case "date":
             return <td key={col.id} className="px-3 py-2"><input type="date" value={String(cfVal2 ?? "")} onChange={(e) => cfSet(e.target.value)} className="w-full bg-transparent outline-none text-sm cursor-pointer" /></td>;
           case "assignee":
-            return <td key={col.id} className="px-3 py-2"><AssigneeCell value={String(cfVal2 ?? "")} onChange={(v) => cfSet(v)} /></td>;
+            return <td key={col.id} className="px-3 py-2"><AssigneeCell value={String(cfVal2 ?? "")} onChange={(v) => cfSet(v)} assignees={assignees} /></td>;
           case "status":
             return <td key={col.id} className="px-3 py-2 min-w-[120px]"><StatusCell value={String(cfVal2 ?? "")} statuses={statuses} onChange={(v) => cfSet(v)} /></td>;
           default:
