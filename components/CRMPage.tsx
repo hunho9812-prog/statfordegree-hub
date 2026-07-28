@@ -1478,10 +1478,10 @@ export default function CRMPage({
   // undo 스냅샷 캡처용 ref 동기화 (매 렌더마다 최신값 유지)
   monthScopedRef.current = monthScoped;
 
-  // 필터 선택 목록: 실제 데이터에 존재하는 값만 (유령 이름 제거)
+  // 필터 선택 목록: crmAssignees(관리 목록) + 실제 데이터에 있는 담당자 합집합
   const distinctAssignees = useMemo(
-    () => Array.from(new Set(monthScoped.map((c) => c.assignee).filter(Boolean))),
-    [monthScoped],
+    () => Array.from(new Set([...crmAssignees, ...monthScoped.map((c) => c.assignee).filter(Boolean)])),
+    [monthScoped, crmAssignees],
   );
 
   let visibleCustomers = monthScoped;
@@ -1540,13 +1540,13 @@ export default function CRMPage({
     (id === "_status"   && statusFilter !== null);
 
   const addFilter = (id: string) => {
-    // 처음 추가 시 현재 데이터에 있는 값 전체 선택 → 이후 체크 해제로 제외
+    // 처음 추가 시 전체 선택 → 원하는 항목만 체크 해제하거나, 전체 해제 후 원하는 것만 체크
     if (id === "_assignee" && assigneeFilter === null)
-      setAssigneeFilter(distinctAssignees);
+      setAssigneeFilter([...distinctAssignees]);
     if (id === "_route" && tagsFilter === null)
-      setTagsFilter(Array.from(new Set(monthScoped.map((c) => c.route).filter(Boolean) as string[])));
+      setTagsFilter(crmTags.map((t) => t.label));
     if (id === "_status" && statusFilter === null)
-      setStatusFilter(Array.from(new Set(monthScoped.map((c) => c.status).filter(Boolean))));
+      setStatusFilter(customerStatuses.map((s) => s.label));
   };
 
   const [showFilterMenu, setShowFilterMenu] = useState(false);
