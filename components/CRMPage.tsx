@@ -1700,12 +1700,24 @@ export default function CRMPage({
   const header = (
     <div className={`border-b border-[#e9e9e7] dark:border-[#2f2f2f]`}>
       <div className={`flex items-center justify-between ${embedded ? "px-4 py-3" : "px-6 py-4"}`}>
-        <div>
-          {!embedded && <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">고객 관리</h1>}
-          <div className="flex items-center gap-3 text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
-            <span>총 {visibleCustomers.length}명</span>
-            {monthScoped.length !== visibleCustomers.length && <span className="text-blue-400 text-xs">(필터 적용 중)</span>}
-          </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {!embedded && <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4] mr-1">고객 관리</h1>}
+          <span className="text-sm text-[#9b9a97] dark:text-[#6b6b6b]">총 {visibleCustomers.length}명</span>
+          {monthScoped.length !== visibleCustomers.length && <span className="text-blue-400 text-xs">(필터 적용 중)</span>}
+          <button onClick={() => setCompact((v) => !v)} title="컴팩트 모드 토글"
+            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${compact ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400" : "border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f]"}`}>
+            컴팩트
+          </button>
+          <button onClick={() => setShowAddForm(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+            <Plus size={15} /> 고객 추가
+          </button>
+          {cashReceiptsHref && (
+            <button onClick={() => router.push(cashReceiptsHref)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors">
+              <Receipt size={13} /> 현금영수증
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {undoStack.length > 0 && (
@@ -1714,20 +1726,6 @@ export default function CRMPage({
               ↩ 되돌리기 <span className="font-semibold text-blue-400">{undoStack.length}</span>
             </button>
           )}
-          <button onClick={() => setCompact((v) => !v)} title="컴팩트 모드 토글"
-            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${compact ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400" : "border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f]"}`}>
-            컴팩트
-          </button>
-          {cashReceiptsHref && (
-            <button onClick={() => router.push(cashReceiptsHref)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors">
-              <Receipt size={13} /> 현금영수증
-            </button>
-          )}
-          <button onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-            <Plus size={15} /> 고객 추가
-          </button>
         </div>
       </div>
 
