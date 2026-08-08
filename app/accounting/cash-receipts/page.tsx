@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, Plus, Trash2, GripVertical, Check, X,
   ChevronUp, ChevronDown, ChevronsUpDown,
-  Filter, Search, RefreshCw, Pencil, CheckSquare, Square, ChevronLeft, ChevronRight,
+  Filter, Search, RefreshCw, Pencil, CheckSquare, Square, ChevronLeft, ChevronRight, Users,
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { useCashReceipts } from "@/hooks/useCashReceipts";
@@ -340,13 +340,18 @@ const EMPTY_ROW = (month: string): Omit<CashReceipt, "id" | "display_order"> => 
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function CashReceiptsPage() {
+function CashReceiptsInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { rows, loading, reload, upsert, remove, reorder } = useCashReceipts();
   const customers = useWorkspaceStore((s) => s.customers);
 
-  // Month
-  const [month, setMonth] = useState(getYM);
+  // Month: ?month=YYYY-MM 쿼리 파라미터 우선 사용
+  const [month, setMonth] = useState(() => {
+    const qm = searchParams.get("month");
+    if (qm && /^\d{4}-\d{2}$/.test(qm)) return qm;
+    return getYM();
+  });
 
   // Column labels
   const [colLabels, setColLabels] = useState<Record<ColId, string>>(DEFAULT_LABELS);
@@ -582,6 +587,14 @@ export default function CashReceiptsPage() {
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm bg-blue-500 text-white hover:bg-blue-600 transition-colors">
                   <Plus size={13} /> 추가
                 </button>
+                <button
+                  onClick={() => {
+                    const [y, m] = month.split("-").map(Number);
+                    router.push(`/p/crm-month-${month}?from=cash-receipts`);
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs border border-[#e9e9e7] dark:border-[#3f3f3f] bg-white dark:bg-[#252525] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:border-blue-400 hover:text-blue-500 transition-colors">
+                  <Users size={13} /> 고객관리
+                </button>
               </div>
               <div className="flex items-center gap-3 text-xs text-[#9b9a97]">
                 <span>총 {visibleRows.length}건</span>
@@ -596,7 +609,7 @@ export default function CashReceiptsPage() {
                 {(Object.entries(filters) as [ColId, ColFilter][]).map(([colId, filt]) => {
                   const label = colLabels[colId];
                   if (filt.kind === "multiselect") {
-                    const vals = Array.from(new Set(monthRows.map((r) => getVal(r, colId)).filter(Boolean)));
+                    const vals: string[] = Array.from(new Set(monthRows.map((r) => getVal(r, colId)).filter(Boolean)));
                     return <FilterChipMulti key={colId} label={label} values={vals} filter={filt} onChange={(f) => updateFilter(colId, f)} onRemove={() => removeFilter(colId)} />;
                   }
                   if (filt.kind === "bool") return <FilterChipBool key={colId} label={label} filter={filt} onChange={(f) => updateFilter(colId, f)} onRemove={() => removeFilter(colId)} />;
@@ -770,5 +783,13 @@ export default function CashReceiptsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CashReceiptsPage() {
+  return (
+    <Suspense>
+      <CashReceiptsInner />
+    </Suspense>
   );
 }
