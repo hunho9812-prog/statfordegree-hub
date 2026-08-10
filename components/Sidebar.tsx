@@ -83,7 +83,7 @@ export default function Sidebar() {
             <Users size={16} />
           </button>
         </Link>
-        <Link href="/manual">
+        <Link href="/p/menu-manual">
           <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="메뉴얼">
             <BookOpen size={16} />
           </button>
@@ -195,9 +195,9 @@ export default function Sidebar() {
                   <span>고객관리</span>
                 </div>
               </Link>
-              <Link href="/manual">
+              <Link href="/p/menu-manual">
                 <div className={cn("flex items-center gap-2 px-[10px] py-[7px] rounded-[8px] text-[13px] cursor-pointer transition-colors",
-                  (pathname === "/manual" || pathname.startsWith("/p/menu")) ? "bg-[#e7ebe7] dark:bg-[rgba(94,124,100,0.15)] text-[#2f3430] dark:text-[#e6e6e4]" : "text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)]")}>
+                  pathname.startsWith("/p/menu") ? "bg-[#e7ebe7] dark:bg-[rgba(94,124,100,0.15)] text-[#2f3430] dark:text-[#e6e6e4]" : "text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)]")}>
                   <BookOpen size={14} className="text-[#9aa39b]" />
                   <span>메뉴얼</span>
                 </div>
