@@ -345,6 +345,7 @@ function CashReceiptsInner() {
   const searchParams = useSearchParams();
   const { rows, loading, reload, upsert, remove, reorder } = useCashReceipts();
   const customers = useWorkspaceStore((s) => s.customers);
+  const pages = useWorkspaceStore((s) => s.pages);
 
   // Month: ?month=YYYY-MM 쿼리 파라미터 우선 사용
   const [month, setMonth] = useState(() => {
@@ -414,6 +415,23 @@ function CashReceiptsInner() {
 
   // Drag
   const dragIdx = useRef<number | null>(null);
+
+  // 현재 월에 해당하는 실제 CRM 월 페이지 ID 탐색
+  const crmMonthPageId = useMemo(() => {
+    const [y, m] = month.split("-").map(Number);
+    // 1) 결정론적 ID 먼저 확인 (crm-month-YYYY-MM)
+    const deterministicId = `crm-month-${y}-${String(m).padStart(2, "0")}`;
+    if (pages[deterministicId]) return deterministicId;
+    // 2) store의 페이지 트리에서 연도·월 타이틀로 탐색
+    const yearPage = Object.values(pages).find((p) =>
+      p.title.startsWith(`${y}년`) && !p.parentId
+    ) ?? Object.values(pages).find((p) => new RegExp(`^${y}년`).test(p.title));
+    if (!yearPage) return null;
+    const monthPage = yearPage.children
+      .map((id) => pages[id])
+      .find((p) => p && new RegExp(`^${m}월$`).test(p.title));
+    return monthPage?.id ?? null;
+  }, [month, pages]);
 
   // CRM customers: name → assignee + total_amount 연동
   const crmCustomers = useMemo(() =>
@@ -587,14 +605,13 @@ function CashReceiptsInner() {
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm bg-blue-500 text-white hover:bg-blue-600 transition-colors">
                   <Plus size={13} /> 추가
                 </button>
-                <button
-                  onClick={() => {
-                    const [y, m] = month.split("-").map(Number);
-                    router.push(`/p/crm-month-${month}?from=cash-receipts`);
-                  }}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs border border-[#e9e9e7] dark:border-[#3f3f3f] bg-white dark:bg-[#252525] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:border-blue-400 hover:text-blue-500 transition-colors">
-                  <Users size={13} /> 고객관리
-                </button>
+                {crmMonthPageId && (
+                  <button
+                    onClick={() => router.push(`/p/${crmMonthPageId}`)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs border border-[#e9e9e7] dark:border-[#3f3f3f] bg-white dark:bg-[#252525] text-[#9b9a97] hover:text-blue-500 hover:border-blue-400 transition-colors">
+                    <Users size={13} /> 고객관리
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-3 text-xs text-[#9b9a97]">
                 <span>총 {visibleRows.length}건</span>
