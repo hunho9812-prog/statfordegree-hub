@@ -1,5 +1,5 @@
-import PageEditorWrapper from "@/components/PageEditorWrapper";
+import ManualPage from "@/components/ManualPage";
 
 export default function ManualRoute() {
-  return <PageEditorWrapper pageId="menu-manual" />;
+  return <ManualPage />;
 }

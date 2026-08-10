@@ -847,9 +847,9 @@ function ChecklistManual() {
 ───────────────────────────────────────────── */
 
 const TABS = [
-  { id: "analysis", label: "📊 분석 메뉴얼", icon: <BookOpen size={14} /> },
-  { id: "response", label: "💬 응대·크레도", icon: <MessageSquare size={14} /> },
-  { id: "checklist", label: "☑️ 체크리스트", icon: <CheckSquare size={14} /> },
+  { id: "analysis", label: "📊 분석 메뉴얼" },
+  { id: "response", label: "💬 응대·크레도" },
+  { id: "checklist", label: "☑️ 체크리스트" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -858,26 +858,45 @@ export default function ManualPage() {
   const [activeTab, setActiveTab] = useState<TabId>("analysis");
 
   return (
-    <div className="flex-1 overflow-y-auto bg-white dark:bg-[#191919]">
-      <div className="max-w-3xl mx-auto px-16 py-12">
-        {/* 페이지 제목 */}
-        <div className="flex items-center gap-3 mb-2">
-          <BookOpen size={36} className="text-[#37352f] dark:text-[#e6e6e4]" />
-          <h1 className="text-4xl font-bold text-[#37352f] dark:text-[#e6e6e4]">메뉴얼</h1>
+    <div className="flex-1 flex flex-col min-h-0 bg-[#fbfaf9] dark:bg-[#191919]">
+      {/* 1B 헤더 밴드 */}
+      <div className="bg-white dark:bg-[#1f1f1f] border-b border-[#e9e9e7] dark:border-[#3f3f3f] px-8 pt-4 pb-0 flex-shrink-0">
+        {/* 브레드크럼 */}
+        <div className="flex items-center gap-1.5 text-xs text-[#9b9a97] dark:text-[#6b6b6b] mb-3">
+          <span>📋 메뉴얼</span>
+          <ChevronRight size={11} />
+          <span className="text-[#37352f] dark:text-[#e6e6e4] font-semibold">종합 메뉴얼</span>
         </div>
-        <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b] mb-6">
-          SPSS 분석 가이드 · 고객 응대 크레도 · 응대 체크리스트
-        </p>
+
+        {/* 타이틀 + 메타 + 버튼 */}
+        <div className="flex items-center gap-4 mb-3">
+          <span className="text-3xl leading-none">📖</span>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-2xl font-bold text-[#37352f] dark:text-[#e6e6e4] tracking-tight leading-tight mb-1">
+              메뉴얼
+            </h2>
+            <div className="flex items-center gap-3 text-xs text-[#9b9a97] dark:text-[#6b6b6b]">
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-2 h-2 rounded-full bg-green-400" />
+                최신 업데이트
+              </span>
+              <span className="w-px h-3 bg-[#e9e9e7] dark:bg-[#3f3f3f]" />
+              <span className="text-[#5c9cf0]">저장됨</span>
+              <span className="w-px h-3 bg-[#e9e9e7] dark:bg-[#3f3f3f]" />
+              <span>섹션 3개</span>
+            </div>
+          </div>
+        </div>
 
         {/* 탭 */}
-        <div className="flex gap-1 mb-8 p-1 rounded-lg bg-[#f7f7f5] dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f]">
+        <div className="flex items-end gap-5">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+              className={`text-sm pb-2.5 transition-colors relative whitespace-nowrap ${
                 activeTab === tab.id
-                  ? "bg-white dark:bg-[#191919] text-[#37352f] dark:text-[#e6e6e4] shadow-sm"
+                  ? "text-[#37352f] dark:text-[#e6e6e4] font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#37352f] dark:after:bg-[#e6e6e4] after:rounded-full"
                   : "text-[#9b9a97] dark:text-[#6b6b6b] hover:text-[#37352f] dark:hover:text-[#e6e6e4]"
               }`}
             >
@@ -885,17 +904,20 @@ export default function ManualPage() {
             </button>
           ))}
         </div>
+      </div>
 
-        {/* 탭 콘텐츠 */}
-        {activeTab === "analysis" && <AnalysisManual />}
-        {activeTab === "response" && <ResponseManual />}
-        {activeTab === "checklist" && <ChecklistManual />}
+      {/* 콘텐츠 영역 */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-10 py-8">
+          {activeTab === "analysis" && <AnalysisManual />}
+          {activeTab === "response" && <ResponseManual />}
+          {activeTab === "checklist" && <ChecklistManual />}
 
-        {/* Footer */}
-        <div className="mt-12 pt-6 border-t border-[#e9e9e7] dark:border-[#3f3f3f]">
-          <p className="text-xs text-[#c4c3bf] dark:text-[#4f4f4f] text-center">
-            Statfordegree Hub · 종합 메뉴얼 · 최종 업데이트 2026년 3월
-          </p>
+          <div className="mt-12 pt-6 border-t border-[#e9e9e7] dark:border-[#3f3f3f]">
+            <p className="text-xs text-[#c4c3bf] dark:text-[#4f4f4f] text-center">
+              Statfordegree Hub · 종합 메뉴얼 · 최종 업데이트 2026년 3월
+            </p>
+          </div>
         </div>
       </div>
     </div>
