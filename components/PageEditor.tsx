@@ -337,7 +337,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         }).run();
       } else {
         editor.chain().focus().insertContentAt(pos,
-          `<a href="/api/download?url=${encodeURIComponent(json.url)}&name=${encodeURIComponent(json.name)}" class="tiptap-file-link">📎 ${json.name}</a>`
+          `<a href="/api/download?url=${encodeURIComponent(json.url)}&name=${encodeURIComponent(json.name)}" class="tiptap-file-link" data-ext="${json.name.split('.').pop()?.toLowerCase() ?? ''}">${json.name}</a>`
         ).run();
       }
     } catch {

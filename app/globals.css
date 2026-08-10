@@ -516,3 +516,63 @@ select:focus {
 .dark .tiptap-editor .ProseMirror table td,
 .dark .tiptap-editor .ProseMirror table th { border-color: #3f3f3f; }
 .dark .tiptap-editor .ProseMirror table th { background: #2a2a2a; color: #e6e6e4; }
+
+/* File attachment cards */
+.tiptap-file-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 6px;
+  border: 1px solid #e9e9e7;
+  border-radius: 6px;
+  background: #f7f6f3;
+  color: #37352f;
+  text-decoration: none;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  vertical-align: middle;
+  transition: background 0.15s;
+}
+.tiptap-file-link:hover { background: #efefed; }
+.tiptap-file-link::before {
+  content: '';
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  flex-shrink: 0;
+  /* default: generic file icon */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%236b7280' d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v7h7v9H6z'/%3E%3C/svg%3E");
+}
+/* PDF - 빨간 아이콘 */
+.tiptap-file-link[data-ext="pdf"]::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='4' fill='%23e53e3e'/%3E%3Ctext x='12' y='16' font-family='Arial' font-weight='bold' font-size='8' fill='white' text-anchor='middle'%3EPDF%3C/text%3E%3C/svg%3E");
+}
+/* Word - 파란 아이콘 */
+.tiptap-file-link[data-ext="doc"]::before,
+.tiptap-file-link[data-ext="docx"]::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='4' fill='%232b579a'/%3E%3Ctext x='12' y='16' font-family='Arial' font-weight='bold' font-size='10' fill='white' text-anchor='middle'%3EW%3C/text%3E%3C/svg%3E");
+}
+/* PowerPoint - 주황 아이콘 */
+.tiptap-file-link[data-ext="ppt"]::before,
+.tiptap-file-link[data-ext="pptx"]::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='4' fill='%23d24726'/%3E%3Ctext x='12' y='16' font-family='Arial' font-weight='bold' font-size='10' fill='white' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E");
+}
+/* Excel - 초록 아이콘 */
+.tiptap-file-link[data-ext="xls"]::before,
+.tiptap-file-link[data-ext="xlsx"]::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='4' fill='%23217346'/%3E%3Ctext x='12' y='16' font-family='Arial' font-weight='bold' font-size='10' fill='white' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E");
+}
+/* HWP / HWPX - 하늘색 아이콘 */
+.tiptap-file-link[data-ext="hwp"]::before,
+.tiptap-file-link[data-ext="hwpx"]::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='4' fill='%230077c8'/%3E%3Ctext x='12' y='16' font-family='Arial' font-weight='bold' font-size='8' fill='white' text-anchor='middle'%3EHWP%3C/text%3E%3C/svg%3E");
+}
+.dark .tiptap-file-link {
+  background: #2a2a2a;
+  border-color: #3f3f3f;
+  color: #e6e6e4;
+}
+.dark .tiptap-file-link:hover { background: #333; }
