@@ -860,31 +860,17 @@ export default function ManualPage() {
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#fbfaf9] dark:bg-[#191919]">
       {/* 1B 헤더 밴드 */}
-      <div className="bg-white dark:bg-[#1f1f1f] border-b border-[#e9e9e7] dark:border-[#3f3f3f] px-8 pt-4 pb-0 flex-shrink-0">
-        {/* 브레드크럼 */}
-        <div className="flex items-center gap-1.5 text-xs text-[#9b9a97] dark:text-[#6b6b6b] mb-3">
-          <span>📋 메뉴얼</span>
-          <ChevronRight size={11} />
-          <span className="text-[#37352f] dark:text-[#e6e6e4] font-semibold">종합 메뉴얼</span>
-        </div>
-
-        {/* 타이틀 + 메타 + 버튼 */}
+      <div className="bg-white dark:bg-[#1f1f1f] border-b border-[#e9e9e7] dark:border-[#3f3f3f] px-8 pt-5 pb-0 flex-shrink-0">
+        {/* 타이틀 */}
         <div className="flex items-center gap-4 mb-3">
           <span className="text-3xl leading-none">📖</span>
           <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold text-[#37352f] dark:text-[#e6e6e4] tracking-tight leading-tight mb-1">
+            <h2 className="text-2xl font-bold text-[#37352f] dark:text-[#e6e6e4] tracking-tight leading-tight">
               메뉴얼
             </h2>
-            <div className="flex items-center gap-3 text-xs text-[#9b9a97] dark:text-[#6b6b6b]">
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full bg-green-400" />
-                최신 업데이트
-              </span>
-              <span className="w-px h-3 bg-[#e9e9e7] dark:bg-[#3f3f3f]" />
-              <span className="text-[#5c9cf0]">저장됨</span>
-              <span className="w-px h-3 bg-[#e9e9e7] dark:bg-[#3f3f3f]" />
-              <span>섹션 3개</span>
-            </div>
+            <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] mt-1">
+              SPSS 분석 가이드 · 고객 응대 크레도 · 응대 체크리스트
+            </p>
           </div>
         </div>
 
