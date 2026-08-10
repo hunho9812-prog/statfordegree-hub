@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, Plus, Trash2, GripVertical, Check, X,
   ChevronUp, ChevronDown, ChevronsUpDown,
-  Filter, Search, RefreshCw, Pencil, CheckSquare, Square, ChevronLeft, ChevronRight,
+  Filter, Search, RefreshCw, Pencil, CheckSquare, Square, ChevronLeft, ChevronRight, Users,
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { useCashReceipts } from "@/hooks/useCashReceipts";
@@ -340,13 +340,19 @@ const EMPTY_ROW = (month: string): Omit<CashReceipt, "id" | "display_order"> => 
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function CashReceiptsPage() {
+function CashReceiptsInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { rows, loading, reload, upsert, remove, reorder } = useCashReceipts();
   const customers = useWorkspaceStore((s) => s.customers);
+  const pages = useWorkspaceStore((s) => s.pages);
 
-  // Month
-  const [month, setMonth] = useState(getYM);
+  // Month: ?month=YYYY-MM 쿼리 파라미터 우선 사용
+  const [month, setMonth] = useState(() => {
+    const qm = searchParams.get("month");
+    if (qm && /^\d{4}-\d{2}$/.test(qm)) return qm;
+    return getYM();
+  });
 
   // Column labels
   const [colLabels, setColLabels] = useState<Record<ColId, string>>(DEFAULT_LABELS);
@@ -409,6 +415,23 @@ export default function CashReceiptsPage() {
 
   // Drag
   const dragIdx = useRef<number | null>(null);
+
+  // 현재 월에 해당하는 실제 CRM 월 페이지 ID 탐색
+  const crmMonthPageId = useMemo(() => {
+    const [y, m] = month.split("-").map(Number);
+    // 1) 결정론적 ID 먼저 확인 (crm-month-YYYY-MM)
+    const deterministicId = `crm-month-${y}-${String(m).padStart(2, "0")}`;
+    if (pages[deterministicId]) return deterministicId;
+    // 2) store의 페이지 트리에서 연도·월 타이틀로 탐색
+    const yearPage = Object.values(pages).find((p) =>
+      p.title.startsWith(`${y}년`) && !p.parentId
+    ) ?? Object.values(pages).find((p) => new RegExp(`^${y}년`).test(p.title));
+    if (!yearPage) return null;
+    const monthPage = yearPage.children
+      .map((id) => pages[id])
+      .find((p) => p && new RegExp(`^${m}월$`).test(p.title));
+    return monthPage?.id ?? null;
+  }, [month, pages]);
 
   // CRM customers: name → assignee + total_amount 연동
   const crmCustomers = useMemo(() =>
@@ -582,6 +605,13 @@ export default function CashReceiptsPage() {
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm bg-blue-500 text-white hover:bg-blue-600 transition-colors">
                   <Plus size={13} /> 추가
                 </button>
+                {crmMonthPageId && (
+                  <button
+                    onClick={() => router.push(`/p/${crmMonthPageId}`)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs border border-[#e9e9e7] dark:border-[#3f3f3f] bg-white dark:bg-[#252525] text-[#9b9a97] hover:text-blue-500 hover:border-blue-400 transition-colors">
+                    <Users size={13} /> 고객관리
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-3 text-xs text-[#9b9a97]">
                 <span>총 {visibleRows.length}건</span>
@@ -596,7 +626,7 @@ export default function CashReceiptsPage() {
                 {(Object.entries(filters) as [ColId, ColFilter][]).map(([colId, filt]) => {
                   const label = colLabels[colId];
                   if (filt.kind === "multiselect") {
-                    const vals = Array.from(new Set(monthRows.map((r) => getVal(r, colId)).filter(Boolean)));
+                    const vals: string[] = Array.from(new Set(monthRows.map((r) => getVal(r, colId)).filter(Boolean)));
                     return <FilterChipMulti key={colId} label={label} values={vals} filter={filt} onChange={(f) => updateFilter(colId, f)} onRemove={() => removeFilter(colId)} />;
                   }
                   if (filt.kind === "bool") return <FilterChipBool key={colId} label={label} filter={filt} onChange={(f) => updateFilter(colId, f)} onRemove={() => removeFilter(colId)} />;
@@ -770,5 +800,13 @@ export default function CashReceiptsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CashReceiptsPage() {
+  return (
+    <Suspense>
+      <CashReceiptsInner />
+    </Suspense>
   );
 }
