@@ -2,13 +2,14 @@
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/lib/store";
 import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColumnDef, CustomColumnType, CrmTag } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import {
   Plus, Trash2, Settings, X, Check, GripVertical, ArrowRightLeft,
   Filter, ChevronUp, ChevronDown, Pencil,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Receipt,
 } from "lucide-react";
 
 // 담당자 아바타 색상 팔레트 (인덱스 순환)
@@ -1236,6 +1237,16 @@ export default function CRMPage({
   monthPageId?: string | null;
   embedded?: boolean;
 }) {
+  const router = useRouter();
+
+  // monthPageId가 "crm-month-YYYY-MM" 형식이면 현금영수증 링크 생성
+  const cashReceiptsHref = useMemo(() => {
+    if (!monthPageId) return null;
+    const m = monthPageId.match(/^crm-month-(\d{4})-(\d{2})$/);
+    if (!m) return null;
+    return `/accounting/cash-receipts?month=${m[1]}-${m[2]}`;
+  }, [monthPageId]);
+
   const {
     customers, customerStatuses, customColumns,
     createCustomer, updateCustomer, deleteCustomer, restoreCustomer, reorderCustomers,
@@ -1689,20 +1700,10 @@ export default function CRMPage({
   const header = (
     <div className={`border-b border-[#e9e9e7] dark:border-[#2f2f2f]`}>
       <div className={`flex items-center justify-between ${embedded ? "px-4 py-3" : "px-8 py-4"}`}>
-        <div>
-          {!embedded && <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">고객 관리</h1>}
-          <div className="flex items-center gap-3 text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
-            <span>총 {visibleCustomers.length}명</span>
-            {monthScoped.length !== visibleCustomers.length && <span className="text-blue-400 text-xs">(필터 적용 중)</span>}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {undoStack.length > 0 && (
-            <button onClick={handleUndo} title={`실행 취소 (Ctrl+Z) — ${undoStack.length}단계 남음`}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors">
-              ↩ 되돌리기 <span className="font-semibold text-blue-400">{undoStack.length}</span>
-            </button>
-          )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {!embedded && <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4] mr-1">고객 관리</h1>}
+          <span className="text-sm text-[#9b9a97] dark:text-[#6b6b6b]">총 {visibleCustomers.length}명</span>
+          {monthScoped.length !== visibleCustomers.length && <span className="text-blue-400 text-xs">(필터 적용 중)</span>}
           <button onClick={() => setCompact((v) => !v)} title="컴팩트 모드 토글"
             className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${compact ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400" : "border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f]"}`}>
             컴팩트
@@ -1711,6 +1712,20 @@ export default function CRMPage({
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
             <Plus size={15} /> 고객 추가
           </button>
+          {cashReceiptsHref && (
+            <button onClick={() => router.push(cashReceiptsHref)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors">
+              <Receipt size={13} /> 현금영수증
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {undoStack.length > 0 && (
+            <button onClick={handleUndo} title={`실행 취소 (Ctrl+Z) — ${undoStack.length}단계 남음`}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors">
+              ↩ 되돌리기 <span className="font-semibold text-blue-400">{undoStack.length}</span>
+            </button>
+          )}
         </div>
       </div>
 
