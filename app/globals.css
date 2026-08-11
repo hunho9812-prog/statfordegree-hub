@@ -516,3 +516,73 @@ select:focus {
 .dark .tiptap-editor .ProseMirror table td,
 .dark .tiptap-editor .ProseMirror table th { border-color: #3f3f3f; }
 .dark .tiptap-editor .ProseMirror table th { background: #2a2a2a; color: #e6e6e4; }
+
+/* ─── File attachment link card ─────────────────────────────────────────── */
+.tiptap-file-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #e0e4e0;
+  background: #f7f9f7;
+  color: #2f3430;
+  text-decoration: none;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tiptap-file-link:hover { background: #eef0ed; }
+.dark .tiptap-file-link { border-color: #3a3a3a; background: #252525; color: #e6e6e4; }
+.dark .tiptap-file-link:hover { background: #2f2f2f; }
+
+/* icon badge via ::before */
+.tiptap-file-link::before {
+  content: "";
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: #9aa39b;
+  /* default grey icon */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3C/svg%3E");
+}
+
+/* PDF */
+.tiptap-file-link[data-ext="pdf"]::before {
+  background-color: #e53e3e;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='4' fill='%23e53e3e'/%3E%3Ctext x='50%25' y='68%25' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='9' fill='white'%3EPDF%3C/text%3E%3C/svg%3E");
+}
+
+/* Word */
+.tiptap-file-link[data-ext="doc"]::before,
+.tiptap-file-link[data-ext="docx"]::before {
+  background-color: #2b5797;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='4' fill='%232b5797'/%3E%3Ctext x='50%25' y='68%25' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='12' fill='white'%3EW%3C/text%3E%3C/svg%3E");
+}
+
+/* PowerPoint */
+.tiptap-file-link[data-ext="ppt"]::before,
+.tiptap-file-link[data-ext="pptx"]::before {
+  background-color: #d24726;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='4' fill='%23d24726'/%3E%3Ctext x='50%25' y='68%25' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='12' fill='white'%3EP%3C/text%3E%3C/svg%3E");
+}
+
+/* Excel */
+.tiptap-file-link[data-ext="xls"]::before,
+.tiptap-file-link[data-ext="xlsx"]::before {
+  background-color: #1d6f42;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='4' fill='%231d6f42'/%3E%3Ctext x='50%25' y='68%25' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='12' fill='white'%3EX%3C/text%3E%3C/svg%3E");
+}
+
+/* HWP */
+.tiptap-file-link[data-ext="hwp"]::before,
+.tiptap-file-link[data-ext="hwpx"]::before {
+  background-color: #1a73e8;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='4' fill='%231a73e8'/%3E%3Ctext x='50%25' y='68%25' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='8' fill='white'%3EHWP%3C/text%3E%3C/svg%3E");
+}
