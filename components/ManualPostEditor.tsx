@@ -135,9 +135,9 @@ export default function ManualPostEditor({ post }: Props) {
   const isAdmin = profile?.role === "admin";
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white dark:bg-[#1e1e1e]">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-[#e9ece9] dark:border-[#2f2f2f] flex-shrink-0 gap-3">
+      <div className="flex items-center gap-3 px-6 pt-4 pb-3 border-b border-[#e9ece9] dark:border-[#2f2f2f] flex-shrink-0">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <select
             value={category}
@@ -187,47 +187,52 @@ export default function ManualPostEditor({ post }: Props) {
         </div>
       </div>
 
-      {/* Title */}
-      <div className="px-8 pt-5 pb-2 flex-shrink-0">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="제목을 입력하세요"
-          className="w-full text-[22px] font-bold text-[#2f3430] dark:text-[#e6e6e4] placeholder-[#c8cfc8] bg-transparent focus:outline-none border-none"
-        />
-      </div>
+      {/* Content area — centered column */}
+      <div className="flex-1 overflow-auto">
+        <div className="max-w-3xl mx-auto px-8">
+          {/* Title */}
+          <div className="pt-8 pb-3">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="제목을 입력하세요"
+              className="w-full text-[26px] font-bold text-[#2f3430] dark:text-[#e6e6e4] placeholder-[#c8cfc8] bg-transparent focus:outline-none border-none leading-snug"
+            />
+          </div>
 
-      {/* Toolbar */}
-      <div className="px-6 py-1.5 border-b border-[#e9ece9] dark:border-[#2f2f2f] flex items-center gap-0.5 flex-shrink-0 flex-wrap">
-        {editor && (
-          <>
-            <ToolBtn onClick={() => editor.chain().focus().undo().run()} title="실행취소"><Undo size={15} /></ToolBtn>
-            <ToolBtn onClick={() => editor.chain().focus().redo().run()} title="다시실행"><Redo size={15} /></ToolBtn>
-            <Divider />
-            <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="굵게"><Bold size={15} /></ToolBtn>
-            <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="기울임"><Italic size={15} /></ToolBtn>
-            <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="밑줄"><UnderlineIcon size={15} /></ToolBtn>
-            <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive("strike")} title="취소선"><Strikethrough size={15} /></ToolBtn>
-            <Divider />
-            <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="왼쪽 정렬"><AlignLeft size={15} /></ToolBtn>
-            <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="가운데 정렬"><AlignCenter size={15} /></ToolBtn>
-            <ToolBtn onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="오른쪽 정렬"><AlignRight size={15} /></ToolBtn>
-            <Divider />
-            <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="글머리 기호"><List size={15} /></ToolBtn>
-            <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="번호 목록"><ListOrdered size={15} /></ToolBtn>
-            <Divider />
-            <ToolBtn onClick={addLink} active={editor.isActive("link")} title="링크"><LinkIcon size={15} /></ToolBtn>
-            <label title="파일 업로드 (이미지·문서·동영상)" className={cn("w-7 h-7 flex items-center justify-center rounded cursor-pointer text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)] transition-colors", uploading && "opacity-50 pointer-events-none")}>
-              {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
-              <input type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ""; }} />
-            </label>
-          </>
-        )}
-      </div>
+          {/* Toolbar */}
+          <div className="py-1.5 border-y border-[#e9ece9] dark:border-[#2f2f2f] flex items-center gap-0.5 flex-wrap mb-4">
+            {editor && (
+              <>
+                <ToolBtn onClick={() => editor.chain().focus().undo().run()} title="실행취소"><Undo size={15} /></ToolBtn>
+                <ToolBtn onClick={() => editor.chain().focus().redo().run()} title="다시실행"><Redo size={15} /></ToolBtn>
+                <Divider />
+                <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="굵게"><Bold size={15} /></ToolBtn>
+                <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="기울임"><Italic size={15} /></ToolBtn>
+                <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="밑줄"><UnderlineIcon size={15} /></ToolBtn>
+                <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive("strike")} title="취소선"><Strikethrough size={15} /></ToolBtn>
+                <Divider />
+                <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="왼쪽 정렬"><AlignLeft size={15} /></ToolBtn>
+                <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="가운데 정렬"><AlignCenter size={15} /></ToolBtn>
+                <ToolBtn onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="오른쪽 정렬"><AlignRight size={15} /></ToolBtn>
+                <Divider />
+                <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="글머리 기호"><List size={15} /></ToolBtn>
+                <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="번호 목록"><ListOrdered size={15} /></ToolBtn>
+                <Divider />
+                <ToolBtn onClick={addLink} active={editor.isActive("link")} title="링크"><LinkIcon size={15} /></ToolBtn>
+                <label title="파일 업로드 (이미지·문서·동영상)" className={cn("w-7 h-7 flex items-center justify-center rounded cursor-pointer text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)] transition-colors", uploading && "opacity-50 pointer-events-none")}>
+                  {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
+                  <input type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ""; }} />
+                </label>
+              </>
+            )}
+          </div>
 
-      {/* Editor body */}
-      <div className="flex-1 overflow-auto px-8 py-4">
-        {editor && <EditorContent editor={editor} />}
+          {/* Editor body */}
+          <div className="pb-12">
+            {editor && <EditorContent editor={editor} />}
+          </div>
+        </div>
       </div>
     </div>
   );

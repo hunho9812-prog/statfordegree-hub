@@ -137,7 +137,8 @@ export default function ManualPostView({ postId }: Props) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto px-8 py-6">
+      <div className="flex-1 overflow-auto">
+      <div className="max-w-3xl mx-auto px-8 py-6">
         {/* Meta */}
         <div className="flex items-center gap-2 mb-3">
           {post.is_notice && (
@@ -174,6 +175,7 @@ export default function ManualPostView({ postId }: Props) {
         </div>
 
         {editor && <EditorContent editor={editor} />}
+      </div>
       </div>
     </div>
   );
