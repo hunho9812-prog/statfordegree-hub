@@ -1699,7 +1699,7 @@ export default function CRMPage({
 
   const header = (
     <div className={`border-b border-[#e9e9e7] dark:border-[#2f2f2f]`}>
-      <div className={`flex items-center justify-between ${embedded ? "px-4 py-3" : "px-6 py-4"}`}>
+      <div className={`flex items-center justify-between ${embedded ? "px-4 py-3" : "px-8 py-4"}`}>
         <div className="flex items-center gap-2 flex-wrap">
           {!embedded && <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4] mr-1">고객 관리</h1>}
           <span className="text-sm text-[#9b9a97] dark:text-[#6b6b6b]">총 {visibleCustomers.length}명</span>
@@ -1769,7 +1769,7 @@ export default function CRMPage({
   );
 
   const table = (
-    <div className={embedded ? "overflow-x-auto" : "flex-1 overflow-auto"}>
+    <div className={embedded ? "overflow-x-auto" : "flex-1 overflow-auto px-2"}>
       <table className="w-full border-collapse text-[#37352f] dark:text-[#e6e6e4] text-sm">
         <thead className="sticky top-0 bg-[#f7f6f3] dark:bg-[#252525] z-10">
           <tr>

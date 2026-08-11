@@ -24,18 +24,6 @@ export async function POST(req: NextRequest) {
     // 3. Supabase Storage 업로드
     const admin = createAdminClient();
 
-    // 버킷이 없으면 자동 생성 (public 버킷)
-    const { error: bucketCheckError } = await admin.storage.getBucket("uploads");
-    if (bucketCheckError) {
-      const { error: createError } = await admin.storage.createBucket("uploads", {
-        public: true,
-        fileSizeLimit: 52428800, // 50MB
-      });
-      if (createError && !createError.message.includes("already exists")) {
-        return NextResponse.json({ error: `버킷 생성 실패: ${createError.message}` }, { status: 500 });
-      }
-    }
-
     const safeName = file.name.replace(/[^a-zA-Z0-9._\-]/g, "_");
     const path = `${user.id}/${Date.now()}-${safeName}`;
 

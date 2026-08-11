@@ -87,7 +87,7 @@ export default function TaskBoard() {
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col bg-white dark:bg-[#191919]">
-      <div className="px-8 py-6 border-b border-[#e9e9e7] dark:border-[#2f2f2f] flex items-center justify-between">
+      <div className="px-6 py-4 border-b border-[#e9e9e7] dark:border-[#2f2f2f] flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#37352f] dark:text-[#e6e6e4]">업무 보드</h1>
           <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b] mt-1">
@@ -105,8 +105,8 @@ export default function TaskBoard() {
         </button>
       </div>
 
-      <div className="flex-1 overflow-x-auto p-8">
-        <div className="flex gap-5 h-full min-w-[700px]">
+      <div className="flex-1 overflow-x-auto px-6 py-5">
+        <div className="flex gap-4 h-full min-w-[660px] max-w-[1200px]">
           {COLUMNS.map((col) => {
             const colTasks = getTasksByStatus(col.id);
             return (
