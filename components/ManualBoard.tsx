@@ -61,10 +61,10 @@ export default function ManualBoard() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-[#e9ece9] dark:border-[#2f2f2f] flex-shrink-0">
-        <div>
-          <h1 className="text-[18px] font-bold text-[#2f3430] dark:text-[#e6e6e4]">메뉴얼</h1>
-          <p className="text-[12px] text-[#9aa39b] mt-0.5">팀 공유 자료 및 지침</p>
+      <div className="flex items-center gap-4 px-6 pt-4 pb-3 border-b border-[#e9ece9] dark:border-[#2f2f2f] flex-shrink-0">
+        <div className="flex-shrink-0">
+          <h1 className="text-[16px] font-bold text-[#2f3430] dark:text-[#e6e6e4] leading-tight">메뉴얼</h1>
+          <p className="text-[11px] text-[#9aa39b]">팀 공유 자료 및 지침</p>
         </div>
         <div className="flex items-center gap-2">
           <form onSubmit={handleSearch} className="flex items-center gap-1">
@@ -74,7 +74,7 @@ export default function ManualBoard() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="제목 검색"
-                className="pl-8 pr-3 py-1.5 text-[13px] border border-[#e0e4e0] dark:border-[#3a3a3a] rounded-md bg-white dark:bg-[#2a2a2a] text-[#2f3430] dark:text-[#e6e6e4] placeholder-[#b0b8b0] focus:outline-none focus:ring-1 focus:ring-[#5e7c64] w-48"
+                className="pl-8 pr-3 py-1.5 text-[13px] border border-[#e0e4e0] dark:border-[#3a3a3a] rounded-md bg-white dark:bg-[#2a2a2a] text-[#2f3430] dark:text-[#e6e6e4] placeholder-[#b0b8b0] focus:outline-none focus:ring-1 focus:ring-[#5e7c64] w-44"
               />
             </div>
             <button type="submit" className="px-3 py-1.5 text-[13px] bg-[#5e7c64] hover:bg-[#4d6b53] text-white rounded-md transition-colors">
