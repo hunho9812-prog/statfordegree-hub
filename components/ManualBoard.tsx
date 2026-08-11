@@ -61,7 +61,8 @@ export default function ManualBoard() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-4 px-6 pt-4 pb-3 border-b border-[#e9ece9] dark:border-[#2f2f2f] flex-shrink-0">
+      <div className="border-b border-[#e9ece9] dark:border-[#2f2f2f] flex-shrink-0">
+      <div className="max-w-5xl mx-auto px-8 py-4 flex items-center gap-4">
         <div className="flex-shrink-0">
           <h1 className="text-[16px] font-bold text-[#2f3430] dark:text-[#e6e6e4] leading-tight">메뉴얼</h1>
           <p className="text-[11px] text-[#9aa39b]">팀 공유 자료 및 지침</p>
@@ -90,9 +91,11 @@ export default function ManualBoard() {
           </button>
         </div>
       </div>
+      </div>
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
+      <div className="max-w-5xl mx-auto">
         <table className="w-full text-[13px]">
           <thead>
             <tr className="border-b border-[#e9ece9] dark:border-[#2f2f2f] text-[#9aa39b] text-left">
@@ -164,6 +167,7 @@ export default function ManualBoard() {
             )}
           </tbody>
         </table>
+      </div>
       </div>
 
       {/* Pagination */}
