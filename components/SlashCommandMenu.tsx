@@ -16,6 +16,9 @@ import {
   Quote,
   Image,
   Lightbulb,
+  Table2,
+  Video,
+  ChevronsDownUp,
 } from "lucide-react";
 
 export interface SlashCommandItem {
@@ -95,9 +98,31 @@ export const SLASH_COMMANDS: SlashCommandItem[] = [
   },
   // Blocks
   {
+    id: "toggleH2",
+    title: "토글 중주제",
+    description: "접기 / 펼치기 H2 헤딩",
+    icon: <ChevronsDownUp size={18} />,
+    group: "블록",
+    command: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      (editor.commands as unknown as Record<string, () => boolean>).insertToggleH2?.();
+    },
+  },
+  {
+    id: "toggleH3",
+    title: "토글 소주제",
+    description: "접기 / 펼치기 H3 헤딩",
+    icon: <ChevronRight size={18} />,
+    group: "블록",
+    command: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      (editor.commands as unknown as Record<string, () => boolean>).insertToggleH3?.();
+    },
+  },
+  {
     id: "toggle",
-    title: "토글",
-    description: "접기 / 펼치기 블록",
+    title: "토글 블록",
+    description: "접기 / 펼치기 일반 블록",
     icon: <ChevronRight size={18} />,
     group: "블록",
     command: (editor, range) => {
@@ -162,6 +187,39 @@ export const SLASH_COMMANDS: SlashCommandItem[] = [
       } else {
         editor.chain().focus().deleteRange(range).run();
       }
+    },
+  },
+  {
+    id: "video",
+    title: "동영상",
+    description: "mp4 URL 또는 YouTube 링크",
+    icon: <Video size={18} />,
+    group: "미디어",
+    command: (editor, range) => {
+      const url = prompt("동영상 URL (mp4 또는 YouTube)을 입력하세요:");
+      if (url) {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "videoBlock",
+          attrs: { src: url, title: "" },
+        }).run();
+      } else {
+        editor.chain().focus().deleteRange(range).run();
+      }
+    },
+  },
+  {
+    id: "table",
+    title: "표",
+    description: "3×3 표 삽입",
+    icon: <Table2 size={18} />,
+    group: "미디어",
+    command: (editor, range) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+        .run();
     },
   },
 ];

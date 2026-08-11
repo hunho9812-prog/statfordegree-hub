@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Page, Task, Customer, StatusOption, ManualNode } from "./types";
+import type { Page, Task, Customer, StatusOption, CustomColumnDef, ManualNode } from "./types";
 
 // ── Type mappers ──────────────────────────────────────────────────────────────
 
@@ -71,14 +71,12 @@ function dbToCustomer(r: Record<string, unknown>): Customer {
     alba: r.alba as string,
     total_amount: r.total_amount as number | null,
     balance: r.balance as number | null,
-    review_proposed: r.review_proposed as boolean,
-    balance_received: r.balance_received as boolean,
-    kmong_review: r.kmong_review as boolean,
-    kakao_review: r.kakao_review as boolean,
+    custom_fields: (r.custom_fields as Record<string, boolean>) ?? {},
     submit_date: (r.submit_date as string) ?? "",
     status: r.status as string,
     memo: r.memo as string,
     monthPageId: r.month_page_id as string | null,
+    display_order: r.display_order as number | null ?? null,
     created_at: r.created_at as string,
     updated_at: r.updated_at as string,
   };
@@ -94,14 +92,12 @@ function customerToDb(c: Customer) {
     alba: c.alba,
     total_amount: c.total_amount,
     balance: c.balance,
-    review_proposed: c.review_proposed,
-    balance_received: c.balance_received,
-    kmong_review: c.kmong_review,
-    kakao_review: c.kakao_review,
+    custom_fields: c.custom_fields ?? {},
     submit_date: c.submit_date || null,
     status: c.status,
     memo: c.memo,
     month_page_id: c.monthPageId,
+    display_order: c.display_order ?? null,
     created_at: c.created_at,
     updated_at: c.updated_at,
   };
@@ -124,6 +120,24 @@ function statusToDb(s: StatusOption) {
     color: s.color,
     text_color: s.textColor,
     category: s.category,
+  };
+}
+
+function dbToColumn(r: Record<string, unknown>): CustomColumnDef {
+  return {
+    id: r.id as string,
+    label: r.label as string,
+    type: r.type as CustomColumnDef["type"],
+    order: r.sort_order as number,
+  };
+}
+
+function columnToDb(c: CustomColumnDef) {
+  return {
+    id: c.id,
+    label: c.label,
+    type: c.type,
+    sort_order: c.order,
   };
 }
 
@@ -226,10 +240,14 @@ export const dbCustomers = {
     return (data ?? []).map(dbToCustomer);
   },
 
-  async upsert(customer: Customer): Promise<void> {
-    if (!supabase) return;
+  async upsert(customer: Customer): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: true };
     const { error } = await supabase.from("customers").upsert(customerToDb(customer));
-    if (error) console.error("dbCustomers.upsert", error);
+    if (error) {
+      console.error("dbCustomers.upsert", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
   },
 
   async delete(id: string): Promise<void> {
@@ -265,6 +283,35 @@ export const dbCustomerStatuses = {
     if (!supabase) return;
     const { error } = await supabase.from("customer_statuses").delete().eq("id", id);
     if (error) console.error("dbCustomerStatuses.delete", error);
+  },
+};
+
+// ── Table Columns (dynamic checkbox columns metadata) ─────────────────────────
+
+export const dbTableColumns = {
+  async fetchAll(): Promise<CustomColumnDef[]> {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from("table_columns").select("*").order("sort_order");
+    if (error) { console.error("dbTableColumns.fetchAll", error); return []; }
+    return (data ?? []).map(dbToColumn);
+  },
+
+  async upsert(column: CustomColumnDef): Promise<void> {
+    if (!supabase) return;
+    const { error } = await supabase.from("table_columns").upsert(columnToDb(column));
+    if (error) console.error("dbTableColumns.upsert", error);
+  },
+
+  async upsertMany(columns: CustomColumnDef[]): Promise<void> {
+    if (!supabase || columns.length === 0) return;
+    const { error } = await supabase.from("table_columns").upsert(columns.map(columnToDb));
+    if (error) console.error("dbTableColumns.upsertMany", error);
+  },
+
+  async delete(id: string): Promise<void> {
+    if (!supabase) return;
+    const { error } = await supabase.from("table_columns").delete().eq("id", id);
+    if (error) console.error("dbTableColumns.delete", error);
   },
 };
 

@@ -11,14 +11,23 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import TextStyle from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
+import Image from "@tiptap/extension-image";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
 import { useWorkspaceStore } from "@/lib/store";
 import { formatRelativeTime } from "@/lib/utils";
 import EditorMenuBar from "./EditorMenuBar";
 import SlashCommandMenu, { SLASH_COMMANDS } from "./SlashCommandMenu";
 import { ToggleBlock } from "./extensions/ToggleBlock";
+import { FontSize } from "./extensions/FontSize";
+import { ToggleHeading } from "./extensions/ToggleHeading";
 import { CalloutBlock } from "./extensions/CalloutBlock";
-import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical, ImageUp, FileUp, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { VideoBlock } from "./extensions/VideoBlock";
+import { FileAttachment } from "./extensions/FileAttachment";
+import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical, ImageUp, FileUp, Loader2, MoreHorizontal, Pencil, AlertTriangle, ChevronDown as ChevronDownIcon } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
 import MonthPageManager from "./MonthPageManager";
 import CRMPage from "./CRMPage";
 import YearRevenueDashboard from "./YearRevenueDashboard";
@@ -53,7 +62,8 @@ interface DragState {
 
 export default function PageEditor({ pageId }: { pageId: string }) {
   const router = useRouter();
-  const { pages, updatePage, createPage } = useWorkspaceStore();
+  const pathname = usePathname();
+  const { pages, updatePage, createPage, deletePage } = useWorkspaceStore();
   const page = pages[pageId];
 
   const [title, setTitle] = useState(page?.title || "");
@@ -67,9 +77,13 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   });
 
   const [blockButtons, setBlockButtons] = useState<BlockButton[]>([]);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [customColor, setCustomColor] = useState("");
   const [blockMenuOpen, setBlockMenuOpen] = useState(false);
   const [blockMenuCoords, setBlockMenuCoords] = useState({ x: 0, y: 0 });
   const [dropBtnIdx, setDropBtnIdx] = useState<number | null>(null);
+  const [hoveredBtnIdx, setHoveredBtnIdx] = useState<number | null>(null);
+  const hoveredBtnIdxRef = useRef<number | null>(null);
 
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const titleSaveTimer = useRef<NodeJS.Timeout | null>(null);
@@ -88,6 +102,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadPosRef = useRef<number>(0);
+  const uploadFnRef = useRef<((file: File, isImage: boolean) => void) | null>(null);
   const [uploading, setUploading] = useState(false);
 
   const closeSlashMenu = useCallback(() => {
@@ -103,6 +118,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           return "'/' 를 입력하여 블록을 추가하세요";
         },
         emptyEditorClass: "is-editor-empty",
+        showOnlyCurrent: true,
         includeChildren: true,
       }),
       TaskList,
@@ -115,8 +131,17 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       }),
       TextStyle,
       Color,
+      FontSize,
+      Image.configure({ inline: false, allowBase64: true }),
       ToggleBlock,
+      ToggleHeading,
       CalloutBlock,
+      VideoBlock,
+      FileAttachment,
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableCell,
+      TableHeader,
     ],
     content: page?.content
       ? JSON.parse(page.content)
@@ -184,6 +209,34 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           }
         }
         return false;
+      },
+      // 클립보드에서 이미지 붙여넣기 (Ctrl+V / 스크린샷 붙여넣기)
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+        for (const item of Array.from(items)) {
+          if (item.type.startsWith("image/")) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (!file) continue;
+            uploadPosRef.current = view.state.selection.from;
+            uploadFnRef.current?.(file, true);
+            return true;
+          }
+        }
+        return false;
+      },
+      // 파일 드래그 앤 드롭으로 이미지 삽입
+      handleDrop: (view, event) => {
+        const files = event.dataTransfer?.files;
+        if (!files || files.length === 0) return false;
+        const file = files[0];
+        if (!file.type.startsWith("image/")) return false;
+        event.preventDefault();
+        const coords = view.posAtCoords({ left: event.clientX, top: event.clientY });
+        uploadPosRef.current = coords?.pos ?? view.state.selection.from;
+        uploadFnRef.current?.(file, true);
+        return true;
       },
     },
   });
@@ -276,12 +329,23 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       if (!res.ok) { alert(json.error || "업로드 실패"); return; }
 
       const pos = uploadPosRef.current;
+      const isVideo = /\.(mp4|webm|ogg|mov|avi)$/i.test(json.name ?? "");
       if (isImage) {
-        editor.chain().focus().insertContentAt(pos, `<img src="${json.url}" alt="${json.name}" class="tiptap-image" />`).run();
+        editor.chain().focus().setTextSelection(pos).setImage({ src: json.url, alt: json.name }).run();
+      } else if (isVideo) {
+        editor.chain().focus().insertContentAt(pos, {
+          type: "videoBlock",
+          attrs: { src: json.url, title: json.name },
+        }).run();
       } else {
-        editor.chain().focus().insertContentAt(pos,
-          `<a href="${json.url}" target="_blank" rel="noopener noreferrer" class="tiptap-file-link">📎 ${json.name}</a>`
-        ).run();
+        editor.chain().focus().insertContentAt(pos, {
+          type: "fileAttachment",
+          attrs: {
+            href: `/api/download?url=${encodeURIComponent(json.url)}&name=${encodeURIComponent(json.name)}`,
+            name: json.name,
+            ext: (json.name ?? "").split(".").pop()?.toLowerCase() ?? "",
+          },
+        }).run();
       }
     } catch {
       alert("업로드 중 오류가 발생했습니다.");
@@ -289,6 +353,8 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       setUploading(false);
     }
   }, [editor]);
+
+  uploadFnRef.current = doUpload;
 
   const handleImageInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -375,6 +441,25 @@ export default function PageEditor({ pageId }: { pageId: string }) {
     dragStateRef.current = null;
     setDropBtnIdx(null);
   }, []);
+
+  // Track which block the mouse is hovering over — only re-render when the index changes
+  const handleContainerMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const containerEl = scrollContainerRef.current;
+    if (!containerEl || blockButtons.length === 0) return;
+    const mouseY = e.clientY - containerEl.getBoundingClientRect().top + containerEl.scrollTop;
+    let closest: number | null = null;
+    let minDist = Infinity;
+    blockButtons.forEach((btn, idx) => {
+      if (mouseY >= btn.blockTop - 4 && mouseY <= btn.blockBottom + 4) {
+        const dist = Math.abs((btn.blockTop + btn.blockBottom) / 2 - mouseY);
+        if (dist < minDist) { minDist = dist; closest = idx; }
+      }
+    });
+    if (closest !== hoveredBtnIdxRef.current) {
+      hoveredBtnIdxRef.current = closest;
+      setHoveredBtnIdx(closest);
+    }
+  }, [blockButtons]);
 
   // Drop-indicator position (blue line shown while dragging)
   const dropIndicator = useMemo(() => {
@@ -489,40 +574,45 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       {editor && (
         <BubbleMenu
           editor={editor}
-          tippyOptions={{ duration: 100, placement: "top" }}
+          tippyOptions={{ duration: 100, placement: "top", onHide: () => setShowColorPicker(false) }}
           className="flex items-center gap-0.5 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-lg shadow-lg px-1.5 py-1"
         >
+          {/* Bold */}
           <button
             onClick={() => editor.chain().focus().toggleBold().run()}
             className={`w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${editor.isActive("bold") ? "bg-gray-200 dark:bg-gray-600 text-blue-600" : "text-[#37352f] dark:text-[#e6e6e4]"}`}
           >
             <Bold size={13} />
           </button>
+          {/* Italic */}
           <button
             onClick={() => editor.chain().focus().toggleItalic().run()}
             className={`w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${editor.isActive("italic") ? "bg-gray-200 dark:bg-gray-600 text-blue-600" : "text-[#37352f] dark:text-[#e6e6e4]"}`}
           >
             <Italic size={13} />
           </button>
+          {/* Underline */}
           <button
             onClick={() => editor.chain().focus().toggleUnderline().run()}
             className={`w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${editor.isActive("underline") ? "bg-gray-200 dark:bg-gray-600 text-blue-600" : "text-[#37352f] dark:text-[#e6e6e4]"}`}
           >
             <UnderlineIcon size={13} />
           </button>
+          {/* Code */}
           <button
             onClick={() => editor.chain().focus().toggleCode().run()}
             className={`w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${editor.isActive("code") ? "bg-gray-200 dark:bg-gray-600 text-blue-600" : "text-[#37352f] dark:text-[#e6e6e4]"}`}
           >
             <Code size={13} />
           </button>
-          <div className="w-px h-4 bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-0.5" />
+          {/* Highlight */}
           <button
             onClick={() => editor.chain().focus().toggleHighlight().run()}
             className={`w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${editor.isActive("highlight") ? "bg-yellow-200 text-yellow-800" : "text-[#37352f] dark:text-[#e6e6e4]"}`}
           >
             H
           </button>
+          {/* Link */}
           <button
             onClick={() => {
               const url = prompt("링크 URL:");
@@ -532,6 +622,115 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           >
             🔗
           </button>
+
+          <div className="w-px h-4 bg-[#e9e9e7] dark:bg-[#3f3f3f] mx-0.5" />
+
+          {/* Font size dropdown */}
+          <div className="relative flex items-center">
+            <select
+              value={(() => {
+                const attrs = editor.getAttributes("textStyle");
+                return attrs.fontSize ?? "";
+              })()}
+              onChange={(e) => {
+                const val = e.target.value;
+                const cmds = editor.chain().focus() as unknown as {
+                  setFontSize: (s: string) => { run: () => void };
+                  unsetFontSize: () => { run: () => void };
+                };
+                if (!val) cmds.unsetFontSize().run();
+                else cmds.setFontSize(val).run();
+              }}
+              className="appearance-none h-6 pl-1.5 pr-4 rounded text-[11px] text-[#37352f] dark:text-[#e6e6e4] bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 border-none outline-none cursor-pointer"
+              title="글씨 크기"
+            >
+              <option value="">기본</option>
+              <option value="12px">Small</option>
+              <option value="18px">Large</option>
+              <option value="24px">XL</option>
+            </select>
+            <ChevronDownIcon size={9} className="absolute right-0.5 pointer-events-none text-gray-400" />
+          </div>
+
+          {/* Text color */}
+          <div className="relative">
+            <button
+              onClick={() => setShowColorPicker((v) => !v)}
+              className="w-7 h-7 flex flex-col items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors gap-0.5"
+              title="글씨 색상"
+            >
+              <span className="text-[11px] font-bold text-[#37352f] dark:text-[#e6e6e4] leading-none">A</span>
+              <span
+                className="w-4 h-1 rounded-sm"
+                style={{ background: editor.getAttributes("textStyle").color ?? "#37352f" }}
+              />
+            </button>
+
+            {showColorPicker && (
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-xl p-3 w-52"
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">글씨 색상</p>
+                <div className="grid grid-cols-5 gap-1.5 mb-2">
+                  {[
+                    { label: "기본", color: null },
+                    { label: "회색", color: "#9b9a97" },
+                    { label: "갈색", color: "#64473a" },
+                    { label: "주황", color: "#d9730d" },
+                    { label: "노랑", color: "#cb912f" },
+                    { label: "초록", color: "#448361" },
+                    { label: "파랑", color: "#337ea9" },
+                    { label: "보라", color: "#9065b0" },
+                    { label: "분홍", color: "#c14c8a" },
+                    { label: "빨강", color: "#d44c47" },
+                  ].map(({ label, color }) => (
+                    <button
+                      key={label}
+                      title={label}
+                      onClick={() => {
+                        if (color) {
+                          editor.chain().focus().setColor(color).run();
+                        } else {
+                          editor.chain().focus().unsetColor().run();
+                        }
+                        setShowColorPicker(false);
+                      }}
+                      className="w-7 h-7 rounded-lg border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-500 transition-colors flex items-center justify-center"
+                      style={{ background: color ?? "#f0f0f0" }}
+                    >
+                      {!color && (
+                        <span className="text-[9px] text-gray-500 font-bold leading-none">기</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={customColor}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    placeholder="#hex"
+                    maxLength={7}
+                    className="flex-1 h-6 px-2 rounded border border-[#e9e9e7] dark:border-[#3f3f3f] text-[11px] bg-transparent text-[#37352f] dark:text-[#e6e6e4] outline-none focus:border-blue-400"
+                  />
+                  <button
+                    onClick={() => {
+                      const c = customColor.trim();
+                      if (/^#[0-9a-fA-F]{3,6}$/.test(c)) {
+                        editor.chain().focus().setColor(c).run();
+                        setShowColorPicker(false);
+                        setCustomColor("");
+                      }
+                    }}
+                    className="h-6 px-2 rounded bg-[#37352f] dark:bg-[#e6e6e4] text-white dark:text-[#37352f] text-[10px] font-semibold"
+                  >
+                    적용
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </BubbleMenu>
       )}
 
@@ -541,6 +740,8 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         className="flex-1 overflow-y-auto relative"
         onDragOver={handleContainerDragOver}
         onDrop={handleContainerDrop}
+        onMouseMove={handleContainerMouseMove}
+        onMouseLeave={() => { hoveredBtnIdxRef.current = null; setHoveredBtnIdx(null); }}
         onDragLeave={(e) => {
           // Only clear when leaving the scroll container entirely
           if (!scrollContainerRef.current?.contains(e.relatedTarget as Node)) {
@@ -634,29 +835,21 @@ export default function PageEditor({ pageId }: { pageId: string }) {
                   새 페이지
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {page.children.map((childId) => {
                   const child = pages[childId];
                   if (!child) return null;
                   return (
-                    <button
+                    <ChildPageCard
                       key={childId}
-                      onClick={() => router.push(`/p/${childId}`)}
-                      className="flex items-center gap-3 px-3 py-3 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] hover:bg-[rgba(55,53,47,0.04)] dark:hover:bg-[rgba(255,255,255,0.04)] text-left transition-colors group"
-                    >
-                      <span className="text-2xl flex-shrink-0 leading-none">{child.emoji}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[#37352f] dark:text-[#e6e6e4] truncate group-hover:text-black dark:group-hover:text-white transition-colors">
-                          {child.title || "제목 없음"}
-                        </p>
-                        {child.children.length > 0 && (
-                          <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] mt-0.5">
-                            하위 페이지 {child.children.length}개
-                          </p>
-                        )}
-                      </div>
-                      <ChevronRight size={15} className="text-[#c4c3bf] dark:text-[#4f4f4f] group-hover:text-[#9b9a97] transition-colors flex-shrink-0" />
-                    </button>
+                      child={child}
+                      onOpen={() => router.push(`/p/${childId}`)}
+                      onRename={(title) => updatePage(childId, { title })}
+                      onDelete={() => {
+                        deletePage(childId);
+                        if (pathname === `/p/${childId}`) router.push(`/p/${pageId}`);
+                      }}
+                    />
                   );
                 })}
               </div>
@@ -684,46 +877,49 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           </div>
         )}
 
-        {/* Per-block control group: ⋮⋮ drag · ➕ add · 🗑️ delete
-            key=docStart for stable identity across re-renders. */}
-        {!blockMenuOpen && blockButtons.map((btn, idx) => (
-          <div
-            key={btn.docStart}
-            style={{ position: "absolute", top: btn.top, left: btn.left, zIndex: 30 }}
-            className="flex items-center gap-0.5"
-          >
-            {/* ⋮⋮ Drag handle */}
-            <button
-              draggable
-              onDragStart={(e) => handleDragStart(e, btn.docStart, btn.docEnd, idx)}
-              onDragEnd={handleDragEnd}
-              className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-500 dark:hover:text-gray-300 cursor-grab active:cursor-grabbing transition-colors"
-              title="드래그하여 이동"
+        {/* Per-block control group — only rendered for the hovered block.
+            This avoids permanent overlays that interfere with editor clicks. */}
+        {!blockMenuOpen && hoveredBtnIdx !== null && blockButtons[hoveredBtnIdx] && (() => {
+          const btn = blockButtons[hoveredBtnIdx];
+          return (
+            <div
+              key={btn.docStart}
+              style={{ position: "absolute", top: btn.top, left: btn.left, zIndex: 30 }}
+              className="flex items-center gap-0.5"
             >
-              <GripVertical size={11} />
-            </button>
+              {/* ⋮⋮ Drag handle */}
+              <button
+                draggable
+                onDragStart={(e) => handleDragStart(e, btn.docStart, btn.docEnd, hoveredBtnIdx)}
+                onDragEnd={handleDragEnd}
+                className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-500 dark:hover:text-gray-300 cursor-grab active:cursor-grabbing transition-colors"
+                title="드래그하여 이동"
+              >
+                <GripVertical size={11} />
+              </button>
 
-            {/* ➕ Add block */}
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleInsertBlock(btn.docEnd)}
-              className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              title="블록 추가"
-            >
-              <Plus size={12} />
-            </button>
+              {/* ➕ Add block */}
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleInsertBlock(btn.docEnd)}
+                className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                title="블록 추가"
+              >
+                <Plus size={12} />
+              </button>
 
-            {/* 🗑️ Delete block */}
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleDeleteBlock(btn.docStart, btn.docEnd)}
-              className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-              title="블록 삭제"
-            >
-              <Trash2 size={11} />
-            </button>
-          </div>
-        ))}
+              {/* 🗑️ Delete block */}
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleDeleteBlock(btn.docStart, btn.docEnd)}
+                className="w-[18px] h-[18px] flex items-center justify-center rounded text-gray-300 dark:text-gray-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                title="블록 삭제"
+              >
+                <Trash2 size={11} />
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Blue drop-target indicator line shown while dragging */}
         {dropIndicator && (
@@ -856,5 +1052,156 @@ export default function PageEditor({ pageId }: { pageId: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+// ── Child page card with rename / delete ──────────────────────────────────────
+
+function ChildPageCard({
+  child,
+  onOpen,
+  onRename,
+  onDelete,
+}: {
+  child: { id: string; title: string; emoji: string; children: string[] };
+  onOpen: () => void;
+  onRename: (title: string) => void;
+  onDelete: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameVal, setRenameVal] = useState(child.title);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const renameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
+    if (isRenaming && renameRef.current) {
+      renameRef.current.focus();
+      renameRef.current.select();
+    }
+  }, [isRenaming]);
+
+  const commitRename = () => {
+    const t = renameVal.trim();
+    if (t && t !== child.title) onRename(t);
+    setIsRenaming(false);
+  };
+
+  return (
+    <>
+      <div className="relative group">
+        <button
+          onClick={onOpen}
+          className="w-full flex flex-col items-start px-4 py-4 rounded-xl border border-[#e9e9e7] dark:border-[#3f3f3f] hover:shadow-md hover:-translate-y-0.5 text-left transition-all duration-150 bg-white dark:bg-[#1e1e1c]"
+        >
+          <span className="text-3xl leading-none mb-3">{child.emoji || "📄"}</span>
+          <p className="text-sm font-medium text-[#37352f] dark:text-[#e6e6e4] line-clamp-2 group-hover:text-black dark:group-hover:text-white transition-colors">
+            {child.title || "제목 없음"}
+          </p>
+          {child.children.length > 0 && (
+            <p className="text-xs text-[#9b9a97] dark:text-[#6b6b6b] mt-1">
+              하위 페이지 {child.children.length}개
+            </p>
+          )}
+        </button>
+
+        {/* 컨텍스트 메뉴 버튼 */}
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" ref={menuRef}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+            className="w-6 h-6 flex items-center justify-center rounded-md bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] shadow-sm"
+          >
+            <MoreHorizontal size={12} />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-7 z-50 bg-white dark:bg-[#2f2f2f] border border-[#e9e9e7] dark:border-[#3f3f3f] rounded-xl shadow-xl py-1 w-40 text-sm">
+              <button
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#37352f] dark:text-[#e6e6e4] hover:bg-[rgba(55,53,47,0.06)] dark:hover:bg-[rgba(255,255,255,0.06)]"
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setRenameVal(child.title); setIsRenaming(true); }}
+              >
+                <Pencil size={12} className="text-[#9b9a97]" /> 이름 변경
+              </button>
+              <button
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#37352f] dark:text-[#e6e6e4] hover:bg-[rgba(55,53,47,0.06)] dark:hover:bg-[rgba(255,255,255,0.06)]"
+                onClick={(e) => { e.stopPropagation(); onOpen(); }}
+              >
+                <ChevronRight size={12} className="text-[#9b9a97]" /> 열기
+              </button>
+              <div className="my-1 border-t border-[#e9e9e7] dark:border-[#3f3f3f]" />
+              <button
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setShowDeleteConfirm(true); }}
+              >
+                <Trash2 size={12} /> 삭제
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 인라인 이름 변경 오버레이 */}
+        {isRenaming && (
+          <div className="absolute inset-0 z-40 flex items-end px-4 pb-4 rounded-xl bg-white/95 dark:bg-[#1e1e1c]/95 border border-blue-400">
+            <div className="w-full">
+              <p className="text-xs text-[#9b9a97] mb-1">새 이름 입력</p>
+              <input
+                ref={renameRef}
+                value={renameVal}
+                onChange={(e) => setRenameVal(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitRename();
+                  if (e.key === "Escape") setIsRenaming(false);
+                }}
+                className="w-full px-2 py-1 text-sm border border-blue-400 rounded-lg bg-white dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] outline-none"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 삭제 확인 모달 */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#3f3f3f] shadow-xl p-6 w-80 mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500 flex-shrink-0">
+                <AlertTriangle size={16} />
+              </div>
+              <div>
+                <h2 className="font-bold text-[#37352f] dark:text-[#e6e6e4] text-sm">페이지 삭제</h2>
+                <p className="text-xs text-[#9b9a97] mt-0.5">{child.emoji} {child.title || "제목 없음"}</p>
+              </div>
+            </div>
+            <p className="text-sm text-[#9b9a97] mb-1">
+              이 페이지{child.children.length > 0 ? `와 하위 페이지 ${child.children.length}개` : ""}를 삭제할까요?
+            </p>
+            <p className="text-xs text-red-400 mb-5">삭제한 페이지는 복구할 수 없습니다.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2 rounded-lg border border-[#e9e9e7] dark:border-[#3f3f3f] text-sm text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f] transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => { onDelete(); setShowDeleteConfirm(false); }}
+                className="flex-1 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

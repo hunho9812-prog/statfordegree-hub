@@ -367,25 +367,95 @@ select:focus {
   border-radius: 8px;
   margin: 0.75rem 0;
   display: block;
+  /* Ensure pointer events work for hover even inside toggles */
+  pointer-events: auto;
+  position: relative;
+}
+
+/* Image wrapper: allow hover controls to appear on top */
+.tiptap-editor-content p:has(img),
+.tiptap-editor-content .toggle-content p:has(img) {
+  position: relative;
 }
 
 /* ─── Toggle Block ────────────────────────────────────────────────── */
 .tiptap-editor-content .toggle-block { margin: 0.25rem 0; }
-.tiptap-editor-content .toggle-content { border-left: 2px solid #e9e9e7; }
-.dark .tiptap-editor-content .toggle-content { border-left-color: #2f2f2f; }
+
+/* toggle-body: first child = title (bold), rest = indented body */
+.tiptap-editor-content .toggle-body > [data-node-view-content-react] > *:first-child {
+  font-weight: 600;
+  margin: 0;
+}
+.tiptap-editor-content .toggle-body > [data-node-view-content-react] > *:not(:first-child) {
+  padding-left: 1rem;
+  border-left: 2px solid #e9e9e7;
+  margin-top: 0.125rem;
+}
+.dark .tiptap-editor-content .toggle-body > [data-node-view-content-react] > *:not(:first-child) {
+  border-left-color: #3a3a3a;
+}
+/* Hide body when closed */
+.tiptap-editor-content .toggle-body.toggle-closed > [data-node-view-content-react] > *:not(:first-child) {
+  display: none;
+}
+
+/* ─── Toggle Heading ──────────────────────────────────────────────── */
+/* level-2: title styled as mid-heading */
+.tiptap-editor-content .toggle-heading-body.level-2 > [data-node-view-content-react] > *:first-child {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #37352f;
+  margin: 0;
+  line-height: 1.4;
+}
+.dark .tiptap-editor-content .toggle-heading-body.level-2 > [data-node-view-content-react] > *:first-child {
+  color: #e6e6e4;
+}
+/* level-3: title styled as sub-heading */
+.tiptap-editor-content .toggle-heading-body.level-3 > [data-node-view-content-react] > *:first-child {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #37352f;
+  margin: 0;
+  line-height: 1.4;
+}
+.dark .tiptap-editor-content .toggle-heading-body.level-3 > [data-node-view-content-react] > *:first-child {
+  color: #e6e6e4;
+}
+/* body for toggle headings */
+.tiptap-editor-content .toggle-heading-body > [data-node-view-content-react] > *:not(:first-child) {
+  padding-left: 1rem;
+  border-left: 2px solid #e9e9e7;
+  margin-top: 0.125rem;
+}
+.dark .tiptap-editor-content .toggle-heading-body > [data-node-view-content-react] > *:not(:first-child) {
+  border-left-color: #3a3a3a;
+}
+/* Hide body when closed */
+.tiptap-editor-content .toggle-heading-body.toggle-closed > [data-node-view-content-react] > *:not(:first-child) {
+  display: none;
+}
+
+/* Image selected state */
+.tiptap-editor-content img.ProseMirror-selectednode,
+.tiptap-editor-content .ProseMirror-selectednode img {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+.tiptap-editor-content img { cursor: default; }
 
 /* ─── Callout Block ───────────────────────────────────────────────── */
 .tiptap-editor-content .callout-block p { margin: 0; }
 
-/* Placeholder for toggle/callout inner paragraphs */
-.tiptap-editor-content .is-empty::before {
+/* Placeholder: only show for the focused node (showOnlyCurrent: true is set in code) */
+.tiptap-editor-content .is-empty.is-node-empty::before {
   content: attr(data-placeholder);
   color: #c4c3bf;
   pointer-events: none;
   float: left;
   height: 0;
 }
-.dark .tiptap-editor-content .is-empty::before { color: #4f4f4f; }
+.dark .tiptap-editor-content .is-empty.is-node-empty::before { color: #4f4f4f; }
 
 /* ─── Legacy tiptap-editor class compatibility ────────────────────── */
 .tiptap-editor .ProseMirror { outline: none; }
@@ -401,3 +471,118 @@ select:focus {
 .dark .tiptap-editor .ProseMirror mark { background-color: #5a4f00; color: #e6e6e4; }
 .dark .tiptap-editor .ProseMirror.is-editor-empty:first-child::before { color: #4f4f4f; }
 .dark .tiptap-editor .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div > p { color: #6b6b6b; }
+
+/* Table styles */
+.tiptap-editor .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+  table-layout: fixed;
+  overflow: hidden;
+}
+.tiptap-editor .ProseMirror table td,
+.tiptap-editor .ProseMirror table th {
+  border: 1px solid #e9e9e7;
+  padding: 6px 10px;
+  min-width: 80px;
+  vertical-align: top;
+  position: relative;
+  box-sizing: border-box;
+}
+.tiptap-editor .ProseMirror table th {
+  background: #f7f6f3;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #37352f;
+}
+.tiptap-editor .ProseMirror table .selectedCell::after {
+  background: rgba(99,155,255,0.15);
+  content: "";
+  left: 0; right: 0; top: 0; bottom: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+.tiptap-editor .ProseMirror table .column-resize-handle {
+  background-color: #3b82f6;
+  bottom: -2px;
+  position: absolute;
+  right: -2px;
+  pointer-events: none;
+  top: 0;
+  width: 4px;
+}
+.tiptap-editor .ProseMirror table p { margin: 0; }
+.dark .tiptap-editor .ProseMirror table td,
+.dark .tiptap-editor .ProseMirror table th { border-color: #3f3f3f; }
+.dark .tiptap-editor .ProseMirror table th { background: #2a2a2a; color: #e6e6e4; }
+
+/* ─── File attachment link card ─────────────────────────────────────────── */
+.tiptap-file-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #e0e4e0;
+  background: #f7f9f7;
+  color: #2f3430;
+  text-decoration: none;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tiptap-file-link:hover { background: #eef0ed; }
+.dark .tiptap-file-link { border-color: #3a3a3a; background: #252525; color: #e6e6e4; }
+.dark .tiptap-file-link:hover { background: #2f2f2f; }
+
+/* icon badge via ::before */
+.tiptap-file-link::before {
+  content: "";
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: #9aa39b;
+  /* default grey icon */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3C/svg%3E");
+}
+
+/* PDF */
+.tiptap-file-link[data-ext="pdf"]::before {
+  background-color: #e53e3e;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='4' fill='%23e53e3e'/%3E%3Ctext x='50%25' y='68%25' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='9' fill='white'%3EPDF%3C/text%3E%3C/svg%3E");
+}
+
+/* Word */
+.tiptap-file-link[data-ext="doc"]::before,
+.tiptap-file-link[data-ext="docx"]::before {
+  background-color: #2b5797;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='4' fill='%232b5797'/%3E%3Ctext x='50%25' y='68%25' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='12' fill='white'%3EW%3C/text%3E%3C/svg%3E");
+}
+
+/* PowerPoint */
+.tiptap-file-link[data-ext="ppt"]::before,
+.tiptap-file-link[data-ext="pptx"]::before {
+  background-color: #d24726;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='4' fill='%23d24726'/%3E%3Ctext x='50%25' y='68%25' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='12' fill='white'%3EP%3C/text%3E%3C/svg%3E");
+}
+
+/* Excel */
+.tiptap-file-link[data-ext="xls"]::before,
+.tiptap-file-link[data-ext="xlsx"]::before {
+  background-color: #1d6f42;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='4' fill='%231d6f42'/%3E%3Ctext x='50%25' y='68%25' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='12' fill='white'%3EX%3C/text%3E%3C/svg%3E");
+}
+
+/* HWP */
+.tiptap-file-link[data-ext="hwp"]::before,
+.tiptap-file-link[data-ext="hwpx"]::before {
+  background-color: #1a73e8;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='4' fill='%231a73e8'/%3E%3Ctext x='50%25' y='68%25' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='8' fill='white'%3EHWP%3C/text%3E%3C/svg%3E");
+}

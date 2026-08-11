@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
 
     // 3. Supabase Storage 업로드
     const admin = createAdminClient();
-    const safeName = file.name.replace(/[^a-zA-Z0-9._\-가-힣]/g, "_");
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9._\-]/g, "_");
     const path = `${user.id}/${Date.now()}-${safeName}`;
 
     const bytes = await file.arrayBuffer();
