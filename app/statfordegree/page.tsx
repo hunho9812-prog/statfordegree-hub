@@ -21,7 +21,7 @@ export interface DashCard {
 
 const DEFAULT_CARDS: DashCard[] = [
   { id: "accounting", emoji: "🧾", iconBg: "from-indigo-400 to-blue-600",   title: "회계",      href: "/accounting" },
-  { id: "manual",     emoji: "📋", iconBg: "from-sky-500 to-blue-600",      title: "메뉴얼",    href: `/p/${MENU_IDS.MANUAL}` },
+  { id: "manual",     emoji: "📋", iconBg: "from-sky-500 to-blue-600",      title: "메뉴얼",    href: "/manual" },
   { id: "crm",        emoji: "👥", iconBg: "from-violet-400 to-purple-600", title: "고객관리",  href: "/crm" },
   { id: "keywords",   emoji: "🔑", iconBg: "from-teal-400 to-cyan-600",     title: "키워드 관리", href: "/statfordegree/keywords" },
 ];
