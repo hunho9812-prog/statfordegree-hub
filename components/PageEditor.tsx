@@ -25,6 +25,7 @@ import { FontSize } from "./extensions/FontSize";
 import { ToggleHeading } from "./extensions/ToggleHeading";
 import { CalloutBlock } from "./extensions/CalloutBlock";
 import { VideoBlock } from "./extensions/VideoBlock";
+import { FileAttachment } from "./extensions/FileAttachment";
 import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical, ImageUp, FileUp, Loader2, MoreHorizontal, Pencil, AlertTriangle, ChevronDown as ChevronDownIcon } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import MonthPageManager from "./MonthPageManager";
@@ -136,6 +137,7 @@ export default function PageEditor({ pageId }: { pageId: string }) {
       ToggleHeading,
       CalloutBlock,
       VideoBlock,
+      FileAttachment,
       Table.configure({ resizable: true }),
       TableRow,
       TableCell,
@@ -336,9 +338,14 @@ export default function PageEditor({ pageId }: { pageId: string }) {
           attrs: { src: json.url, title: json.name },
         }).run();
       } else {
-        editor.chain().focus().insertContentAt(pos,
-          `<a href="/api/download?url=${encodeURIComponent(json.url)}&name=${encodeURIComponent(json.name)}" class="tiptap-file-link" data-ext="${(json.name ?? "").split(".").pop()?.toLowerCase() ?? ""}">📎 ${json.name}</a>`
-        ).run();
+        editor.chain().focus().insertContentAt(pos, {
+          type: "fileAttachment",
+          attrs: {
+            href: `/api/download?url=${encodeURIComponent(json.url)}&name=${encodeURIComponent(json.name)}`,
+            name: json.name,
+            ext: (json.name ?? "").split(".").pop()?.toLowerCase() ?? "",
+          },
+        }).run();
       }
     } catch {
       alert("업로드 중 오류가 발생했습니다.");

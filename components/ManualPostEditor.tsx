@@ -15,6 +15,7 @@ import Color from "@tiptap/extension-color";
 import Image from "@tiptap/extension-image";
 import TextAlign from "@tiptap/extension-text-align";
 import { VideoBlock } from "./extensions/VideoBlock";
+import { FileAttachment } from "./extensions/FileAttachment";
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight, List, ListOrdered,
@@ -54,6 +55,7 @@ export default function ManualPostEditor({ post }: Props) {
       TaskItem.configure({ nested: true }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       VideoBlock,
+      FileAttachment,
       Placeholder.configure({ placeholder: "내용을 입력하세요..." }),
     ],
     content: post?.content ? JSON.parse(post.content) : "",
@@ -84,9 +86,14 @@ export default function ManualPostEditor({ post }: Props) {
         }).run();
       } else {
         const ext = (json.name ?? "").split(".").pop()?.toLowerCase() ?? "";
-        editor.chain().focus().insertContent(
-          `<a href="/api/download?url=${encodeURIComponent(json.url)}&name=${encodeURIComponent(json.name)}" class="tiptap-file-link" data-ext="${ext}">📎 ${json.name}</a>`
-        ).run();
+        editor.chain().focus().insertContent({
+          type: "fileAttachment",
+          attrs: {
+            href: `/api/download?url=${encodeURIComponent(json.url)}&name=${encodeURIComponent(json.name)}`,
+            name: json.name,
+            ext,
+          },
+        }).run();
       }
     } catch {
       alert("업로드 중 오류가 발생했습니다.");

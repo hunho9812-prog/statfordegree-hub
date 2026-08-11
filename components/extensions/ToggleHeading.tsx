@@ -62,7 +62,7 @@ function ToggleHeadingView({ node, updateAttributes, deleteNode, editor, getPos 
       } else {
         editor.chain().focus().insertContentAt(
           insertPos,
-          `<a href="/api/download?url=${encodeURIComponent(json.url)}&name=${encodeURIComponent(json.name)}" class="tiptap-file-link" data-ext="${(json.name ?? "").split(".").pop()?.toLowerCase() ?? ""}">📎 ${json.name}</a>`
+          { type: "fileAttachment", attrs: { href: `/api/download?url=${encodeURIComponent(json.url)}&name=${encodeURIComponent(json.name)}`, name: json.name, ext: (json.name ?? "").split(".").pop()?.toLowerCase() ?? "" } }
         ).run();
       }
     } catch {
