@@ -13,6 +13,7 @@ import Image from "@tiptap/extension-image";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import TextAlign from "@tiptap/extension-text-align";
+import { VideoBlock } from "./extensions/VideoBlock";
 import { ChevronLeft, Pencil, Trash2, Pin } from "lucide-react";
 import { fetchPost, deletePost, type ManualPost } from "@/lib/db-manual-posts";
 import { useAuth } from "./AuthProvider";
@@ -44,6 +45,7 @@ export default function ManualPostView({ postId }: Props) {
       TaskList,
       TaskItem.configure({ nested: true }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
+      VideoBlock,
     ],
     content: "",
     editable: false,

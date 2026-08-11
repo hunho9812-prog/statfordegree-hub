@@ -14,10 +14,11 @@ import TextStyle from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
 import Image from "@tiptap/extension-image";
 import TextAlign from "@tiptap/extension-text-align";
+import { VideoBlock } from "./extensions/VideoBlock";
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight, List, ListOrdered,
-  Undo, Redo, ImageUp, Loader2, Link as LinkIcon,
+  Undo, Redo, Paperclip, Loader2, Link as LinkIcon,
 } from "lucide-react";
 import { createPost, updatePost, PREFIXES, type ManualPost, type ManualPostInput } from "@/lib/db-manual-posts";
 import { useAuth } from "./AuthProvider";
@@ -52,6 +53,7 @@ export default function ManualPostEditor({ post }: Props) {
       TaskList,
       TaskItem.configure({ nested: true }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
+      VideoBlock,
       Placeholder.configure({ placeholder: "내용을 입력하세요..." }),
     ],
     content: post?.content ? JSON.parse(post.content) : "",
@@ -62,7 +64,7 @@ export default function ManualPostEditor({ post }: Props) {
     },
   });
 
-  const handleImageUpload = useCallback(async (file: File) => {
+  const handleFileUpload = useCallback(async (file: File) => {
     if (!editor) return;
     setUploading(true);
     try {
@@ -71,7 +73,21 @@ export default function ManualPostEditor({ post }: Props) {
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) { alert(json.error || "업로드 실패"); return; }
-      editor.chain().focus().setImage({ src: json.url, alt: json.name }).run();
+      const isImage = /\.(jpe?g|png|gif|webp|svg|bmp|avif)$/i.test(json.name ?? "");
+      const isVideo = /\.(mp4|webm|ogg|mov|avi)$/i.test(json.name ?? "");
+      if (isImage) {
+        editor.chain().focus().setImage({ src: json.url, alt: json.name }).run();
+      } else if (isVideo) {
+        editor.chain().focus().insertContent({
+          type: "videoBlock",
+          attrs: { src: json.url, title: json.name },
+        }).run();
+      } else {
+        const ext = (json.name ?? "").split(".").pop()?.toLowerCase() ?? "";
+        editor.chain().focus().insertContent(
+          `<a href="/api/download?url=${encodeURIComponent(json.url)}&name=${encodeURIComponent(json.name)}" class="tiptap-file-link" data-ext="${ext}">📎 ${json.name}</a>`
+        ).run();
+      }
     } catch {
       alert("업로드 중 오류가 발생했습니다.");
     } finally {
@@ -201,9 +217,9 @@ export default function ManualPostEditor({ post }: Props) {
             <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="번호 목록"><ListOrdered size={15} /></ToolBtn>
             <Divider />
             <ToolBtn onClick={addLink} active={editor.isActive("link")} title="링크"><LinkIcon size={15} /></ToolBtn>
-            <label title="이미지 업로드" className={cn("w-7 h-7 flex items-center justify-center rounded cursor-pointer text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)] transition-colors", uploading && "opacity-50 pointer-events-none")}>
-              {uploading ? <Loader2 size={15} className="animate-spin" /> : <ImageUp size={15} />}
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.target.value = ""; }} />
+            <label title="파일 업로드 (이미지·문서·동영상)" className={cn("w-7 h-7 flex items-center justify-center rounded cursor-pointer text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)] transition-colors", uploading && "opacity-50 pointer-events-none")}>
+              {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
+              <input type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ""; }} />
             </label>
           </>
         )}
