@@ -88,6 +88,7 @@ export default function Sidebar() {
             <BookOpen size={16} />
           </button>
         </Link>
+
         <Link href="/admin">
           <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="팀원관리">
             <UserCog size={16} />
@@ -159,7 +160,7 @@ export default function Sidebar() {
             className={cn(
               "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-colors",
               hover,
-              (pathname === "/statfordegree" || pathname === "/tasks" || pathname === "/crm" || pathname === "/manual" || pathname === "/p/menu-manual" || pathname === "/stats")
+              (pathname === "/statfordegree" || pathname === "/tasks" || pathname === "/crm" || pathname.startsWith("/manual") || pathname === "/stats")
                 ? "bg-[rgba(55,53,47,0.08)] dark:bg-[rgba(255,255,255,0.06)] text-[#37352f] dark:text-[#e6e6e4]"
                 : "text-[#37352f] dark:text-[#e6e6e4]"
             )}
@@ -197,7 +198,7 @@ export default function Sidebar() {
               </Link>
               <Link href="/manual">
                 <div className={cn("flex items-center gap-2 px-[10px] py-[7px] rounded-[8px] text-[13px] cursor-pointer transition-colors",
-                  (pathname === "/manual" || pathname.startsWith("/p/menu")) ? "bg-[#e7ebe7] dark:bg-[rgba(94,124,100,0.15)] text-[#2f3430] dark:text-[#e6e6e4]" : "text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)]")}>
+                  pathname.startsWith("/manual") ? "bg-[#e7ebe7] dark:bg-[rgba(94,124,100,0.15)] text-[#2f3430] dark:text-[#e6e6e4]" : "text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)]")}>
                   <BookOpen size={14} className="text-[#9aa39b]" />
                   <span>메뉴얼</span>
                 </div>
