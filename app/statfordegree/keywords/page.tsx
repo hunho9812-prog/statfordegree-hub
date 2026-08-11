@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Pencil, Trash2, GripVertical, Check, X, ExternalLink, RefreshCw } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, GripVertical, Check, X, ExternalLink, RefreshCw, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { useKeywords } from "@/hooks/useKeywords";
 import { type KeywordEntry } from "@/lib/db-keywords";
 import { cn } from "@/lib/utils";
 import { v4 as uuidv4 } from "uuid";
 
 const EMPTY_FORM = { keyword: "", is_exposed: true, link: "", check_date: "" };
+
+type SortCol = "keyword" | "is_exposed" | "check_date";
+type SortDir = "asc" | "desc";
 
 export default function KeywordsPage() {
   const router = useRouter();
@@ -26,6 +29,34 @@ export default function KeywordsPage() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const dragIdx = useRef<number | null>(null);
+
+  const [sort, setSort] = useState<{ col: SortCol; dir: SortDir } | null>(null);
+
+  const cycleSort = (col: SortCol) => {
+    setSort((prev) => {
+      if (!prev || prev.col !== col) return { col, dir: "asc" };
+      if (prev.dir === "asc") return { col, dir: "desc" };
+      return null;
+    });
+  };
+
+  const sortedEntries = useMemo(() => {
+    if (!sort) return entries;
+    const copy = [...entries];
+    copy.sort((a, b) => {
+      let cmp = 0;
+      if (sort.col === "keyword") cmp = a.keyword.localeCompare(b.keyword, "ko");
+      else if (sort.col === "is_exposed") cmp = Number(a.is_exposed) - Number(b.is_exposed);
+      else cmp = a.check_date.localeCompare(b.check_date);
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [entries, sort]);
+
+  const sortIcon = (col: SortCol) => {
+    if (!sort || sort.col !== col) return <ChevronsUpDown size={12} className="text-[#c8c7c4]" />;
+    return sort.dir === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />;
+  };
 
   const showToast = useCallback((type: "success" | "error", msg: string) => {
     setToast({ type, msg });
@@ -85,6 +116,7 @@ export default function KeywordsPage() {
   const onDragStart = (idx: number) => { dragIdx.current = idx; };
   const onDragOver = (e: React.DragEvent, idx: number) => {
     e.preventDefault();
+    if (sort) return;
     const from = dragIdx.current;
     if (from === null || from === idx) return;
     const next = [...entries];
@@ -209,17 +241,26 @@ export default function KeywordsPage() {
               {/* Table header */}
               <div className="grid grid-cols-[28px_1fr_120px_1fr_100px_80px] gap-2 px-4 py-2 border-b border-[#e9e9e7] dark:border-[#2f2f2f] bg-[#f7f6f3] dark:bg-[#2a2a2a]">
                 <div />
-                <span className="text-xs font-semibold text-[#9b9a97]">키워드</span>
-                <span className="text-xs font-semibold text-[#9b9a97]">상위노출 여부</span>
+                <button onClick={() => cycleSort("keyword")}
+                  className="flex items-center gap-1 text-xs font-semibold text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] transition-colors">
+                  키워드 {sortIcon("keyword")}
+                </button>
+                <button onClick={() => cycleSort("is_exposed")}
+                  className="flex items-center gap-1 text-xs font-semibold text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] transition-colors">
+                  상위노출 여부 {sortIcon("is_exposed")}
+                </button>
                 <span className="text-xs font-semibold text-[#9b9a97]">링크</span>
-                <span className="text-xs font-semibold text-[#9b9a97]">확인 날짜</span>
+                <button onClick={() => cycleSort("check_date")}
+                  className="flex items-center gap-1 text-xs font-semibold text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] transition-colors">
+                  확인 날짜 {sortIcon("check_date")}
+                </button>
                 <span className="text-xs font-semibold text-[#9b9a97] text-right">삭제</span>
               </div>
 
-              {entries.map((entry, idx) => (
+              {sortedEntries.map((entry, idx) => (
                 <div
                   key={entry.id}
-                  draggable
+                  draggable={!sort}
                   onDragStart={() => onDragStart(idx)}
                   onDragOver={(e) => onDragOver(e, idx)}
                   onDragEnd={onDragEnd}
