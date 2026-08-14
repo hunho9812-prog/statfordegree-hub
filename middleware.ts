@@ -120,5 +120,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // api 라우트는 각자 핸들러에서 직접 인증하거나(관리자 API) 애초에 공개용(signup, download)이라
+  // 미들웨어의 auth.getUser() 왕복(요청마다 Supabase Auth 서버 호출)에 의존하지 않음 — 제외해서
+  // API 호출마다 불필요한 추가 네트워크 왕복이 생기지 않도록 함
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };
