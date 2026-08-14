@@ -30,7 +30,8 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [statOpen, setStatOpen] = useState(true);
 
-  const { darkMode, toggleDarkMode } = useWorkspaceStore();
+  const darkMode = useWorkspaceStore((s) => s.darkMode);
+  const toggleDarkMode = useWorkspaceStore((s) => s.toggleDarkMode);
   const { user, profile, signOut } = useAuth();
 
   useEffect(() => {

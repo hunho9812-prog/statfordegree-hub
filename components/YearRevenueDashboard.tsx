@@ -13,7 +13,8 @@ function monthFromTitle(title: string): number {
 }
 
 export default function YearRevenueDashboard({ pageId }: { pageId: string }) {
-  const { pages, customers } = useWorkspaceStore();
+  const pages = useWorkspaceStore((s) => s.pages);
+  const customers = useWorkspaceStore((s) => s.customers);
   const page = pages[pageId];
 
   const yearMatch = page?.title.match(/^(\d{4})년/);

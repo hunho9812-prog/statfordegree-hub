@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, ChevronDown, ChevronRight, Users, Trash2, X, AlertTriangle, RefreshCw } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
+import { useShallow } from "zustand/react/shallow";
 
 const MONTH_NAMES = [
   "1월", "2월", "3월", "4월", "5월", "6월",
@@ -65,7 +66,16 @@ function DeleteConfirmModal({
 
 export default function CRMHub() {
   const router = useRouter();
-  const { pages, createPage, updatePage, deletePage, loadFromSupabase, isRefreshing } = useWorkspaceStore();
+  const { pages, createPage, updatePage, deletePage, loadFromSupabase, isRefreshing } = useWorkspaceStore(
+    useShallow((s) => ({
+      pages: s.pages,
+      createPage: s.createPage,
+      updatePage: s.updatePage,
+      deletePage: s.deletePage,
+      loadFromSupabase: s.loadFromSupabase,
+      isRefreshing: s.isRefreshing,
+    }))
+  );
 
   const [expandedYears, setExpandedYears] = useState<Set<string>>(() => new Set());
   const [showYearInput, setShowYearInput] = useState(false);

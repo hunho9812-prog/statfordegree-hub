@@ -16,7 +16,10 @@ function getMonthNum(title: string): number {
 
 export default function MonthPageManager({ pageId }: { pageId: string }) {
   const router = useRouter();
-  const { pages, createPage, updatePage, deletePage } = useWorkspaceStore();
+  const pages = useWorkspaceStore((s) => s.pages);
+  const createPage = useWorkspaceStore((s) => s.createPage);
+  const updatePage = useWorkspaceStore((s) => s.updatePage);
+  const deletePage = useWorkspaceStore((s) => s.deletePage);
   const page = pages[pageId];
 
   const [deleteTarget, setDeleteTarget] = useState<{

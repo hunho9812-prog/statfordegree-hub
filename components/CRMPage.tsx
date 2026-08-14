@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } fr
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/lib/store";
+import { useShallow } from "zustand/react/shallow";
 import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColumnDef, CustomColumnType, CrmTag } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -526,7 +527,9 @@ function StatusOptionRow({ status, onSave, onDelete }: { status: StatusOption; o
 }
 
 function StatusEditor({ onClose }: { onClose: () => void }) {
-  const { customerStatuses, upsertCustomerStatus, deleteCustomerStatus } = useWorkspaceStore();
+  const customerStatuses = useWorkspaceStore((s) => s.customerStatuses);
+  const upsertCustomerStatus = useWorkspaceStore((s) => s.upsertCustomerStatus);
+  const deleteCustomerStatus = useWorkspaceStore((s) => s.deleteCustomerStatus);
   const [newLabel, setNewLabel] = useState("");
   const [newCategory, setNewCategory] = useState<StatusCategory>("할 일");
   const [newColor, setNewColor] = useState(COLOR_PRESETS[0]);
@@ -1033,7 +1036,7 @@ function AddTriggerRow({ onAdd, colSpan }: { onAdd: () => void; colSpan: number 
 // ─── Move modal ───────────────────────────────────────────────────────────────
 
 function MoveModal({ currentMonthPageId, onMove, onClose }: { currentMonthPageId: string | null; onMove: (targetMonthPageId: string | null) => void; onClose: () => void }) {
-  const { pages } = useWorkspaceStore();
+  const pages = useWorkspaceStore((s) => s.pages);
   const [selected, setSelected] = useState<string | null>(null);
   const yearPages = Object.values(pages).filter((p) => /^(\d{4})년/.test(p.title)).sort((a, b) => {
     const ay = parseInt(a.title.match(/^(\d{4})/)?.[1] ?? "0");
@@ -1254,7 +1257,33 @@ export default function CRMPage({
     crmColOrder, crmColLabels, crmHiddenCols, crmColTypes,
     setCrmColOrder, setCrmColLabel, setCrmHiddenCols, setCrmColType,
     crmAssignees, crmTags, setCrmAssignees, setCrmTags,
-  } = useWorkspaceStore();
+  } = useWorkspaceStore(
+    useShallow((s) => ({
+      customers: s.customers,
+      customerStatuses: s.customerStatuses,
+      customColumns: s.customColumns,
+      createCustomer: s.createCustomer,
+      updateCustomer: s.updateCustomer,
+      deleteCustomer: s.deleteCustomer,
+      restoreCustomer: s.restoreCustomer,
+      reorderCustomers: s.reorderCustomers,
+      upsertCustomColumn: s.upsertCustomColumn,
+      deleteCustomColumn: s.deleteCustomColumn,
+      reorderCustomColumns: s.reorderCustomColumns,
+      crmColOrder: s.crmColOrder,
+      crmColLabels: s.crmColLabels,
+      crmHiddenCols: s.crmHiddenCols,
+      crmColTypes: s.crmColTypes,
+      setCrmColOrder: s.setCrmColOrder,
+      setCrmColLabel: s.setCrmColLabel,
+      setCrmHiddenCols: s.setCrmHiddenCols,
+      setCrmColType: s.setCrmColType,
+      crmAssignees: s.crmAssignees,
+      crmTags: s.crmTags,
+      setCrmAssignees: s.setCrmAssignees,
+      setCrmTags: s.setCrmTags,
+    }))
+  );
 
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showAssigneeEditor, setShowAssigneeEditor] = useState(false);

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useWorkspaceStore } from "@/lib/store";
+import { useShallow } from "zustand/react/shallow";
 import {
   Plus,
   X,
@@ -46,7 +47,16 @@ const defaultForm: NewTaskForm = {
 };
 
 export default function TaskBoard() {
-  const { tasks, createTask, updateTask, deleteTask, loadFromSupabase, isRefreshing } = useWorkspaceStore();
+  const { tasks, createTask, updateTask, deleteTask, loadFromSupabase, isRefreshing } = useWorkspaceStore(
+    useShallow((s) => ({
+      tasks: s.tasks,
+      createTask: s.createTask,
+      updateTask: s.updateTask,
+      deleteTask: s.deleteTask,
+      loadFromSupabase: s.loadFromSupabase,
+      isRefreshing: s.isRefreshing,
+    }))
+  );
   const [addingTo, setAddingTo] = useState<TaskStatus | null>(null);
   const [form, setForm] = useState<NewTaskForm>(defaultForm);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);

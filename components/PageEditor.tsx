@@ -63,7 +63,10 @@ interface DragState {
 export default function PageEditor({ pageId }: { pageId: string }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { pages, updatePage, createPage, deletePage } = useWorkspaceStore();
+  const pages = useWorkspaceStore((s) => s.pages);
+  const updatePage = useWorkspaceStore((s) => s.updatePage);
+  const createPage = useWorkspaceStore((s) => s.createPage);
+  const deletePage = useWorkspaceStore((s) => s.deletePage);
   const page = pages[pageId];
 
   const [title, setTitle] = useState(page?.title || "");

@@ -68,7 +68,8 @@ function saveCards(cards: DashCard[]) {
 
 export default function StatfordegreePage() {
   const router = useRouter();
-  const { loadFromSupabase, isRefreshing } = useWorkspaceStore();
+  const loadFromSupabase = useWorkspaceStore((s) => s.loadFromSupabase);
+  const isRefreshing = useWorkspaceStore((s) => s.isRefreshing);
 
   const [cards, setCards] = useState<DashCard[]>(DEFAULT_CARDS);
   const [editMode, setEditMode] = useState(false);

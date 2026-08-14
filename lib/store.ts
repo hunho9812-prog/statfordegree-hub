@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 import { v4 as uuidv4 } from "uuid";
 import type { WorkspaceState, Page, Task, Customer, StatusOption, CustomColumnDef, CustomColumnType, ManualNode, ManualPageData } from "./types";
 import {
@@ -1562,6 +1562,45 @@ export async function forceReseedManualPages(): Promise<void> {
   await useWorkspaceStore.getState().loadFromSupabase();
 }
 
+// persist는 state가 바뀔 때마다(에디터 키 입력, 400ms 리얼타임 리로드 등) 호출됩니다.
+// 매번 전체 state(매뉴얼 문서 전체, 고객 목록 등)를 동기적으로 JSON.stringify + localStorage
+// 에 쓰면 메인 스레드가 자주 blocking됩니다. 실제 디스크 쓰기(직렬화 포함)를 짧게 디바운스해서
+// 저장 내용/마이그레이션 로직은 그대로 두고 쓰기 빈도만 줄입니다.
+function createDebouncedLocalStorage<T>(delay = 800): PersistStorage<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  return {
+    getItem: (name) => {
+      if (typeof localStorage === "undefined") return null;
+      const raw = localStorage.getItem(name);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw) as StorageValue<T>;
+      } catch {
+        return null;
+      }
+    },
+    setItem: (name, value) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        try {
+          localStorage.setItem(name, JSON.stringify(value));
+        } catch (e) {
+          console.error("[store] localStorage 저장 실패", e);
+        }
+      }, delay);
+    },
+    removeItem: (name) => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      localStorage.removeItem(name);
+    },
+  };
+}
+
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
@@ -2352,6 +2391,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     {
       name: "statfordegree-hub-storage",
       version: 9,
+      storage: createDebouncedLocalStorage(800),
       migrate: (persistedState: unknown, version: number) => {
         const s = persistedState as Record<string, unknown>;
         const DEFAULT_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
