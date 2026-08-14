@@ -55,22 +55,30 @@ export default function AdminPage() {
 
   useEffect(() => { fetchMembers(); }, [fetchMembers]);
 
+  // 토글/역할 변경은 낙관적으로 로컬 state를 바로 갱신합니다.
+  // 이전에는 성공 시 fetchMembers()로 전체 재조회를 했는데, fetchMembers가
+  // membersLoading(true)를 거치면서 목록 전체가 스켈레톤으로 잠깐 바뀌었다가
+  // 다시 채워지는 "번쩍임"이 매 클릭마다 발생했습니다. 실패 시에만 이전 상태로 되돌립니다.
   async function handleRoleChange(memberId: string, newRole: "admin" | "member") {
+    const prevMembers = members;
+    setMembers((ms) => ms.map((m) => (m.id === memberId ? { ...m, role: newRole } : m)));
     const res = await fetch(`/api/admin/users/${memberId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: newRole }),
     });
-    if (res.ok) fetchMembers();
+    if (!res.ok) setMembers(prevMembers);
   }
 
   async function handleAccessToggle(memberId: string, field: "accounting_access" | "manual_access" | "crm_access", current: boolean) {
+    const prevMembers = members;
+    setMembers((ms) => ms.map((m) => (m.id === memberId ? { ...m, [field]: !current } : m)));
     const res = await fetch(`/api/admin/users/${memberId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: !current }),
     });
-    if (res.ok) fetchMembers();
+    if (!res.ok) setMembers(prevMembers);
   }
 
   async function handleDelete() {
@@ -78,7 +86,10 @@ export default function AdminPage() {
     setDeleteLoading(true);
     const res = await fetch(`/api/admin/users/${deleteTarget.id}`, { method: "DELETE" });
     setDeleteLoading(false);
-    if (res.ok) { setDeleteTarget(null); fetchMembers(); }
+    if (res.ok) {
+      setMembers((ms) => ms.filter((m) => m.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    }
   }
 
   const approvedMembers = members.filter((m) => m.status === "approved");
