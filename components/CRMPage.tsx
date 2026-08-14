@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, memo } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/lib/store";
@@ -1089,16 +1089,16 @@ function MoveModal({ currentMonthPageId, onMove, onClose }: { currentMonthPageId
 
 // ─── Data row ─────────────────────────────────────────────────────────────────
 
-function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, draggable, onDragStart, onDragOver, onDrop, compact, assignees, tags }: {
+const DataRow = memo(function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, draggable, onDragStart, onDragOver, onDrop, compact, assignees, tags }: {
   customer: Customer;
   statuses: StatusOption[];
   allCols: AnyCol[];
-  onUpdate: (updates: Partial<Omit<Customer, "id" | "created_at">>) => void;
-  onDelete: () => void;
-  onMove: (targetMonthPageId: string | null) => void;
+  onUpdate: (id: string, updates: Partial<Omit<Customer, "id" | "created_at">>) => void;
+  onDelete: (id: string) => void;
+  onMove: (id: string, targetMonthPageId: string | null) => void;
   draggable?: boolean;
-  onDragStart?: () => void;
-  onDragOver?: (e: React.DragEvent) => void;
+  onDragStart?: (id: string) => void;
+  onDragOver?: (e: React.DragEvent, id: string) => void;
   onDrop?: () => void;
   compact?: boolean;
   assignees: string[];
@@ -1109,15 +1109,15 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
   const [isDragOver, setIsDragOver] = useState(false);
 
   function handleDeleteClick() {
-    if (confirmDelete) { onDelete(); }
+    if (confirmDelete) { onDelete(customer.id); }
     else { setConfirmDelete(true); setTimeout(() => setConfirmDelete(false), 3000); }
   }
 
   return (
     <tr
       draggable={draggable}
-      onDragStart={onDragStart}
-      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); onDragOver?.(e); }}
+      onDragStart={() => onDragStart?.(customer.id)}
+      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); onDragOver?.(e, customer.id); }}
       onDragLeave={() => setIsDragOver(false)}
       onDrop={() => { setIsDragOver(false); onDrop?.(); }}
       className={`border-t border-[#e9e9e7] dark:border-[#2f2f2f] hover:bg-gray-50 dark:hover:bg-[#1f1f1f] group transition-colors ${isDragOver ? "border-t-2 border-t-blue-400" : ""}`}
@@ -1132,7 +1132,7 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
         // Special case: _route uses a dedicated dropdown (not overridable)
         if (col.id === "_route") return (
           <td key={col.id} className={`${cellCls} min-w-[80px]`}>
-            <TagsCell value={customer.route} onChange={(v) => onUpdate({ route: v })} tags={tags} />
+            <TagsCell value={customer.route} onChange={(v) => onUpdate(customer.id, { route: v })} tags={tags} />
           </td>
         );
 
@@ -1148,11 +1148,11 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
 
         const setVal = (v: string | number | boolean | null) => {
           if (col.kind === "builtin" && col.field) {
-            onUpdate({ [col.field]: v } as Partial<Omit<Customer, "id" | "created_at">>);
+            onUpdate(customer.id, { [col.field]: v } as Partial<Omit<Customer, "id" | "created_at">>);
           } else {
             const cfv: boolean | string | null =
               typeof v === "number" ? String(v) : v;
-            onUpdate({ custom_fields: { ...customer.custom_fields, [col.id]: cfv } });
+            onUpdate(customer.id, { custom_fields: { ...customer.custom_fields, [col.id]: cfv } });
           }
         };
 
@@ -1219,11 +1219,11 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
             <span>{confirmDelete ? "삭제?" : "삭제"}</span>
           </button>
         </div>
-        {showMoveModal && <MoveModal currentMonthPageId={customer.monthPageId} onMove={onMove} onClose={() => setShowMoveModal(false)} />}
+        {showMoveModal && <MoveModal currentMonthPageId={customer.monthPageId} onMove={(target) => onMove(customer.id, target)} onClose={() => setShowMoveModal(false)} />}
       </td>
     </tr>
   );
-}
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1411,6 +1411,21 @@ export default function CRMPage({
     updateCustomer(id, updates);
   }, [updateCustomer, pushUndoSnapshot]);
 
+  // 안정적인 참조를 DataRow(React.memo)에 넘기기 위한 콜백들 —
+  // 매 렌더마다 새 클로저를 만들면 memo가 무력화되므로 id를 인자로 받는 형태로 고정
+  const handleDeleteCustomer = useCallback((id: string) => {
+    pushUndoSnapshot(true);
+    deleteCustomer(id);
+  }, [deleteCustomer, pushUndoSnapshot]);
+
+  const handleMoveCustomer = useCallback((id: string, targetMonthPageId: string | null) => {
+    handleUpdate(id, { monthPageId: targetMonthPageId });
+  }, [handleUpdate]);
+
+  const handleDropOnCurrentMonth = useCallback(() => {
+    handleRowDrop(monthPageId);
+  }, [handleRowDrop, monthPageId]);
+
   // ─── Filters & sort ───────────────────────────────────────────────────────
   const [activeFilters, setActiveFilters] = useState<Record<string, ColFilter>>({});
   const [sortConfig, setSortConfig] = useState<{ field: string; dir: "asc" | "desc" } | null>(null);
@@ -1554,7 +1569,10 @@ export default function CRMPage({
   }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder, pushUndoSnapshot]);
 
   // ─── Customers visible in this month scope ────────────────────────────────
-  const monthScoped = monthPageId ? customers.filter((c) => c.monthPageId === monthPageId) : customers;
+  const monthScoped = useMemo(
+    () => (monthPageId ? customers.filter((c) => c.monthPageId === monthPageId) : customers),
+    [customers, monthPageId]
+  );
   // undo 스냅샷 캡처용 ref 동기화 (매 렌더마다 최신값 유지)
   monthScopedRef.current = monthScoped;
 
@@ -1579,47 +1597,57 @@ export default function CRMPage({
     return String(c.custom_fields?.[colId] ?? "");
   }, []);
 
-  let visibleCustomers = monthScoped;
-  for (const [colId, filt] of Object.entries(activeFilters) as [string, ColFilter][]) {
-    if (filt.kind === "multiselect") {
-      if (filt.selected.length > 0)
-        visibleCustomers = visibleCustomers.filter((c) => filt.selected.includes(getColVal(c, colId)));
-    } else if (filt.kind === "checkbox") {
-      if (filt.value !== null)
-        visibleCustomers = visibleCustomers.filter((c) => {
-          const v = !!c.custom_fields?.[colId];
-          return filt.value === "checked" ? v : !v;
-        });
-    } else if (filt.kind === "text") {
-      if (filt.value.trim())
-        visibleCustomers = visibleCustomers.filter((c) =>
-          getColVal(c, colId).toLowerCase().includes(filt.value.toLowerCase())
-        );
-    }
-  }
-
-  if (sortConfig) {
-    const { field, dir } = sortConfig;
-    visibleCustomers = [...visibleCustomers].sort((a, b) => {
-      let av: string | number;
-      let bv: string | number;
-      // Map col id → actual value
-      const spec = BUILTIN_BY_ID[field];
-      if (spec) {
-        av = ((a as unknown) as Record<string, unknown>)[spec.field as string] as string | number ?? "";
-        bv = ((b as unknown) as Record<string, unknown>)[spec.field as string] as string | number ?? "";
-      } else {
-        av = a.custom_fields?.[field] ? 1 : 0;
-        bv = b.custom_fields?.[field] ? 1 : 0;
+  const visibleCustomers = useMemo(() => {
+    let result = monthScoped;
+    for (const [colId, filt] of Object.entries(activeFilters) as [string, ColFilter][]) {
+      if (filt.kind === "multiselect") {
+        if (filt.selected.length > 0)
+          result = result.filter((c) => filt.selected.includes(getColVal(c, colId)));
+      } else if (filt.kind === "checkbox") {
+        if (filt.value !== null)
+          result = result.filter((c) => {
+            const v = !!c.custom_fields?.[colId];
+            return filt.value === "checked" ? v : !v;
+          });
+      } else if (filt.kind === "text") {
+        if (filt.value.trim())
+          result = result.filter((c) =>
+            getColVal(c, colId).toLowerCase().includes(filt.value.toLowerCase())
+          );
       }
-      if (typeof av === "number" && typeof bv === "number") return dir === "asc" ? av - bv : bv - av;
-      return dir === "asc" ? String(av).localeCompare(String(bv), "ko") : String(bv).localeCompare(String(av), "ko");
-    });
-  }
+    }
 
-  const totalRevenue = visibleCustomers.reduce((sum, c) => sum + (c.total_amount ?? 0), 0);
-  const settlementTotal = visibleCustomers.reduce((sum, c) => sum + (c.settlement_amount ?? 0), 0);
-  const balanceTotal = visibleCustomers.reduce((sum, c) => sum + (c.balance ?? 0), 0);
+    if (sortConfig) {
+      const { field, dir } = sortConfig;
+      result = [...result].sort((a, b) => {
+        let av: string | number;
+        let bv: string | number;
+        // Map col id → actual value
+        const spec = BUILTIN_BY_ID[field];
+        if (spec) {
+          av = ((a as unknown) as Record<string, unknown>)[spec.field as string] as string | number ?? "";
+          bv = ((b as unknown) as Record<string, unknown>)[spec.field as string] as string | number ?? "";
+        } else {
+          av = a.custom_fields?.[field] ? 1 : 0;
+          bv = b.custom_fields?.[field] ? 1 : 0;
+        }
+        if (typeof av === "number" && typeof bv === "number") return dir === "asc" ? av - bv : bv - av;
+        return dir === "asc" ? String(av).localeCompare(String(bv), "ko") : String(bv).localeCompare(String(av), "ko");
+      });
+    }
+
+    return result;
+  }, [monthScoped, activeFilters, sortConfig, getColVal]);
+
+  const { totalRevenue, settlementTotal, balanceTotal } = useMemo(() => {
+    let totalRevenue = 0, settlementTotal = 0, balanceTotal = 0;
+    for (const c of visibleCustomers) {
+      totalRevenue += c.total_amount ?? 0;
+      settlementTotal += c.settlement_amount ?? 0;
+      balanceTotal += c.balance ?? 0;
+    }
+    return { totalRevenue, settlementTotal, balanceTotal };
+  }, [visibleCustomers]);
 
   // colSpan: all visible cols + action column
   const totalColSpan = allCols.length + 1;
@@ -1856,13 +1884,13 @@ export default function CRMPage({
               customer={c}
               statuses={customerStatuses}
               allCols={allCols}
-              onUpdate={(updates) => handleUpdate(c.id, updates)}
-              onDelete={() => { pushUndoSnapshot(true); deleteCustomer(c.id); }}
-              onMove={(targetMonthPageId) => handleUpdate(c.id, { monthPageId: targetMonthPageId })}
+              onUpdate={handleUpdate}
+              onDelete={handleDeleteCustomer}
+              onMove={handleMoveCustomer}
               draggable
-              onDragStart={() => handleRowDragStart(c.id)}
-              onDragOver={(e) => handleRowDragOver(e, c.id)}
-              onDrop={() => handleRowDrop(monthPageId)}
+              onDragStart={handleRowDragStart}
+              onDragOver={handleRowDragOver}
+              onDrop={handleDropOnCurrentMonth}
               compact={compact}
               assignees={crmAssignees}
               tags={crmTags}
