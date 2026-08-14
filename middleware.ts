@@ -30,10 +30,14 @@ export async function middleware(request: NextRequest) {
       },
     });
 
-    // 세션 갱신 + 사용자 확인 (getUser가 getSession보다 안전)
+    // getSession()은 쿠키의 JWT를 로컬에서 디코딩만 하고 Supabase Auth 서버에 왕복하지
+    // 않아 getUser()보다 훨씬 빠르지만, 계정이 삭제/차단된 경우에도 액세스 토큰이 자연
+    // 만료(보통 최대 1시간)될 때까지는 여전히 통과할 수 있다는 트레이드오프가 있음.
+    // 페이지 전환 속도를 위해 의도적으로 선택.
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
 
     const isLoginPage = pathname === "/login";
     const isAuthRoute = pathname.startsWith("/auth/"); // /auth/callback, /auth/signup 등
