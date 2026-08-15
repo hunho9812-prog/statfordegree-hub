@@ -41,6 +41,12 @@ export default function MonthPageManager({ pageId }: { pageId: string }) {
     return map;
   }, [page.children, pages]);
 
+  // "기타" 페이지: 특정 월에 속하지 않는 고객 모음
+  const etcPageId = useMemo(
+    () => page.children.find((id) => pages[id]?.title === "기타"),
+    [page.children, pages]
+  );
+
   const handleMonthClick = (monthNum: number) => {
     const existingId = monthPageMap[monthNum];
     if (existingId) {
@@ -49,6 +55,16 @@ export default function MonthPageManager({ pageId }: { pageId: string }) {
     }
     const id = createPage(pageId);
     updatePage(id, { title: `${monthNum}월`, emoji: "📋" });
+    router.push(`/p/${id}`);
+  };
+
+  const handleEtcClick = () => {
+    if (etcPageId) {
+      router.push(`/p/${etcPageId}`);
+      return;
+    }
+    const id = createPage(pageId, undefined, `crm-etc-${year}`);
+    updatePage(id, { title: "기타", emoji: "📋" });
     router.push(`/p/${id}`);
   };
 
@@ -92,6 +108,31 @@ export default function MonthPageManager({ pageId }: { pageId: string }) {
               </div>
             );
           })}
+          {/* 기타: 특정 월에 속하지 않는 고객 모음 */}
+          <div className="relative group/month">
+            <button
+              onClick={handleEtcClick}
+              className={`w-full py-3 rounded-lg text-sm font-medium transition-all ${
+                etcPageId
+                  ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-950/40"
+                  : "bg-[#f1f1ef] dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] hover:bg-[#37352f] hover:text-white dark:hover:bg-[#e6e6e4] dark:hover:text-[#191919]"
+              }`}
+            >
+              기타
+            </button>
+            {etcPageId && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteTarget({ id: etcPageId, title: "기타" });
+                }}
+                title={`${year}년 기타 삭제`}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-400 hover:bg-red-500 text-white flex items-center justify-center opacity-0 group-hover/month:opacity-100 transition-opacity shadow-sm"
+              >
+                <X size={10} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

@@ -116,6 +116,12 @@ export default function CRMHub() {
   // 월 결정적 ID: 어느 PC에서 만들어도 동일한 ID
   const monthPageDeterministicId = (year: number, month: number) =>
     `crm-month-${year}-${String(month).padStart(2, "0")}`;
+  // 기타 결정적 ID: 어느 PC에서 만들어도 동일한 ID
+  const etcPageDeterministicId = (year: number) => `crm-etc-${year}`;
+
+  // yearPageId 아래에서 "기타" 페이지 ID 찾기 (특정 월에 속하지 않는 고객 모음)
+  const getEtcPageId = (yearPageId: string): string | undefined =>
+    pages[yearPageId]?.children.find((id) => pages[id]?.title === "기타");
 
   // 월 클릭: 없으면 생성 후 이동, 있으면 바로 이동
   const handleMonthClick = (yearPageId: string, monthNum: number) => {
@@ -133,6 +139,21 @@ export default function CRMHub() {
       : undefined; // 연도 파싱 실패 시 fallback
     const id = createPage(yearPageId, undefined, deterministicId);
     updatePage(id, { title: `${monthNum}월`, emoji: "📋" });
+    router.push(`/p/${id}`);
+  };
+
+  // 기타 클릭: 없으면 생성 후 이동, 있으면 바로 이동
+  const handleEtcClick = (yearPageId: string) => {
+    const existingId = getEtcPageId(yearPageId);
+    if (existingId) {
+      router.push(`/p/${existingId}`);
+      return;
+    }
+    const yearTitle = pages[yearPageId]?.title ?? "";
+    const yearNum = parseInt(yearTitle.match(/^(\d{4})/)?.[1] ?? "0");
+    const deterministicId = yearNum ? etcPageDeterministicId(yearNum) : undefined;
+    const id = createPage(yearPageId, undefined, deterministicId);
+    updatePage(id, { title: "기타", emoji: "📋" });
     router.push(`/p/${id}`);
   };
 
@@ -158,11 +179,11 @@ export default function CRMHub() {
   // 년도 삭제 확인
   const handleDeleteYear = (yearPage: { id: string; title: string }) => {
     const yearNum = yearPage.title.match(/^(\d{4})/)?.[1] ?? "";
-    const monthCount = Object.keys(getMonthMap(yearPage.id)).length;
+    const monthCount = Object.keys(getMonthMap(yearPage.id)).length + (getEtcPageId(yearPage.id) ? 1 : 0);
     setDeleteModal({
       title: `${yearNum}년 삭제`,
       description: monthCount > 0
-        ? `${yearNum}년 데이터와 하위 ${monthCount}개 월 페이지(고객 데이터 포함)가 모두 삭제됩니다.`
+        ? `${yearNum}년 데이터와 하위 ${monthCount}개 페이지(고객 데이터 포함)가 모두 삭제됩니다.`
         : `${yearNum}년 데이터가 삭제됩니다.`,
       onConfirm: () => {
         deletePage(yearPage.id);
@@ -279,6 +300,7 @@ export default function CRMHub() {
               const yearNum = yearPage.title.match(/^(\d{4})/)?.[1] ?? "";
               const monthMap = getMonthMap(yearPage.id);
               const existingCount = Object.keys(monthMap).length;
+              const etcPageId = getEtcPageId(yearPage.id);
               const expanded = expandedYears.has(yearPage.id);
 
               return (
@@ -351,6 +373,31 @@ export default function CRMHub() {
                           </div>
                         );
                       })}
+                      {/* 기타: 특정 월에 속하지 않는 고객 모음 */}
+                      <div className="relative group/month">
+                        <button
+                          onClick={() => handleEtcClick(yearPage.id)}
+                          className={`w-full py-3 rounded-lg text-sm font-medium transition-all ${
+                            etcPageId
+                              ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-950/40"
+                              : "bg-[#f1f1ef] dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] hover:bg-[#37352f] hover:text-white dark:hover:bg-[#e6e6e4] dark:hover:text-[#191919]"
+                          }`}
+                        >
+                          기타
+                        </button>
+                        {etcPageId && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteMonth(etcPageId, "기타", yearNum);
+                            }}
+                            title={`${yearNum}년 기타 삭제`}
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-400 hover:bg-red-500 text-white flex items-center justify-center opacity-0 group-hover/month:opacity-100 transition-opacity shadow-sm"
+                          >
+                            <X size={10} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

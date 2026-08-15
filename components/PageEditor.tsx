@@ -553,8 +553,10 @@ export default function PageEditor({ pageId }: { pageId: string }) {
 
   // Page type detection
   const isYearPage = /^(\d{4})년/.test(page.title);
+  // 월 페이지 또는 "기타"(특정 월에 속하지 않는 고객 모음) 페이지 — 둘 다 연도 페이지의 자식이며
+  // CRMPage를 임베드해서 보여줌
   const isMonthPage =
-    /^\d{1,2}월$/.test(page.title) &&
+    (/^\d{1,2}월$/.test(page.title) || page.title === "기타") &&
     page.parentId !== null &&
     /^(\d{4})년/.test(pages[page.parentId]?.title ?? "");
 
