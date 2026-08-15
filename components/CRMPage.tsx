@@ -1043,8 +1043,15 @@ function MoveModal({ currentMonthPageId, onMove, onClose }: { currentMonthPageId
     const by = parseInt(b.title.match(/^(\d{4})/)?.[1] ?? "0");
     return by - ay;
   });
-  const getMonths = (yearPageId: string) =>
-    (pages[yearPageId]?.children ?? []).map((id) => pages[id]).filter(Boolean).filter((p) => /^\d{1,2}월$/.test(p.title)).sort((a, b) => parseInt(a.title) - parseInt(b.title));
+  const getMonths = (yearPageId: string) => {
+    const children = (pages[yearPageId]?.children ?? []).map((id) => pages[id]).filter(Boolean);
+    const months = children
+      .filter((p) => /^\d{1,2}월$/.test(p.title))
+      .sort((a, b) => parseInt(a.title) - parseInt(b.title));
+    // "기타"(특정 월에 속하지 않는 고객 모음)도 이동 대상 목록 맨 뒤에 포함
+    const etc = children.filter((p) => p.title === "기타");
+    return [...months, ...etc];
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
