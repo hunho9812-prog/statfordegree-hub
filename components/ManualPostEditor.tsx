@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -42,6 +42,10 @@ export default function ManualPostEditor({ post }: Props) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  // handlePaste는 useEditor() 안에서 정의되는데 그 시점엔 아직 editor 인스턴스가 없어서,
+  // 실제 업로드 함수(editor가 필요함)는 ref에 나중에 채워 넣고 여기선 ref를 통해 호출함
+  const uploadFnRef = useRef<((file: File) => void) | null>(null);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -62,6 +66,22 @@ export default function ManualPostEditor({ post }: Props) {
     editorProps: {
       attributes: {
         class: "prose prose-sm max-w-none focus:outline-none min-h-[300px] px-0 py-2",
+      },
+      // 클립보드에서 이미지 붙여넣기 (Ctrl+V / 스크린샷 붙여넣기) — 텍스트 붙여넣기는
+      // ProseMirror 기본 동작으로 이미 지원되므로 별도 처리 불필요
+      handlePaste: (_view, event) => {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+        for (const item of Array.from(items)) {
+          if (item.type.startsWith("image/")) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (!file) continue;
+            uploadFnRef.current?.(file);
+            return true;
+          }
+        }
+        return false;
       },
     },
   });
@@ -101,6 +121,10 @@ export default function ManualPostEditor({ post }: Props) {
       setUploading(false);
     }
   }, [editor]);
+
+  useEffect(() => {
+    uploadFnRef.current = handleFileUpload;
+  }, [handleFileUpload]);
 
   const handleSave = async () => {
     if (!title.trim()) { alert("제목을 입력하세요."); return; }
