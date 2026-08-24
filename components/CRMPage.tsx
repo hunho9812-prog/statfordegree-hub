@@ -1035,10 +1035,20 @@ function AddTriggerRow({ onAdd, colSpan }: { onAdd: () => void; colSpan: number 
 
 // ─── Move modal ───────────────────────────────────────────────────────────────
 
+// 페이지 ID의 -month-YYYY-MM / -etc-YYYY 접미사를 떼어 CRM 네임스페이스 접두사를 뽑아냄
+// (예: "fluento-crm-month-2026-08" → "fluento-crm"). 이걸로 이동 목록을 같은 네임스페이스의
+// 년도/월 페이지로만 한정해서, 플루엔토 고객이 스탯포디그리 월로(혹은 그 반대로) 이동되지 않게 함.
+function deriveCrmIdPrefix(pageId: string | null): string {
+  const m = pageId?.match(/^(.+)-(?:month|etc)-\d{4}(?:-\d{2})?$/);
+  return m ? m[1] : "crm";
+}
+
 function MoveModal({ currentMonthPageId, onMove, onClose }: { currentMonthPageId: string | null; onMove: (targetMonthPageId: string | null) => void; onClose: () => void }) {
   const pages = useWorkspaceStore((s) => s.pages);
   const [selected, setSelected] = useState<string | null>(null);
-  const yearPages = Object.values(pages).filter((p) => /^(\d{4})년/.test(p.title)).sort((a, b) => {
+  const idPrefix = deriveCrmIdPrefix(currentMonthPageId);
+  const yearIdPrefix = `${idPrefix}-year-`;
+  const yearPages = Object.values(pages).filter((p) => p.id.startsWith(yearIdPrefix) && /^(\d{4})년/.test(p.title)).sort((a, b) => {
     const ay = parseInt(a.title.match(/^(\d{4})/)?.[1] ?? "0");
     const by = parseInt(b.title.match(/^(\d{4})/)?.[1] ?? "0");
     return by - ay;

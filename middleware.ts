@@ -59,7 +59,7 @@ export async function middleware(request: NextRequest) {
 
     const isAccounting = pathname.startsWith("/accounting");
     const isManual = pathname.startsWith("/p/");
-    const isCrm = pathname.startsWith("/crm");
+    const isCrm = pathname.startsWith("/crm") || pathname.startsWith("/fluento/crm");
 
     if (user && (isAccounting || isManual || isCrm)) {
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

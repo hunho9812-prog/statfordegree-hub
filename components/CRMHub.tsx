@@ -63,8 +63,20 @@ function DeleteConfirmModal({
 }
 
 // ─── CRMHub ────────────────────────────────────────────────────────────────────
+// idPrefix로 완전히 독립된 고객관리 인스턴스를 여러 개 둘 수 있음(예: 스탯포디그리 "crm",
+// 플루엔토 "fluento-crm"). 년도/월/기타 페이지 ID를 전부 이 접두사로 생성하고, 목록도 이
+// 접두사로만 필터링해서 서로의 고객 데이터가 섞이지 않게 함(DB 스키마 변경 없이 페이지 ID
+// 네임스페이스만으로 분리).
 
-export default function CRMHub() {
+export default function CRMHub({
+  idPrefix = "crm",
+  heading = "고객관리양식",
+  yearTitleSuffix = "고객관리양식",
+}: {
+  idPrefix?: string;
+  heading?: string;
+  yearTitleSuffix?: string;
+}) {
   const router = useRouter();
   const { pages, createPage, updatePage, deletePage, loadFromSupabase, isRefreshing } = useWorkspaceStore(
     useShallow((s) => ({
@@ -88,16 +100,18 @@ export default function CRMHub() {
     onConfirm: () => void;
   } | null>(null);
 
-  // 년도 페이지 목록 (최신순)
+  // 년도 페이지 목록 (최신순) — title 패턴뿐 아니라 idPrefix로도 필터링해서
+  // 다른 네임스페이스(예: 스탯포디그리 ↔ 플루엔토)의 년도 페이지가 섞이지 않게 함
+  const yearIdPrefix = `${idPrefix}-year-`;
   const yearPages = useMemo(() => {
     return Object.values(pages)
-      .filter((p) => /^(\d{4})년/.test(p.title))
+      .filter((p) => p.id.startsWith(yearIdPrefix) && /^(\d{4})년/.test(p.title))
       .sort((a, b) => {
         const aY = parseInt(a.title.match(/^(\d{4})/)?.[1] ?? "0");
         const bY = parseInt(b.title.match(/^(\d{4})/)?.[1] ?? "0");
         return bY - aY;
       });
-  }, [pages]);
+  }, [pages, yearIdPrefix]);
 
   // yearPageId 아래에서 월번호 → 페이지ID 매핑
   const getMonthMap = (yearPageId: string): Record<number, string> => {
@@ -112,12 +126,12 @@ export default function CRMHub() {
   };
 
   // 년도 결정적 ID: 어느 PC에서 만들어도 동일한 ID
-  const yearPageDeterministicId = (year: number) => `crm-year-${year}`;
+  const yearPageDeterministicId = (year: number) => `${idPrefix}-year-${year}`;
   // 월 결정적 ID: 어느 PC에서 만들어도 동일한 ID
   const monthPageDeterministicId = (year: number, month: number) =>
-    `crm-month-${year}-${String(month).padStart(2, "0")}`;
+    `${idPrefix}-month-${year}-${String(month).padStart(2, "0")}`;
   // 기타 결정적 ID: 어느 PC에서 만들어도 동일한 ID
-  const etcPageDeterministicId = (year: number) => `crm-etc-${year}`;
+  const etcPageDeterministicId = (year: number) => `${idPrefix}-etc-${year}`;
 
   // yearPageId 아래에서 "기타" 페이지 ID 찾기 (특정 월에 속하지 않는 고객 모음)
   const getEtcPageId = (yearPageId: string): string | undefined =>
@@ -161,8 +175,8 @@ export default function CRMHub() {
   const handleAddYear = () => {
     const y = parseInt(yearInput.trim());
     if (!y || y < 2000 || y > 2100) return;
-    const title = `${y}년 고객관리양식`;
-    const already = Object.values(pages).find((p) => p.title === title);
+    const title = `${y}년 ${yearTitleSuffix}`;
+    const already = yearPages.find((p) => p.title === title);
     if (already) {
       setExpandedYears((prev) => new Set([...prev, already.id]));
       setShowYearInput(false);
@@ -227,7 +241,7 @@ export default function CRMHub() {
             <div className="flex items-center gap-3 mb-2">
               <Users size={32} className="text-[#37352f] dark:text-[#e6e6e4]" />
               <h1 className="text-4xl font-bold text-[#37352f] dark:text-[#e6e6e4]">
-                고객관리양식
+                {heading}
               </h1>
             </div>
             <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
