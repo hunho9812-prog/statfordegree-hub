@@ -185,9 +185,9 @@ export default function FluentoLedgerPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <button onClick={() => router.push("/fluento")}
+            <button onClick={() => router.push("/fluento/accounting")}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-white dark:hover:bg-[#252525] border border-[#e9e9e7] dark:border-[#2f2f2f] transition-colors">
-              <ArrowLeft size={14} /> 플루엔토
+              <ArrowLeft size={14} /> 회계
             </button>
             <h1 className="text-xl font-bold">
               💡 <span className="bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">플루엔토</span>

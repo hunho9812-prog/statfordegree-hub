@@ -526,8 +526,12 @@ function StatusOptionRow({ status, onSave, onDelete }: { status: StatusOption; o
   );
 }
 
-function StatusEditor({ onClose }: { onClose: () => void }) {
-  const customerStatuses = useWorkspaceStore((s) => s.customerStatuses);
+function StatusEditor({ onClose, idPrefix }: { onClose: () => void; idPrefix: string }) {
+  const allCustomerStatuses = useWorkspaceStore((s) => s.customerStatuses);
+  const customerStatuses = useMemo(
+    () => allCustomerStatuses.filter((s) => isOwnScopeId(idPrefix, s.id)),
+    [allCustomerStatuses, idPrefix]
+  );
   const upsertCustomerStatus = useWorkspaceStore((s) => s.upsertCustomerStatus);
   const deleteCustomerStatus = useWorkspaceStore((s) => s.deleteCustomerStatus);
   const [newLabel, setNewLabel] = useState("");
@@ -535,7 +539,7 @@ function StatusEditor({ onClose }: { onClose: () => void }) {
   const [newColor, setNewColor] = useState(COLOR_PRESETS[0]);
   const addStatus = () => {
     if (!newLabel.trim()) return;
-    upsertCustomerStatus({ id: uuidv4(), label: newLabel.trim(), color: newColor.color, textColor: newColor.textColor, category: newCategory });
+    upsertCustomerStatus({ id: newScopedId(idPrefix), label: newLabel.trim(), color: newColor.color, textColor: newColor.textColor, category: newCategory });
     setNewLabel("");
   };
   return (
@@ -1043,6 +1047,20 @@ function deriveCrmIdPrefix(pageId: string | null): string {
   return m ? m[1] : "crm";
 }
 
+// customColumns/customerStatuses는 워크스페이스 전체에서 하나로 공유되는 배열이라, 여기서
+// 브랜드별 아이템인지를 "ID 접두사"로만 구분한다(스키마 변경 없이 페이지 ID와 동일한 방식).
+// 기본(crm) 스코프는 과거에 접두사 없이 만들어진 기존 항목을 전부 그대로 포함해 데이터가
+// 사라지지 않게 하고, 새 브랜드(fluento-crm 등) 스코프는 자기 접두사가 붙은 항목만 포함한다.
+function isOwnScopeId(idPrefix: string, id: string): boolean {
+  if (idPrefix === "crm") return !id.startsWith("fluento-crm-");
+  return id.startsWith(`${idPrefix}-`);
+}
+
+// 새 커스텀 컬럼/상태를 만들 때 붙일 브랜드 스코프 ID
+function newScopedId(idPrefix: string): string {
+  return idPrefix === "crm" ? uuidv4() : `${idPrefix}-${uuidv4()}`;
+}
+
 function MoveModal({ currentMonthPageId, onMove, onClose }: { currentMonthPageId: string | null; onMove: (targetMonthPageId: string | null) => void; onClose: () => void }) {
   const pages = useWorkspaceStore((s) => s.pages);
   const [selected, setSelected] = useState<string | null>(null);
@@ -1267,8 +1285,13 @@ export default function CRMPage({
     return `/accounting/cash-receipts?month=${m[1]}-${m[2]}`;
   }, [monthPageId]);
 
+  // 이 페이지가 속한 CRM 네임스페이스(스탯포디그리="crm", 플루엔토="fluento-crm" 등).
+  // 커스텀 컬럼/상태는 워크스페이스 전체에서 하나의 배열로 공유되므로, 화면에는 이
+  // idPrefix에 해당하는 항목만 걸러서 보여준다 → 다른 브랜드의 컬럼/상태가 섞여 보이지 않음.
+  const idPrefix = deriveCrmIdPrefix(monthPageId);
+
   const {
-    customers, customerStatuses, customColumns,
+    customers, customerStatuses: allCustomerStatuses, customColumns: allCustomColumns,
     createCustomer, updateCustomer, deleteCustomer, restoreCustomer, reorderCustomers,
     upsertCustomColumn, deleteCustomColumn, reorderCustomColumns,
     crmColOrder, crmColLabels, crmHiddenCols, crmColTypes,
@@ -1300,6 +1323,15 @@ export default function CRMPage({
       setCrmAssignees: s.setCrmAssignees,
       setCrmTags: s.setCrmTags,
     }))
+  );
+
+  const customerStatuses = useMemo(
+    () => allCustomerStatuses.filter((s) => isOwnScopeId(idPrefix, s.id)),
+    [allCustomerStatuses, idPrefix]
+  );
+  const customColumns = useMemo(
+    () => allCustomColumns.filter((c) => isOwnScopeId(idPrefix, c.id)),
+    [allCustomColumns, idPrefix]
   );
 
   const [showStatusEditor, setShowStatusEditor] = useState(false);
@@ -1556,7 +1588,7 @@ export default function CRMPage({
   // Insert a new custom column to the left or right of a given column
   const insertCol = useCallback((atColId: string, side: "left" | "right") => {
     pushUndoSnapshot(true);
-    const newId = uuidv4();
+    const newId = newScopedId(idPrefix);
     const currentOrder = crmColOrder ?? [
       ...DEFAULT_COL_ORDER.slice(0, 7),
       ...sortedCustomCols.map((c) => c.id),
@@ -1567,12 +1599,12 @@ export default function CRMPage({
     newOrder.splice(atIdx === -1 ? newOrder.length : (side === "left" ? atIdx : atIdx + 1), 0, newId);
     upsertCustomColumn({ id: newId, label: "새 열", type: "checkbox", order: sortedCustomCols.length });
     setCrmColOrder(newOrder);
-  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder, pushUndoSnapshot]);
+  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder, pushUndoSnapshot, idPrefix]);
 
   // Add a new custom column (inserted at the end before _submit_date)
   const addColumn = useCallback(() => {
     pushUndoSnapshot(true);
-    const newId = uuidv4();
+    const newId = newScopedId(idPrefix);
     const currentOrder = crmColOrder ?? [
       ...DEFAULT_COL_ORDER.slice(0, 7),
       ...sortedCustomCols.map((c) => c.id),
@@ -1583,7 +1615,7 @@ export default function CRMPage({
     newOrder.splice(insertAt === -1 ? newOrder.length : insertAt, 0, newId);
     upsertCustomColumn({ id: newId, label: "새 열", type: "checkbox", order: sortedCustomCols.length });
     setCrmColOrder(newOrder);
-  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder, pushUndoSnapshot]);
+  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder, pushUndoSnapshot, idPrefix]);
 
   // ─── Customers visible in this month scope ────────────────────────────────
   const monthScoped = useMemo(
@@ -1943,7 +1975,7 @@ export default function CRMPage({
       ) : (
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#191919]">{header}{table}</div>
       )}
-      {showStatusEditor && <StatusEditor onClose={() => setShowStatusEditor(false)} />}
+      {showStatusEditor && <StatusEditor onClose={() => setShowStatusEditor(false)} idPrefix={idPrefix} />}
       {showAssigneeEditor && <AssigneeEditor assignees={crmAssignees} onSave={setCrmAssignees} onClose={() => setShowAssigneeEditor(false)} />}
       {showTagsEditor && <TagsEditor tags={crmTags} onSave={setCrmTags} onClose={() => setShowTagsEditor(false)} />}
     </>
