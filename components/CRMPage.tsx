@@ -1537,17 +1537,9 @@ export default function CRMPage({
 
   // 열 ID → 고객 값 추출 헬퍼
   const getColVal = useCallback((c: Customer, colId: string): string => {
-    if (colId === "_assignee")        return c.assignee ?? "";
-    if (colId === "_route")           return c.route ?? "";
-    if (colId === "_status")          return c.status ?? "";
-    if (colId === "_name")            return c.name ?? "";
-    if (colId === "_memo")            return c.memo ?? "";
-    if (colId === "_alba")            return c.alba ?? "";
-    if (colId === "_settlement_amount") return String(c.settlement_amount ?? "");
-    if (colId === "_total_amount")    return String(c.total_amount ?? "");
-    if (colId === "_balance")         return String(c.balance ?? "");
-    if (colId === "_submit_date")     return c.submit_date ?? "";
-    return String(c.custom_fields?.[colId] ?? "");
+    const spec = BUILTIN_BY_ID[colId];
+    const v = spec ? c[spec.field] : c.custom_fields?.[colId];
+    return v === null || v === undefined ? "" : String(v);
   }, []);
 
   let visibleCustomers = monthScoped;
@@ -1571,20 +1563,20 @@ export default function CRMPage({
 
   if (sortConfig) {
     const { field, dir } = sortConfig;
+    // 열 유형에 맞게 실제 값으로 비교 (빈 값은 방향과 관계없이 항상 맨 뒤)
+    const sortType = allCols.find((c) => c.id === field)?.effectiveType ?? "text";
+    const sign = dir === "asc" ? 1 : -1;
     visibleCustomers = [...visibleCustomers].sort((a, b) => {
-      let av: string | number;
-      let bv: string | number;
-      // Map col id → actual value
-      const spec = BUILTIN_BY_ID[field];
-      if (spec) {
-        av = ((a as unknown) as Record<string, unknown>)[spec.field as string] as string | number ?? "";
-        bv = ((b as unknown) as Record<string, unknown>)[spec.field as string] as string | number ?? "";
-      } else {
-        av = a.custom_fields?.[field] ? 1 : 0;
-        bv = b.custom_fields?.[field] ? 1 : 0;
+      const as = getColVal(a, field);
+      const bs = getColVal(b, field);
+      if (sortType === "checkbox") {
+        const av = as === "true" || as === "1" ? 1 : 0;
+        const bv = bs === "true" || bs === "1" ? 1 : 0;
+        return sign * (av - bv);
       }
-      if (typeof av === "number" && typeof bv === "number") return dir === "asc" ? av - bv : bv - av;
-      return dir === "asc" ? String(av).localeCompare(String(bv), "ko") : String(bv).localeCompare(String(av), "ko");
+      if (as === "" || bs === "") return as === bs ? 0 : as === "" ? 1 : -1;
+      if (sortType === "number") return sign * (Number(as) - Number(bs));
+      return sign * as.localeCompare(bs, "ko");
     });
   }
 
