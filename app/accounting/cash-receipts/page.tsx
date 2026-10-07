@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useCashReceipts } from "@/hooks/useCashReceipts";
 import { type CashReceipt } from "@/lib/db-cash-receipts";
 import { useWorkspaceStore } from "@/lib/store";
+import { isYearTitle, scopeOfYearTitle, scopeOfMonthPage } from "@/lib/crm-scope";
 import { cn } from "@/lib/utils";
 
 // ── Column config ─────────────────────────────────────────────────────────────
@@ -421,11 +422,12 @@ function CashReceiptsInner() {
     const [y, m] = month.split("-").map(Number);
     // 1) 결정론적 ID 먼저 확인 (crm-month-YYYY-MM)
     const deterministicId = `crm-month-${y}-${String(m).padStart(2, "0")}`;
-    if (pages[deterministicId]) return deterministicId;
-    // 2) store의 페이지 트리에서 연도·월 타이틀로 탐색
-    const yearPage = Object.values(pages).find((p) =>
-      p.title.startsWith(`${y}년`) && !p.parentId
-    ) ?? Object.values(pages).find((p) => new RegExp(`^${y}년`).test(p.title));
+    if (pages[deterministicId] && scopeOfMonthPage(pages, deterministicId) !== "fluento") return deterministicId;
+    // 2) store의 페이지 트리에서 연도·월 타이틀로 탐색 (플루엔토 고객관리는 제외)
+    const sfdYears = Object.values(pages).filter((p) =>
+      isYearTitle(p.title) && scopeOfYearTitle(p.title) === "statfordegree" && p.title.startsWith(`${y}년`)
+    );
+    const yearPage = sfdYears.find((p) => !p.parentId) ?? sfdYears[0];
     if (!yearPage) return null;
     const monthPage = yearPage.children
       .map((id) => pages[id])
@@ -435,13 +437,13 @@ function CashReceiptsInner() {
 
   // CRM customers: name → assignee + total_amount 연동
   const crmCustomers = useMemo(() =>
-    customers.map((c) => ({
+    customers.filter((c) => scopeOfMonthPage(pages, c.monthPageId) !== "fluento").map((c) => ({
       id: c.id,
       name: c.name,
       assignee: c.assignee ?? "",
       total_amount: c.total_amount ?? 0,
     })),
-    [customers]
+    [customers, pages]
   );
 
   // Months that have data (for sidebar dots)

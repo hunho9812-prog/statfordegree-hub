@@ -2,8 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ChevronDown, ChevronRight, Users, Trash2, X, AlertTriangle, RefreshCw } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, Users, Trash2, X, AlertTriangle, RefreshCw, ArrowLeft, ArrowRightLeft } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
+import {
+  type CrmScope, CRM_SCOPE_LABEL, isYearTitle, scopeOfYearTitle, crmYearTitle, crmYearPageId, crmMonthPageId,
+} from "@/lib/crm-scope";
 
 const MONTH_NAMES = [
   "1월", "2월", "3월", "4월", "5월", "6월",
@@ -19,11 +22,13 @@ function getMonthNum(title: string): number {
 function DeleteConfirmModal({
   title,
   description,
+  confirmLabel,
   onConfirm,
   onCancel,
 }: {
   title: string;
   description: string;
+  confirmLabel?: string; // 지정 시 삭제가 아닌 일반 확인 모달로 표시
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -31,17 +36,21 @@ function DeleteConfirmModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="w-full max-w-sm mx-4 bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#3f3f3f] shadow-2xl p-6">
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center flex-shrink-0">
-            <AlertTriangle size={16} className="text-red-500" />
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${confirmLabel ? "bg-blue-100 dark:bg-blue-950/50" : "bg-red-100 dark:bg-red-950/50"}`}>
+            {confirmLabel
+              ? <ArrowRightLeft size={16} className="text-blue-500" />
+              : <AlertTriangle size={16} className="text-red-500" />}
           </div>
           <div>
             <h3 className="text-base font-semibold text-[#37352f] dark:text-[#e6e6e4]">{title}</h3>
             <p className="text-sm text-[#9b9a97] mt-1">{description}</p>
           </div>
         </div>
-        <p className="text-xs text-red-500 dark:text-red-400 mb-4">
-          삭제된 데이터는 복구할 수 없습니다.
-        </p>
+        {!confirmLabel && (
+          <p className="text-xs text-red-500 dark:text-red-400 mb-4">
+            삭제된 데이터는 복구할 수 없습니다.
+          </p>
+        )}
         <div className="flex gap-2">
           <button
             onClick={onCancel}
@@ -51,9 +60,9 @@ function DeleteConfirmModal({
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-2 text-sm rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
+            className={`flex-1 py-2 text-sm rounded-lg text-white font-semibold transition-colors ${confirmLabel ? "bg-blue-500 hover:bg-blue-600" : "bg-red-500 hover:bg-red-600"}`}
           >
-            삭제
+            {confirmLabel ?? "삭제"}
           </button>
         </div>
       </div>
@@ -63,7 +72,7 @@ function DeleteConfirmModal({
 
 // ─── CRMHub ────────────────────────────────────────────────────────────────────
 
-export default function CRMHub() {
+export default function CRMHub({ scope = "statfordegree" }: { scope?: CrmScope }) {
   const router = useRouter();
   const { pages, createPage, updatePage, deletePage, loadFromSupabase, isRefreshing } = useWorkspaceStore();
 
@@ -75,19 +84,22 @@ export default function CRMHub() {
   const [deleteModal, setDeleteModal] = useState<{
     title: string;
     description: string;
+    confirmLabel?: string;
     onConfirm: () => void;
   } | null>(null);
 
-  // 년도 페이지 목록 (최신순)
+  const otherScope: CrmScope = scope === "fluento" ? "statfordegree" : "fluento";
+
+  // 년도 페이지 목록 (이 사업부 소속만, 최신순)
   const yearPages = useMemo(() => {
     return Object.values(pages)
-      .filter((p) => /^(\d{4})년/.test(p.title))
+      .filter((p) => isYearTitle(p.title) && scopeOfYearTitle(p.title) === scope)
       .sort((a, b) => {
         const aY = parseInt(a.title.match(/^(\d{4})/)?.[1] ?? "0");
         const bY = parseInt(b.title.match(/^(\d{4})/)?.[1] ?? "0");
         return bY - aY;
       });
-  }, [pages]);
+  }, [pages, scope]);
 
   // yearPageId 아래에서 월번호 → 페이지ID 매핑
   const getMonthMap = (yearPageId: string): Record<number, string> => {
@@ -101,12 +113,6 @@ export default function CRMHub() {
     return map;
   };
 
-  // 년도 결정적 ID: 어느 PC에서 만들어도 동일한 ID
-  const yearPageDeterministicId = (year: number) => `crm-year-${year}`;
-  // 월 결정적 ID: 어느 PC에서 만들어도 동일한 ID
-  const monthPageDeterministicId = (year: number, month: number) =>
-    `crm-month-${year}-${String(month).padStart(2, "0")}`;
-
   // 월 클릭: 없으면 생성 후 이동, 있으면 바로 이동
   const handleMonthClick = (yearPageId: string, monthNum: number) => {
     const monthMap = getMonthMap(yearPageId);
@@ -118,9 +124,13 @@ export default function CRMHub() {
     // 년도 페이지 제목에서 연도 추출 → 결정적 ID 생성
     const yearTitle = pages[yearPageId]?.title ?? "";
     const yearNum = parseInt(yearTitle.match(/^(\d{4})/)?.[1] ?? "0");
-    const deterministicId = yearNum
-      ? monthPageDeterministicId(yearNum, monthNum)
+    let deterministicId = yearNum
+      ? crmMonthPageId(scope, yearNum, monthNum)
       : undefined; // 연도 파싱 실패 시 fallback
+    // 같은 ID가 다른 연도 페이지 밑에 이미 있으면 그 페이지로 잘못 연결되지 않도록 새 ID 사용
+    if (deterministicId && pages[deterministicId] && pages[deterministicId].parentId !== yearPageId) {
+      deterministicId = undefined;
+    }
     const id = createPage(yearPageId, undefined, deterministicId);
     updatePage(id, { title: `${monthNum}월`, emoji: "📋" });
     router.push(`/p/${id}`);
@@ -130,7 +140,7 @@ export default function CRMHub() {
   const handleAddYear = () => {
     const y = parseInt(yearInput.trim());
     if (!y || y < 2000 || y > 2100) return;
-    const title = `${y}년 고객관리양식`;
+    const title = crmYearTitle(scope, y);
     const already = Object.values(pages).find((p) => p.title === title);
     if (already) {
       setExpandedYears((prev) => new Set([...prev, already.id]));
@@ -138,8 +148,9 @@ export default function CRMHub() {
       return;
     }
     // 결정적 ID로 생성 — 두 PC가 동시에 같은 년도를 만들어도 동일한 ID
-    const deterministicId = yearPageDeterministicId(y);
-    const id = createPage(null, undefined, deterministicId);
+    const deterministicId = crmYearPageId(scope, y);
+    // 같은 ID의 다른 페이지가 이미 있으면 덮어쓰지 않도록 새 ID 사용
+    const id = createPage(null, undefined, pages[deterministicId] ? undefined : deterministicId);
     updatePage(id, { title, emoji: "📅" });
     setShowYearInput(false);
     setExpandedYears((prev) => new Set([...prev, id]));
@@ -161,6 +172,20 @@ export default function CRMHub() {
           next.delete(yearPage.id);
           return next;
         });
+        setDeleteModal(null);
+      },
+    });
+  };
+
+  // 년도를 다른 사업부(스탯포디그리 ↔ 플루엔토)로 이동 — 제목만 바뀌고 하위 월·고객 데이터는 그대로 따라감
+  const handleMoveYear = (yearPage: { id: string; title: string }) => {
+    const yearNum = yearPage.title.match(/^(\d{4})/)?.[1] ?? "";
+    setDeleteModal({
+      title: `${yearNum}년을 ${CRM_SCOPE_LABEL[otherScope]}로 이동`,
+      description: `${yearNum}년 고객관리양식(하위 월·고객 데이터 포함)이 ${CRM_SCOPE_LABEL[otherScope]} 고객관리로 옮겨집니다.`,
+      confirmLabel: "이동",
+      onConfirm: () => {
+        updatePage(yearPage.id, { title: crmYearTitle(otherScope, yearNum) });
         setDeleteModal(null);
       },
     });
@@ -193,10 +218,16 @@ export default function CRMHub() {
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
+            {scope === "fluento" && (
+              <button onClick={() => router.push("/fluento")}
+                className="mb-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-[#f7f6f3] dark:hover:bg-[#252525] border border-[#e9e9e7] dark:border-[#2f2f2f] transition-colors">
+                <ArrowLeft size={14} /> 플루엔토
+              </button>
+            )}
             <div className="flex items-center gap-3 mb-2">
               <Users size={32} className="text-[#37352f] dark:text-[#e6e6e4]" />
               <h1 className="text-4xl font-bold text-[#37352f] dark:text-[#e6e6e4]">
-                고객관리양식
+                {scope === "fluento" ? "플루엔토 고객관리양식" : "고객관리양식"}
               </h1>
             </div>
             <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
@@ -208,7 +239,7 @@ export default function CRMHub() {
               onClick={() => loadFromSupabase()}
               disabled={isRefreshing}
               title="새로고침"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-[rgba(55,53,47,0.08)] dark:hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
               새로고침
@@ -296,6 +327,14 @@ export default function CRMHub() {
                         : <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />
                       }
                     </button>
+                    {/* 다른 사업부로 이동 */}
+                    <button
+                      onClick={() => handleMoveYear(yearPage)}
+                      title={`${yearNum}년을 ${CRM_SCOPE_LABEL[otherScope]} 고객관리로 이동`}
+                      className="mr-1 flex items-center gap-1 px-2 py-1 rounded text-xs text-[#9b9a97] hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+                    >
+                      <ArrowRightLeft size={12} /> {CRM_SCOPE_LABEL[otherScope]}로 이동
+                    </button>
                     {/* 년도 삭제 버튼 (hover 시 표시) */}
                     <button
                       onClick={() => handleDeleteYear(yearPage)}
@@ -355,6 +394,7 @@ export default function CRMHub() {
         <DeleteConfirmModal
           title={deleteModal.title}
           description={deleteModal.description}
+          confirmLabel={deleteModal.confirmLabel}
           onConfirm={deleteModal.onConfirm}
           onCancel={() => setDeleteModal(null)}
         />

@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { CrmScope } from "@/lib/crm-scope";
 
 const CRMHub = dynamic(() => import("./CRMHub"), {
   ssr: false,
@@ -14,6 +15,6 @@ const CRMHub = dynamic(() => import("./CRMHub"), {
   ),
 });
 
-export default function CRMPageWrapper() {
-  return <CRMHub />;
+export default function CRMPageWrapper({ scope }: { scope?: CrmScope }) {
+  return <CRMHub scope={scope} />;
 }
