@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 
 const CARDS = [
   { emoji: "📒", iconBg: "from-green-400 to-emerald-600", title: "장부",   href: "/fluento/ledger" },
-  { emoji: "🧮", iconBg: "from-lime-400 to-green-600",    title: "계산기", href: "/fluento/calculator" },
+  { emoji: "🧮", iconBg: "from-lime-400 to-green-600",    title: "투자비용", href: "/fluento/calculator" },
 ];
 
 export default function FluentoAccountingPage() {
