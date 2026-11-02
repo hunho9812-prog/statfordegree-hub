@@ -1639,8 +1639,8 @@ export default function CRMPage({
     if (colId === "_name")            return c.name ?? "";
     if (colId === "_memo")            return c.memo ?? "";
     if (colId === "_alba")            return c.alba ?? "";
-    if (colId === "_settlement_amount") return String(c.settlement_amount ?? "");
-    if (colId === "_total_amount")    return String(c.total_amount ?? "");
+    if (colId === "_settlement")      return String(c.settlement_amount ?? "");
+    if (colId === "_total")           return String(c.total_amount ?? "");
     if (colId === "_balance")         return String(c.balance ?? "");
     if (colId === "_submit_date")     return c.submit_date ?? "";
     return String(c.custom_fields?.[colId] ?? "");
@@ -1668,25 +1668,42 @@ export default function CRMPage({
 
     if (sortConfig) {
       const { field, dir } = sortConfig;
-      result = [...result].sort((a, b) => {
-        let av: string | number;
-        let bv: string | number;
-        // Map col id → actual value
-        const spec = BUILTIN_BY_ID[field];
-        if (spec) {
-          av = ((a as unknown) as Record<string, unknown>)[spec.field as string] as string | number ?? "";
-          bv = ((b as unknown) as Record<string, unknown>)[spec.field as string] as string | number ?? "";
-        } else {
-          av = a.custom_fields?.[field] ? 1 : 0;
-          bv = b.custom_fields?.[field] ? 1 : 0;
+      const spec = BUILTIN_BY_ID[field];
+      // 커스텀 열은 체크박스뿐 아니라 텍스트·숫자·담당자 유형도 있으므로 유형을 보고 비교한다
+      const colType = allCols.find((c) => c.id === field)?.effectiveType;
+      const mul = dir === "asc" ? 1 : -1;
+
+      const rawOf = (c: Customer): boolean | string | number | null => {
+        if (spec) return (c[spec.field] as boolean | string | number | null) ?? null;
+        return c.custom_fields?.[field] ?? null;
+      };
+      // 빈 값은 null로 정규화해서 오름/내림 어느 쪽이든 항상 아래로 보낸다
+      const norm = (v: boolean | string | number | null): string | number | null => {
+        if (typeof v === "boolean") return v ? 1 : 0;
+        if (v === null || v === undefined) return null;
+        if (typeof v === "number") return v;
+        const t = v.trim();
+        if (t === "") return null;
+        if (colType === "number") {
+          const n = Number(t.replace(/,/g, ""));
+          if (!Number.isNaN(n)) return n;
         }
-        if (typeof av === "number" && typeof bv === "number") return dir === "asc" ? av - bv : bv - av;
-        return dir === "asc" ? String(av).localeCompare(String(bv), "ko") : String(bv).localeCompare(String(av), "ko");
+        return t;
+      };
+
+      result = [...result].sort((a, b) => {
+        const av = norm(rawOf(a));
+        const bv = norm(rawOf(b));
+        if (av === null && bv === null) return 0;
+        if (av === null) return 1;
+        if (bv === null) return -1;
+        if (typeof av === "number" && typeof bv === "number") return (av - bv) * mul;
+        return String(av).localeCompare(String(bv), "ko", { numeric: true }) * mul;
       });
     }
 
     return result;
-  }, [monthScoped, activeFilters, sortConfig, getColVal]);
+  }, [monthScoped, activeFilters, sortConfig, getColVal, allCols]);
 
   const { totalRevenue, settlementTotal, balanceTotal } = useMemo(() => {
     let totalRevenue = 0, settlementTotal = 0, balanceTotal = 0;

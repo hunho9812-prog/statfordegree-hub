@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, RefreshCw, Settings2, Check, X,
@@ -203,7 +204,6 @@ export default function DashboardHub({
               onDelete={() => deleteCard(card.id)}
               onEmojiChange={(emoji) => updateEmoji(card.id, emoji)}
               onGradientChange={(g) => updateGradient(card.id, g)}
-              onNavigate={() => router.push(card.href)}
               onDragStart={() => onDragStart(idx)}
               onDragOver={(e) => onDragOver(e, idx)}
             />
@@ -247,7 +247,7 @@ export default function DashboardHub({
 function DashCardItem({
   card, editMode, titleValue,
   onTitleChange, onDelete, onEmojiChange, onGradientChange,
-  onNavigate, onDragStart, onDragOver,
+  onDragStart, onDragOver,
 }: {
   card: DashCard;
   editMode: boolean;
@@ -256,7 +256,6 @@ function DashCardItem({
   onDelete: () => void;
   onEmojiChange: (emoji: string) => void;
   onGradientChange: (g: string) => void;
-  onNavigate: () => void;
   onDragStart: () => void;
   onDragOver: (e: React.DragEvent) => void;
 }) {
@@ -358,10 +357,13 @@ function DashCardItem({
     );
   }
 
-  // 일반 모드
+  // 일반 모드 — router.push 버튼이 아니라 <Link>로 렌더한다.
+  // 버튼은 클릭한 뒤에야 RSC 페이로드/청크를 받기 시작하지만, Link는 카드가 화면에
+  // 보이는 시점에 미리 받아두기 때문에 클릭이 즉시 반응한다.
   return (
-    <button
-      onClick={onNavigate}
+    <Link
+      href={card.href}
+      prefetch
       className="group bg-white dark:bg-[#252525] rounded-2xl p-5 border border-[#e9e9e7] dark:border-[#2f2f2f] shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-1 flex flex-col items-center gap-3 text-center"
     >
       <div className={`w-[68px] h-[68px] rounded-[18px] bg-gradient-to-br ${card.iconBg} flex items-center justify-center text-3xl shadow-md`}>
@@ -370,7 +372,7 @@ function DashCardItem({
       <p className="font-medium text-sm text-[#37352f] dark:text-[#e6e6e4]">
         {card.title}
       </p>
-    </button>
+    </Link>
   );
 }
 

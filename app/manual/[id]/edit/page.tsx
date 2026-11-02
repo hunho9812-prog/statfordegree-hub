@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import ManualPostEditor from "@/components/ManualPostEditor";
+import ManualPostEditorWrapper from "@/components/ManualPostEditorWrapper";
 import { fetchPost, type ManualPost } from "@/lib/db-manual-posts";
 
 export default function ManualEditPage() {
@@ -21,5 +21,5 @@ export default function ManualEditPage() {
     return <div className="flex items-center justify-center h-full text-sm text-gray-400">게시글을 찾을 수 없습니다.</div>;
   }
 
-  return <ManualPostEditor post={post} />;
+  return <ManualPostEditorWrapper post={post} />;
 }

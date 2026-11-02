@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useMemo } from "react";
 
@@ -44,7 +44,6 @@ const SERVICES = [
 ];
 
 export default function PortalPage() {
-  const router = useRouter();
   const { user, profile } = useAuth();
 
   const { dateStr, greeting } = useMemo(() => {
@@ -83,13 +82,13 @@ export default function PortalPage() {
         </p>
         <div className="grid grid-cols-3 gap-4">
           {SERVICES.map((svc) => (
-            <button
+            // <Link>로 렌더해서 카드가 보이는 순간 라우트를 미리 받아둔다
+            // (router.push 버튼은 클릭 후에야 받기 시작해서 전환이 늦게 느껴짐)
+            <Link
               key={svc.id}
-              onClick={() => {
-                if (svc.href) router.push(svc.href);
-                else alert(`${svc.title}: 준비 중입니다.`);
-              }}
-              className="border border-[#e9ece9] dark:border-[#2f2f2f] rounded-2xl p-7 bg-white dark:bg-[#222] text-left transition-all duration-150 hover:shadow-md hover:-translate-y-px"
+              href={svc.href}
+              prefetch
+              className="block border border-[#e9ece9] dark:border-[#2f2f2f] rounded-2xl p-7 bg-white dark:bg-[#222] text-left transition-all duration-150 hover:shadow-md hover:-translate-y-px"
               style={{ opacity: svc.ready ? 1 : 0.65 }}
             >
               <div className="flex justify-between items-start mb-6">
@@ -111,7 +110,7 @@ export default function PortalPage() {
               <p className="mt-1.5 text-[13px] text-[#8b938b] leading-relaxed">
                 {svc.desc}
               </p>
-            </button>
+            </Link>
           ))}
         </div>
       </div>

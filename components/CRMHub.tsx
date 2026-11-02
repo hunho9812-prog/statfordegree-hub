@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, ChevronDown, ChevronRight, Users, Trash2, X, AlertTriangle, RefreshCw } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
+import { warmPageEditorChunks } from "@/lib/warm-routes";
 
 const MONTH_NAMES = [
   "1월", "2월", "3월", "4월", "5월", "6월",
@@ -363,6 +364,11 @@ export default function CRMHub({
                           <div key={name} className="relative group/month">
                             <button
                               onClick={() => handleMonthClick(yearPage.id, monthNum)}
+                              onMouseEnter={() => {
+                                // 클릭 전에 미리 받아두면 전환이 즉시 일어남
+                                warmPageEditorChunks();
+                                if (monthPageId) router.prefetch(`/p/${monthPageId}`);
+                              }}
                               className={`w-full py-3 rounded-lg text-sm font-medium transition-all ${
                                 exists
                                   ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-950/40"
@@ -391,6 +397,10 @@ export default function CRMHub({
                       <div className="relative group/month">
                         <button
                           onClick={() => handleEtcClick(yearPage.id)}
+                          onMouseEnter={() => {
+                            warmPageEditorChunks();
+                            if (etcPageId) router.prefetch(`/p/${etcPageId}`);
+                          }}
                           className={`w-full py-3 rounded-lg text-sm font-medium transition-all ${
                             etcPageId
                               ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-950/40"

@@ -1,6 +1,41 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// ── 접근권한 조회 캐시 ────────────────────────────────────────────────────────
+// 미들웨어는 페이지 이동뿐 아니라 RSC 페이로드 요청·프리페치마다 실행된다. 그래서
+// team_members 권한 조회를 매번 하면 전환마다 Supabase 왕복이 하나씩 더 붙는다.
+// 권한은 로그인 중에 거의 바뀌지 않으므로 인스턴스 메모리에 짧게 캐시한다.
+// (서버 메모리에만 존재 → 클라이언트가 위조할 수 없음. 권한 회수는 최대 TTL만큼 지연됨)
+type AccessProfile = {
+  role?: unknown;
+  accounting_access?: unknown;
+  manual_access?: unknown;
+  crm_access?: unknown;
+} | null;
+
+const ACCESS_TTL_MS = 60_000;
+const ACCESS_CACHE_MAX = 500;
+const accessCache = new Map<string, { profile: AccessProfile; expiresAt: number }>();
+
+function getCachedAccess(userId: string): AccessProfile | undefined {
+  const hit = accessCache.get(userId);
+  if (!hit) return undefined;
+  if (hit.expiresAt < Date.now()) {
+    accessCache.delete(userId);
+    return undefined;
+  }
+  return hit.profile;
+}
+
+function setCachedAccess(userId: string, profile: AccessProfile) {
+  // 단순 상한 — 넘치면 가장 오래된 항목부터 제거
+  if (accessCache.size >= ACCESS_CACHE_MAX) {
+    const oldest = accessCache.keys().next().value;
+    if (oldest !== undefined) accessCache.delete(oldest);
+  }
+  accessCache.set(userId, { profile, expiresAt: Date.now() + ACCESS_TTL_MS });
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -67,26 +102,32 @@ export async function middleware(request: NextRequest) {
         // 접근권한 조회 자체가 실패해도 사이트 전체가 죽지 않도록 이 블록만 격리.
         // 실패 시 접근 제한을 강제하지 않고 통과시킨다 (fail-open).
         try {
-          const adminSupabase = createServerClient(supabaseUrl, serviceRoleKey, {
-            cookies: { getAll: () => [], setAll: () => {} },
-          });
+          // 같은 사용자의 최근 조회 결과가 있으면 DB 왕복을 생략 (전환 지연의 주요 원인)
+          let profile = getCachedAccess(user.id);
 
-          // 새 컬럼이 아직 없을 수 있으므로 폴백 처리
-          let profile: Record<string, unknown> | null = null;
-          const fullFetch = await adminSupabase
-            .from("team_members")
-            .select("role, accounting_access, manual_access, crm_access")
-            .eq("id", user.id)
-            .maybeSingle();
-          if (fullFetch.error) {
-            const fallback = await adminSupabase
+          if (profile === undefined) {
+            const adminSupabase = createServerClient(supabaseUrl, serviceRoleKey, {
+              cookies: { getAll: () => [], setAll: () => {} },
+            });
+
+            // 새 컬럼이 아직 없을 수 있으므로 폴백 처리
+            const fullFetch = await adminSupabase
               .from("team_members")
-              .select("role, accounting_access")
+              .select("role, accounting_access, manual_access, crm_access")
               .eq("id", user.id)
               .maybeSingle();
-            profile = (fallback.data as Record<string, unknown>) ?? null;
-          } else {
-            profile = (fullFetch.data as Record<string, unknown>) ?? null;
+            if (fullFetch.error) {
+              const fallback = await adminSupabase
+                .from("team_members")
+                .select("role, accounting_access")
+                .eq("id", user.id)
+                .maybeSingle();
+              profile = (fallback.data as AccessProfile) ?? null;
+            } else {
+              profile = (fullFetch.data as AccessProfile) ?? null;
+            }
+
+            setCachedAccess(user.id, profile);
           }
 
           const isAdmin = profile?.role === "admin" || user.email === process.env.ADMIN_EMAIL;

@@ -15,6 +15,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import TextAlign from "@tiptap/extension-text-align";
 import { VideoBlock } from "./extensions/VideoBlock";
 import { FileAttachment } from "./extensions/FileAttachment";
+import { FontSize } from "./extensions/FontSize";
 import { ChevronLeft, Pencil, Trash2, Pin } from "lucide-react";
 import { fetchPost, deletePost, type ManualPost } from "@/lib/db-manual-posts";
 import { useAuth } from "./AuthProvider";
@@ -41,6 +42,7 @@ export default function ManualPostView({ postId }: Props) {
       Highlight.configure({ multicolor: true }),
       TextStyle,
       Color,
+      FontSize,
       Link.configure({ openOnClick: true }),
       Image.configure({ inline: false }),
       TaskList,

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
@@ -16,16 +16,31 @@ import Image from "@tiptap/extension-image";
 import TextAlign from "@tiptap/extension-text-align";
 import { VideoBlock } from "./extensions/VideoBlock";
 import { FileAttachment } from "./extensions/FileAttachment";
+import { FontSize } from "./extensions/FontSize";
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight, List, ListOrdered,
-  Undo, Redo, Paperclip, Loader2, Link as LinkIcon,
+  Undo, Redo, Paperclip, Loader2, Link as LinkIcon, ChevronDown,
 } from "lucide-react";
 import { createPost, updatePost, PREFIXES, type ManualPost, type ManualPostInput } from "@/lib/db-manual-posts";
 import { useAuth } from "./AuthProvider";
 import { cn } from "@/lib/utils";
 
 const CATEGORIES = ["", "메뉴얼", "운영", "기타"];
+
+// 글자 크기 — prose-sm 기본값이 14px이라 이를 "기본"으로 두고 위아래 단계를 둔다
+const BASE_FONT_SIZE = 14;
+const SIZE_STEPS = [11, 12, 14, 16, 18, 20, 24, 30, 36, 48];
+const FONT_SIZE_OPTIONS: { label: string; px: number | null }[] = [
+  { label: "작게 (12)", px: 12 },
+  { label: "기본 (14)", px: null },
+  { label: "조금 크게 (16)", px: 16 },
+  { label: "크게 (18)", px: 18 },
+  { label: "더 크게 (20)", px: 20 },
+  { label: "제목급 (24)", px: 24 },
+  { label: "아주 크게 (30)", px: 30 },
+  { label: "최대 (36)", px: 36 },
+];
 
 interface Props {
   post?: ManualPost; // if editing
@@ -53,6 +68,7 @@ export default function ManualPostEditor({ post }: Props) {
       Highlight.configure({ multicolor: true }),
       TextStyle,
       Color,
+      FontSize,
       Link.configure({ openOnClick: false }),
       Image.configure({ inline: false }),
       TaskList,
@@ -231,8 +247,8 @@ export default function ManualPostEditor({ post }: Props) {
             />
           </div>
 
-          {/* Toolbar */}
-          <div className="py-1.5 border-y border-[#e9ece9] dark:border-[#2f2f2f] flex items-center gap-0.5 flex-wrap mb-4">
+          {/* Toolbar — 스크롤을 내려도 상단에 붙어 따라온다 */}
+          <div className="sticky top-0 z-20 -mx-8 px-8 py-1.5 border-y border-[#e9ece9] dark:border-[#2f2f2f] bg-white dark:bg-[#1e1e1e] flex items-center gap-0.5 flex-wrap mb-4">
             {editor && (
               <>
                 <ToolBtn onClick={() => editor.chain().focus().undo().run()} title="실행취소"><Undo size={15} /></ToolBtn>
@@ -242,6 +258,8 @@ export default function ManualPostEditor({ post }: Props) {
                 <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="기울임"><Italic size={15} /></ToolBtn>
                 <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="밑줄"><UnderlineIcon size={15} /></ToolBtn>
                 <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive("strike")} title="취소선"><Strikethrough size={15} /></ToolBtn>
+                <Divider />
+                <FontSizeControl editor={editor} />
                 <Divider />
                 <ToolBtn onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="왼쪽 정렬"><AlignLeft size={15} /></ToolBtn>
                 <ToolBtn onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="가운데 정렬"><AlignCenter size={15} /></ToolBtn>
@@ -281,6 +299,86 @@ function ToolBtn({ onClick, active, title, children }: { onClick: () => void; ac
     >
       {children}
     </button>
+  );
+}
+
+function FontSizeControl({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const current: string | null = editor.getAttributes("textStyle").fontSize ?? null;
+  const currentPx = current ? parseInt(current, 10) || BASE_FONT_SIZE : BASE_FONT_SIZE;
+
+  const apply = (px: number | null) => {
+    // FontSize 확장의 커스텀 커맨드는 체인 타입에 올라오지 않아 캐스팅해서 호출한다
+    const chain = editor.chain().focus() as unknown as {
+      setFontSize: (s: string) => { run: () => void };
+      unsetFontSize: () => { run: () => void };
+    };
+    if (px === null || px === BASE_FONT_SIZE) chain.unsetFontSize().run();
+    else chain.setFontSize(`${px}px`).run();
+  };
+
+  const step = (dir: 1 | -1) => {
+    let idx = SIZE_STEPS.indexOf(currentPx);
+    if (idx === -1) {
+      idx = SIZE_STEPS.findIndex((s) => s >= currentPx);
+      if (idx === -1) idx = SIZE_STEPS.length - 1;
+    }
+    const next = SIZE_STEPS[Math.min(SIZE_STEPS.length - 1, Math.max(0, idx + dir))];
+    apply(next);
+  };
+
+  return (
+    <div className="relative flex items-center gap-0.5" ref={boxRef}>
+      <ToolBtn onClick={() => step(-1)} title="글자 작게">
+        <span className="text-[11px] font-bold leading-none">A-</span>
+      </ToolBtn>
+      <button
+        onMouseDown={(e) => { e.preventDefault(); setOpen((v) => !v); }}
+        title="글자 크기"
+        className={cn(
+          "h-7 min-w-[42px] px-1.5 flex items-center justify-center gap-0.5 rounded text-[12px] text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)] transition-colors",
+          (open || current) && "bg-[#e7ebe7] dark:bg-[rgba(94,124,100,0.15)] text-[#2f3430] dark:text-[#e6e6e4]"
+        )}
+      >
+        <span>{currentPx}</span>
+        <ChevronDown size={11} />
+      </button>
+      <ToolBtn onClick={() => step(1)} title="글자 크게">
+        <span className="text-[13px] font-bold leading-none">A+</span>
+      </ToolBtn>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 w-40 bg-white dark:bg-[#252525] border border-[#e0e4e0] dark:border-[#3a3a3a] rounded-lg shadow-lg py-1">
+          {FONT_SIZE_OPTIONS.map((opt) => {
+            const active = (opt.px ?? BASE_FONT_SIZE) === currentPx;
+            return (
+              <button
+                key={opt.label}
+                onMouseDown={(e) => { e.preventDefault(); apply(opt.px); setOpen(false); }}
+                className={cn(
+                  "w-full text-left px-3 py-1.5 text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#f0f2f0] dark:hover:bg-[#2f2f2f] transition-colors",
+                  active && "text-[#2f3430] dark:text-[#e6e6e4] font-semibold bg-[#f0f2f0] dark:bg-[#2f2f2f]"
+                )}
+                style={{ fontSize: `${Math.min(opt.px ?? BASE_FONT_SIZE, 20)}px` }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

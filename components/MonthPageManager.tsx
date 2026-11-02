@@ -85,6 +85,7 @@ export default function MonthPageManager({ pageId }: { pageId: string }) {
               <div key={name} className="relative group/month">
                 <button
                   onClick={() => handleMonthClick(monthNum)}
+                  onMouseEnter={() => { if (monthPageId) router.prefetch(`/p/${monthPageId}`); }}
                   className={`w-full py-3 rounded-lg text-sm font-medium transition-all ${
                     exists
                       ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-950/40"
@@ -112,6 +113,7 @@ export default function MonthPageManager({ pageId }: { pageId: string }) {
           <div className="relative group/month">
             <button
               onClick={handleEtcClick}
+              onMouseEnter={() => { if (etcPageId) router.prefetch(`/p/${etcPageId}`); }}
               className={`w-full py-3 rounded-lg text-sm font-medium transition-all ${
                 etcPageId
                   ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-950/40"
