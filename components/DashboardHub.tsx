@@ -12,6 +12,10 @@ import { cn } from "@/lib/utils";
 
 // 서비스별(스탯포디그리/플루엔토 등) 진입 허브 — 카드 목록/순서/이름/색상은
 // storageKey로 구분된 localStorage에 저장되어 서비스끼리 서로 영향을 주지 않음.
+//
+// group 필드는 선택사항: defaultCards 중 하나라도 group을 가지면 그룹 헤더가 있는
+// 섹션형 레이아웃으로 렌더링되고, 하나도 없으면 기존처럼 평평한 그리드로 렌더링된다
+// (group을 쓰지 않는 기존 서비스는 동작이 전혀 바뀌지 않음).
 
 export interface DashCard {
   id: string;
@@ -19,6 +23,7 @@ export interface DashCard {
   iconBg: string;
   title: string;
   href: string;
+  group?: string;
 }
 
 const GRADIENT_OPTIONS = [
@@ -42,7 +47,19 @@ function loadCards(storageKey: string, defaultCards: DashCard[]): DashCard[] {
   if (typeof window === "undefined") return defaultCards;
   try {
     const raw = localStorage.getItem(storageKey);
-    if (raw) return JSON.parse(raw) as DashCard[];
+    if (raw) {
+      const saved = JSON.parse(raw) as DashCard[];
+      const hasGroups = defaultCards.some((c) => c.group);
+      if (!hasGroups) return saved;
+      // 그룹 필드가 새로 추가된 경우: 기존에 저장된(그룹 정보 없는) 카드에
+      // id 매칭으로 그룹을 보강해서, 사용자가 커스터마이징한 이름/순서/이모지는
+      // 그대로 유지하면서 새 그룹 구조에 자연스럽게 편입시킨다.
+      const defaultById = new Map(defaultCards.map((c) => [c.id, c]));
+      const fallbackGroup = defaultCards[0]?.group;
+      return saved.map((c) =>
+        c.group ? c : { ...c, group: defaultById.get(c.id)?.group ?? fallbackGroup }
+      );
+    }
   } catch { /* ignore */ }
   return defaultCards;
 }
@@ -70,6 +87,7 @@ export default function DashboardHub({
 
   const [cards, setCards] = useState<DashCard[]>(defaultCards);
   const [editMode, setEditMode] = useState(false);
+  const [addTargetGroup, setAddTargetGroup] = useState<string | undefined>(undefined);
   const [showAddModal, setShowAddModal] = useState(false);
 
   // 편집 중 임시 이름
@@ -82,6 +100,11 @@ export default function DashboardHub({
     setCards(loadCards(storageKey, defaultCards));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
+
+  // 그룹 목록: defaultCards에 등장하는 순서를 기준으로 삼는다.
+  const groupOrder: string[] = [];
+  defaultCards.forEach((c) => { if (c.group && !groupOrder.includes(c.group)) groupOrder.push(c.group); });
+  const hasGroups = groupOrder.length > 0;
 
   const commit = (next: DashCard[]) => {
     setCards(next);
@@ -126,18 +149,53 @@ export default function DashboardHub({
     commit(cards.map((c) => c.id === id ? { ...c, iconBg } : c));
   };
 
-  // drag-and-drop reorder
+  // drag-and-drop reorder — 그룹이 있는 경우 같은 그룹 내에서만 순서 변경 허용
   const onDragStart = (idx: number) => { dragIdxRef.current = idx; };
   const onDragOver = (e: React.DragEvent, idx: number) => {
     e.preventDefault();
     const from = dragIdxRef.current;
     if (from === null || from === idx) return;
+    if (hasGroups && (cards[from]?.group ?? "기타") !== (cards[idx]?.group ?? "기타")) return;
     const next = [...cards];
     const [item] = next.splice(from, 1);
     next.splice(idx, 0, item);
     dragIdxRef.current = idx;
     commit(next);
   };
+
+  const openAddModal = (group?: string) => {
+    setAddTargetGroup(group);
+    setShowAddModal(true);
+  };
+
+  const renderGrid = (groupCards: { card: DashCard; idx: number }[], group?: string) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      {groupCards.map(({ card, idx }) => (
+        <DashCardItem
+          key={card.id}
+          card={card}
+          editMode={editMode}
+          titleValue={editTitles[card.id] ?? card.title}
+          onTitleChange={(v) => setEditTitles((prev) => ({ ...prev, [card.id]: v }))}
+          onDelete={() => deleteCard(card.id)}
+          onEmojiChange={(emoji) => updateEmoji(card.id, emoji)}
+          onGradientChange={(g) => updateGradient(card.id, g)}
+          onDragStart={() => onDragStart(idx)}
+          onDragOver={(e) => onDragOver(e, idx)}
+        />
+      ))}
+
+      {editMode && (
+        <button
+          onClick={() => openAddModal(group)}
+          className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#d9d9d7] dark:border-[#3f3f3f] bg-transparent hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-all min-h-[140px] text-[#9b9a97] dark:text-[#6b6b6b] hover:text-blue-500"
+        >
+          <Plus size={24} />
+          <span className="text-sm font-medium">카드 추가</span>
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f5f5f7] dark:bg-[#191919]">
@@ -192,40 +250,30 @@ export default function DashboardHub({
 
       {/* Cards — centered */}
       <div className="flex flex-col items-center justify-center px-8 py-8">
-        <div className="w-full max-w-2xl">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          {cards.map((card, idx) => (
-            <DashCardItem
-              key={card.id}
-              card={card}
-              editMode={editMode}
-              titleValue={editTitles[card.id] ?? card.title}
-              onTitleChange={(v) => setEditTitles((prev) => ({ ...prev, [card.id]: v }))}
-              onDelete={() => deleteCard(card.id)}
-              onEmojiChange={(emoji) => updateEmoji(card.id, emoji)}
-              onGradientChange={(g) => updateGradient(card.id, g)}
-              onDragStart={() => onDragStart(idx)}
-              onDragOver={(e) => onDragOver(e, idx)}
-            />
-          ))}
-
-          {/* 카드 추가 버튼 */}
-          {editMode && (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#d9d9d7] dark:border-[#3f3f3f] bg-transparent hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-all min-h-[140px] text-[#9b9a97] dark:text-[#6b6b6b] hover:text-blue-500"
-            >
-              <Plus size={24} />
-              <span className="text-sm font-medium">카드 추가</span>
-            </button>
+        <div className="w-full max-w-2xl flex flex-col gap-8">
+          {hasGroups ? (
+            groupOrder.map((group) => {
+              const groupCards = cards
+                .map((card, idx) => ({ card, idx }))
+                .filter(({ card }) => (card.group ?? groupOrder[0]) === group);
+              return (
+                <div key={group}>
+                  <p className="text-xs font-bold text-[#9b9a97] tracking-[0.04em] uppercase mb-3 px-1">
+                    {group}
+                  </p>
+                  {renderGrid(groupCards, group)}
+                </div>
+              );
+            })
+          ) : (
+            renderGrid(cards.map((card, idx) => ({ card, idx })))
           )}
-        </div>
 
-        {editMode && (
-          <p className="mt-4 text-xs text-[#9b9a97] text-center">
-            카드를 드래그하여 순서를 변경하거나, 이모지·색상·이름을 수정할 수 있습니다.
-          </p>
-        )}
+          {editMode && (
+            <p className="text-xs text-[#9b9a97] text-center">
+              카드를 드래그하여 순서를 변경하거나, 이모지·색상·이름을 수정할 수 있습니다.
+            </p>
+          )}
         </div>
       </div>
 
@@ -234,6 +282,8 @@ export default function DashboardHub({
         <AddCardModal
           existingIds={cards.map((c) => c.id)}
           presetLinks={presetLinks}
+          groups={groupOrder}
+          defaultGroup={addTargetGroup ?? groupOrder[0]}
           onAdd={addCard}
           onClose={() => setShowAddModal(false)}
         />
@@ -378,9 +428,11 @@ function DashCardItem({
 
 // ── AddCardModal ──────────────────────────────────────────────────────────────
 
-function AddCardModal({ existingIds, presetLinks, onAdd, onClose }: {
+function AddCardModal({ existingIds, presetLinks, groups, defaultGroup, onAdd, onClose }: {
   existingIds: string[];
   presetLinks: DashCard[];
+  groups: string[];
+  defaultGroup?: string;
   onAdd: (card: DashCard) => void;
   onClose: () => void;
 }) {
@@ -389,19 +441,23 @@ function AddCardModal({ existingIds, presetLinks, onAdd, onClose }: {
   const [customHref, setCustomHref] = useState("/");
   const [customEmoji, setCustomEmoji] = useState("📄");
   const [customGrad, setCustomGrad] = useState(GRADIENT_OPTIONS[0]);
+  const [selectedGroup, setSelectedGroup] = useState<string | undefined>(defaultGroup);
   const [showEmojiPop, setShowEmojiPop] = useState(false);
 
   const availablePresets = presetLinks.filter((p) => !existingIds.includes(p.id));
 
+  const withGroup = (card: DashCard): DashCard =>
+    groups.length ? { ...card, group: selectedGroup ?? groups[0] } : card;
+
   const handleAddCustom = () => {
     if (!customTitle.trim()) return;
-    onAdd({
+    onAdd(withGroup({
       id: `custom-${Date.now()}`,
       emoji: customEmoji,
       iconBg: customGrad,
       title: customTitle.trim(),
       href: customHref,
-    });
+    }));
   };
 
   return (
@@ -415,8 +471,31 @@ function AddCardModal({ existingIds, presetLinks, onAdd, onClose }: {
           </button>
         </div>
 
+        {/* 그룹 선택 */}
+        {groups.length > 0 && (
+          <div className="px-5 pt-4 pb-1">
+            <p className="text-xs font-medium text-[#9b9a97] mb-1.5">추가할 그룹</p>
+            <div className="flex flex-wrap gap-1.5">
+              {groups.map((g) => (
+                <button
+                  key={g}
+                  onClick={() => setSelectedGroup(g)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors",
+                    (selectedGroup ?? groups[0]) === g
+                      ? "bg-blue-500 text-white border-blue-500"
+                      : "bg-transparent text-[#9b9a97] border-[#e9e9e7] dark:border-[#3f3f3f] hover:border-blue-400"
+                  )}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
-        <div className="flex border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
+        <div className="flex border-b border-[#e9e9e7] dark:border-[#2f2f2f] mt-2">
           {(["preset", "custom"] as const).map((t) => (
             <button
               key={t}
@@ -442,7 +521,7 @@ function AddCardModal({ existingIds, presetLinks, onAdd, onClose }: {
                 {availablePresets.map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => onAdd(p)}
+                    onClick={() => onAdd(withGroup(p))}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#e9e9e7] dark:border-[#3f3f3f] hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-all text-left"
                   >
                     <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${p.iconBg} flex items-center justify-center text-xl shadow-sm flex-shrink-0`}>

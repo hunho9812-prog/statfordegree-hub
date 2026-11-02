@@ -3,10 +3,11 @@
 import DashboardHub, { type DashCard } from "@/components/DashboardHub";
 
 const DEFAULT_CARDS: DashCard[] = [
-  { id: "accounting", emoji: "🧾", iconBg: "from-indigo-400 to-blue-600",   title: "회계",      href: "/accounting" },
-  { id: "manual",     emoji: "📋", iconBg: "from-sky-500 to-blue-600",      title: "메뉴얼",    href: "/manual" },
-  { id: "crm",        emoji: "👥", iconBg: "from-violet-400 to-purple-600", title: "고객관리",  href: "/crm" },
-  { id: "keywords",   emoji: "🔑", iconBg: "from-teal-400 to-cyan-600",     title: "키워드 관리", href: "/statfordegree/keywords" },
+  { id: "accounting", emoji: "🧾", iconBg: "from-indigo-400 to-blue-600",   title: "회계",      href: "/accounting",              group: "통계 분석" },
+  { id: "manual",     emoji: "📋", iconBg: "from-sky-500 to-blue-600",      title: "메뉴얼",    href: "/manual",                  group: "통계 분석" },
+  { id: "crm",        emoji: "👥", iconBg: "from-violet-400 to-purple-600", title: "고객관리",  href: "/crm",                     group: "통계 분석" },
+  { id: "keywords",   emoji: "🔑", iconBg: "from-teal-400 to-cyan-600",     title: "키워드 관리", href: "/statfordegree/keywords", group: "통계 분석" },
+  { id: "content",    emoji: "🗂️", iconBg: "from-rose-400 to-red-500",      title: "콘텐츠 관리", href: "/statfordegree/content",  group: "콘텐츠 관리" },
 ];
 
 // 추가할 수 있는 미리 정의된 링크 목록
