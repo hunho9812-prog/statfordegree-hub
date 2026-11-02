@@ -56,10 +56,10 @@ function ReadonlyMoney({ label, value, accent }: { label: string; value: number;
 // 부가세: 10원 단위 절사
 function calcVat(sales: number) { return Math.floor(sales * 0.1 / 10) * 10; }
 
-type DataState = { sales: string; bizCost: string; laborTotal: string; nonOpIncome: string };
+type DataState = { sales: string; bizCost: string; laborTotal: string; nonOpIncome: string; eunhoLabor: string; hyunhoLabor: string; reserve: string };
 type Toast = { type: "success" | "error"; msg: string };
 
-const EMPTY: DataState = { sales: "", bizCost: "", laborTotal: "", nonOpIncome: "" };
+const EMPTY: DataState = { sales: "", bizCost: "", laborTotal: "", nonOpIncome: "", eunhoLabor: "", hyunhoLabor: "", reserve: "" };
 
 export default function LedgerPage() {
   const router = useRouter();
@@ -97,6 +97,9 @@ export default function LedgerPage() {
         bizCost: entry.businessCost ? String(entry.businessCost) : "",
         laborTotal: entry.laborCost ? String(entry.laborCost) : "",
         nonOpIncome: entry.nonOperatingIncome ? String(entry.nonOperatingIncome) : "",
+        eunhoLabor: "",
+        hyunhoLabor: "",
+        reserve: "",
       });
     } else {
       setData(EMPTY);
@@ -133,8 +136,12 @@ export default function LedgerPage() {
   const vat = calcVat(sales);
   const operatingProfit = sales - vat - bizCost - laborTotal;
   const profit = operatingProfit + nonOpIncome;
+  const eunhoLabor = g("eunhoLabor"), hyunhoLabor = g("hyunhoLabor"), reserve = g("reserve");
+  const dividend = profit - eunhoLabor - hyunhoLabor - reserve;
+  const eunhoDiv = dividend * 0.7, hyunhoDiv = dividend * 0.3;
+  const eunhoTotal = eunhoLabor + eunhoDiv, hyunhoTotal = hyunhoLabor + hyunhoDiv;
 
-  const update = useCallback((key: keyof DataState) => (v: string) => {
+  const update =useCallback((key: keyof DataState) => (v: string) => {
     setData((prev) => ({ ...prev, [key]: v }));
     setSaveStatus("unsaved");
   }, []);
@@ -336,6 +343,57 @@ export default function LedgerPage() {
               </div>
             </div>
 
+            {/* Step 2 */}
+            <div className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#2f2f2f] shadow-sm overflow-hidden mb-4">
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
+                <div className="w-7 h-7 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">2</div>
+                <span className="font-bold text-[#37352f] dark:text-[#e6e6e4]">배당금 배분</span>
+              </div>
+              <div className="px-5 py-4 flex flex-col gap-3">
+                <MoneyInput label="은호 인건비" value={data.eunhoLabor} onChange={update("eunhoLabor")} />
+                <MoneyInput label="현호 인건비" value={data.hyunhoLabor} onChange={update("hyunhoLabor")} />
+                <MoneyInput label="예비비" value={data.reserve} onChange={update("reserve")} />
+              </div>
+              <div className={`flex items-center justify-between px-5 py-3 border-t border-[#e9e9e7] dark:border-[#2f2f2f] ${dividend < 0 ? "bg-red-50 dark:bg-red-950/30 border-l-4 border-red-500" : "bg-violet-50 dark:bg-violet-950/30 border-l-4 border-violet-500"}`}>
+                <div>
+                  <span className="text-sm font-bold text-[#37352f] dark:text-[#e6e6e4]">배당금</span>
+                  <span className="ml-2 text-xs text-[#9b9a97]">= 순이익 − 인건비들 − 예비비</span>
+                </div>
+                <span className={`text-lg font-extrabold ${dividend < 0 ? "text-red-500" : "text-violet-600 dark:text-violet-400"}`}>{fmt(dividend)}</span>
+              </div>
+              <div className="grid grid-cols-2 border-t border-[#e9e9e7] dark:border-[#2f2f2f]">
+                {[
+                  { name: "은호", pct: 70, val: eunhoDiv, bg: "bg-orange-50 dark:bg-orange-950/20", color: "text-orange-600", border: "border-r border-[#e9e9e7] dark:border-[#2f2f2f]" },
+                  { name: "현호", pct: 30, val: hyunhoDiv, bg: "bg-teal-50 dark:bg-teal-950/20", color: "text-teal-600", border: "" },
+                ].map(p => (
+                  <div key={p.name} className={`${p.bg} ${p.border} flex flex-col items-center gap-1 py-5`}>
+                    <span className="text-xs font-bold text-[#9b9a97] uppercase tracking-wider">{p.name} <span className="opacity-60">{p.pct}%</span></span>
+                    <span className={`text-2xl font-extrabold ${p.val < 0 ? "text-red-500" : p.color}`}>{fmt(p.val)}</span>
+                    <span className="text-xs text-[#9b9a97]">배당금 × {p.pct}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Step 3 */}
+            <div className="bg-white dark:bg-[#252525] rounded-2xl border-2 border-[#e9e9e7] dark:border-[#2f2f2f] shadow-sm overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-[#e9e9e7] dark:border-[#2f2f2f]">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 text-white text-xs font-bold flex items-center justify-center">3</div>
+                <span className="font-bold text-[#37352f] dark:text-[#e6e6e4]">총 수령금</span>
+              </div>
+              <div className="grid grid-cols-2">
+                {[
+                  { name: "은호", laborVal: eunhoLabor, divVal: eunhoDiv, total: eunhoTotal, bg: "bg-gradient-to-b from-orange-50 to-orange-100/40 dark:from-orange-950/20 dark:to-transparent", color: "text-orange-700 dark:text-orange-400", border: "border-r border-[#e9e9e7] dark:border-[#2f2f2f]" },
+                  { name: "현호", laborVal: hyunhoLabor, divVal: hyunhoDiv, total: hyunhoTotal, bg: "bg-gradient-to-b from-teal-50 to-teal-100/40 dark:from-teal-950/20 dark:to-transparent", color: "text-teal-700 dark:text-teal-400", border: "" },
+                ].map(p => (
+                  <div key={p.name} className={`${p.bg} ${p.border} px-5 py-6 flex flex-col items-center gap-2 text-center`}>
+                    <span className="text-xs font-extrabold text-[#9b9a97] uppercase tracking-widest">{p.name}</span>
+                    <div className="text-xs text-[#9b9a97]">인건비 {fmt(p.laborVal)} + 배당금 {fmt(p.divVal)}</div>
+                    <span className={`text-3xl font-black tracking-tight ${p.total < 0 ? "text-red-500" : p.color}`}>{fmt(p.total)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
