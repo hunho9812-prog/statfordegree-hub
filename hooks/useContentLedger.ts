@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { dbContentLedger, type ContentLedgerEntry } from "@/lib/db-content-ledger";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-
-const REALTIME_DEBOUNCE_MS = 400;
 
 export function useContentLedger() {
   const [entries, setEntries] = useState<ContentLedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reload = useCallback(async () => {
     const data = await dbContentLedger.fetchAll();
@@ -19,40 +16,43 @@ export function useContentLedger() {
 
   useEffect(() => {
     reload();
+
     if (!isSupabaseConfigured || !supabase) return;
 
-    const scheduleReload = () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      debounceTimer.current = setTimeout(reload, REALTIME_DEBOUNCE_MS);
-    };
-
     const channel = supabase
-      .channel("content_ledger_entries")
-      .on("postgres_changes", { event: "*", schema: "public", table: "content_ledger_entries" }, scheduleReload)
+      .channel("content_ledger")
+      .on("postgres_changes", { event: "*", schema: "public", table: "content_ledger" }, () => {
+        reload();
+      })
       .subscribe();
 
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      supabase?.removeChannel(channel);
-    };
+    return () => { supabase?.removeChannel(channel); };
   }, [reload]);
 
-  const upsert = useCallback(async (entry: ContentLedgerEntry) => {
+  const upsert = useCallback(async (entry: ContentLedgerEntry): Promise<{ success: boolean; error?: string }> => {
     const result = await dbContentLedger.upsert(entry);
     if (result.success) {
       setEntries((prev) => {
-        const idx = prev.findIndex((e) => e.id === entry.id);
-        if (idx >= 0) { const next = [...prev]; next[idx] = entry; return next; }
-        return [entry, ...prev];
+        const idx = prev.findIndex((e) => e.year === entry.year && e.month === entry.month);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = entry;
+          return next;
+        }
+        return [...prev, entry].sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
       });
     }
     return result;
   }, []);
 
-  const remove = useCallback(async (id: string) => {
-    const result = await dbContentLedger.delete(id);
-    if (result.success) setEntries((prev) => prev.filter((e) => e.id !== id));
-    return result;
+  const remove = useCallback(async (year: number, month: number): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await dbContentLedger.delete(year, month);
+      setEntries((prev) => prev.filter((e) => !(e.year === year && e.month === month)));
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: String(e) };
+    }
   }, []);
 
   return { entries, loading, reload, upsert, remove };
