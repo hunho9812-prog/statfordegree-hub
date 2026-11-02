@@ -28,9 +28,27 @@ import { VideoBlock } from "./extensions/VideoBlock";
 import { FileAttachment } from "./extensions/FileAttachment";
 import { Clock, ChevronRight, Bold, Italic, Underline as UnderlineIcon, Code, Plus, Trash2, GripVertical, ImageUp, FileUp, Loader2, MoreHorizontal, Pencil, AlertTriangle, ChevronDown as ChevronDownIcon } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
+import nextDynamic from "next/dynamic";
 import MonthPageManager from "./MonthPageManager";
-import CRMPage from "./CRMPage";
-import YearRevenueDashboard from "./YearRevenueDashboard";
+
+// CRMPage(1,900줄 테이블)와 연매출 대시보드는 각각 월/연도 페이지에서만 쓰이는데
+// 정적 import면 에디터 청크에 항상 같이 묶여 내려와서, 메뉴얼 문서 하나 열 때도
+// CRM 테이블 로직 전체를 받게 된다. 조건부 렌더이므로 청크를 분리한다.
+const CRMPage = nextDynamic(() => import("./CRMPage"), {
+  ssr: false,
+  loading: () => (
+    <div className="animate-pulse space-y-2 py-4">
+      <div className="h-9 rounded-lg bg-[#f4f3f1] dark:bg-[#232323]" />
+      <div className="h-9 rounded-lg bg-[#f7f6f4] dark:bg-[#202020]" />
+      <div className="h-9 rounded-lg bg-[#f7f6f4] dark:bg-[#202020]" />
+    </div>
+  ),
+});
+
+const YearRevenueDashboard = nextDynamic(() => import("./YearRevenueDashboard"), {
+  ssr: false,
+  loading: () => <div className="h-48 rounded-xl bg-[#f7f6f4] dark:bg-[#202020] animate-pulse" />,
+});
 
 const EMOJIS = [
   "📄", "📝", "📚", "📋", "🗂️", "📁", "🗃️", "📌", "📍", "🔖",
@@ -63,7 +81,10 @@ interface DragState {
 export default function PageEditor({ pageId }: { pageId: string }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { pages, updatePage, createPage, deletePage } = useWorkspaceStore();
+  const pages = useWorkspaceStore((s) => s.pages);
+  const updatePage = useWorkspaceStore((s) => s.updatePage);
+  const createPage = useWorkspaceStore((s) => s.createPage);
+  const deletePage = useWorkspaceStore((s) => s.deletePage);
   const page = pages[pageId];
 
   const [title, setTitle] = useState(page?.title || "");
@@ -550,8 +571,10 @@ export default function PageEditor({ pageId }: { pageId: string }) {
 
   // Page type detection
   const isYearPage = /^(\d{4})년/.test(page.title);
+  // 월 페이지 또는 "기타"(특정 월에 속하지 않는 고객 모음) 페이지 — 둘 다 연도 페이지의 자식이며
+  // CRMPage를 임베드해서 보여줌
   const isMonthPage =
-    /^\d{1,2}월$/.test(page.title) &&
+    (/^\d{1,2}월$/.test(page.title) || page.title === "기타") &&
     page.parentId !== null &&
     /^(\d{4})년/.test(pages[page.parentId]?.title ?? "");
 

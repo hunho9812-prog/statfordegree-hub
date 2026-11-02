@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, ChevronDown, ChevronRight, Users, Trash2, X, AlertTriangle, RefreshCw } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
+import { useShallow } from "zustand/react/shallow";
+import { warmPageEditorChunks } from "@/lib/warm-routes";
 
 const MONTH_NAMES = [
   "1월", "2월", "3월", "4월", "5월", "6월",
@@ -62,10 +64,31 @@ function DeleteConfirmModal({
 }
 
 // ─── CRMHub ────────────────────────────────────────────────────────────────────
+// idPrefix로 완전히 독립된 고객관리 인스턴스를 여러 개 둘 수 있음(예: 스탯포디그리 "crm",
+// 플루엔토 "fluento-crm"). 년도/월/기타 페이지 ID를 전부 이 접두사로 생성하고, 목록도 이
+// 접두사로만 필터링해서 서로의 고객 데이터가 섞이지 않게 함(DB 스키마 변경 없이 페이지 ID
+// 네임스페이스만으로 분리).
 
-export default function CRMHub() {
+export default function CRMHub({
+  idPrefix = "crm",
+  heading = "고객관리양식",
+  yearTitleSuffix = "고객관리양식",
+}: {
+  idPrefix?: string;
+  heading?: string;
+  yearTitleSuffix?: string;
+}) {
   const router = useRouter();
-  const { pages, createPage, updatePage, deletePage, loadFromSupabase, isRefreshing } = useWorkspaceStore();
+  const { pages, createPage, updatePage, deletePage, loadFromSupabase, isRefreshing } = useWorkspaceStore(
+    useShallow((s) => ({
+      pages: s.pages,
+      createPage: s.createPage,
+      updatePage: s.updatePage,
+      deletePage: s.deletePage,
+      loadFromSupabase: s.loadFromSupabase,
+      isRefreshing: s.isRefreshing,
+    }))
+  );
 
   const [expandedYears, setExpandedYears] = useState<Set<string>>(() => new Set());
   const [showYearInput, setShowYearInput] = useState(false);
@@ -78,16 +101,18 @@ export default function CRMHub() {
     onConfirm: () => void;
   } | null>(null);
 
-  // 년도 페이지 목록 (최신순)
+  // 년도 페이지 목록 (최신순) — title 패턴뿐 아니라 idPrefix로도 필터링해서
+  // 다른 네임스페이스(예: 스탯포디그리 ↔ 플루엔토)의 년도 페이지가 섞이지 않게 함
+  const yearIdPrefix = `${idPrefix}-year-`;
   const yearPages = useMemo(() => {
     return Object.values(pages)
-      .filter((p) => /^(\d{4})년/.test(p.title))
+      .filter((p) => p.id.startsWith(yearIdPrefix) && /^(\d{4})년/.test(p.title))
       .sort((a, b) => {
         const aY = parseInt(a.title.match(/^(\d{4})/)?.[1] ?? "0");
         const bY = parseInt(b.title.match(/^(\d{4})/)?.[1] ?? "0");
         return bY - aY;
       });
-  }, [pages]);
+  }, [pages, yearIdPrefix]);
 
   // yearPageId 아래에서 월번호 → 페이지ID 매핑
   const getMonthMap = (yearPageId: string): Record<number, string> => {
@@ -102,10 +127,16 @@ export default function CRMHub() {
   };
 
   // 년도 결정적 ID: 어느 PC에서 만들어도 동일한 ID
-  const yearPageDeterministicId = (year: number) => `crm-year-${year}`;
+  const yearPageDeterministicId = (year: number) => `${idPrefix}-year-${year}`;
   // 월 결정적 ID: 어느 PC에서 만들어도 동일한 ID
   const monthPageDeterministicId = (year: number, month: number) =>
-    `crm-month-${year}-${String(month).padStart(2, "0")}`;
+    `${idPrefix}-month-${year}-${String(month).padStart(2, "0")}`;
+  // 기타 결정적 ID: 어느 PC에서 만들어도 동일한 ID
+  const etcPageDeterministicId = (year: number) => `${idPrefix}-etc-${year}`;
+
+  // yearPageId 아래에서 "기타" 페이지 ID 찾기 (특정 월에 속하지 않는 고객 모음)
+  const getEtcPageId = (yearPageId: string): string | undefined =>
+    pages[yearPageId]?.children.find((id) => pages[id]?.title === "기타");
 
   // 월 클릭: 없으면 생성 후 이동, 있으면 바로 이동
   const handleMonthClick = (yearPageId: string, monthNum: number) => {
@@ -126,12 +157,27 @@ export default function CRMHub() {
     router.push(`/p/${id}`);
   };
 
+  // 기타 클릭: 없으면 생성 후 이동, 있으면 바로 이동
+  const handleEtcClick = (yearPageId: string) => {
+    const existingId = getEtcPageId(yearPageId);
+    if (existingId) {
+      router.push(`/p/${existingId}`);
+      return;
+    }
+    const yearTitle = pages[yearPageId]?.title ?? "";
+    const yearNum = parseInt(yearTitle.match(/^(\d{4})/)?.[1] ?? "0");
+    const deterministicId = yearNum ? etcPageDeterministicId(yearNum) : undefined;
+    const id = createPage(yearPageId, undefined, deterministicId);
+    updatePage(id, { title: "기타", emoji: "📋" });
+    router.push(`/p/${id}`);
+  };
+
   // 년도 추가
   const handleAddYear = () => {
     const y = parseInt(yearInput.trim());
     if (!y || y < 2000 || y > 2100) return;
-    const title = `${y}년 고객관리양식`;
-    const already = Object.values(pages).find((p) => p.title === title);
+    const title = `${y}년 ${yearTitleSuffix}`;
+    const already = yearPages.find((p) => p.title === title);
     if (already) {
       setExpandedYears((prev) => new Set([...prev, already.id]));
       setShowYearInput(false);
@@ -148,11 +194,11 @@ export default function CRMHub() {
   // 년도 삭제 확인
   const handleDeleteYear = (yearPage: { id: string; title: string }) => {
     const yearNum = yearPage.title.match(/^(\d{4})/)?.[1] ?? "";
-    const monthCount = Object.keys(getMonthMap(yearPage.id)).length;
+    const monthCount = Object.keys(getMonthMap(yearPage.id)).length + (getEtcPageId(yearPage.id) ? 1 : 0);
     setDeleteModal({
       title: `${yearNum}년 삭제`,
       description: monthCount > 0
-        ? `${yearNum}년 데이터와 하위 ${monthCount}개 월 페이지(고객 데이터 포함)가 모두 삭제됩니다.`
+        ? `${yearNum}년 데이터와 하위 ${monthCount}개 페이지(고객 데이터 포함)가 모두 삭제됩니다.`
         : `${yearNum}년 데이터가 삭제됩니다.`,
       onConfirm: () => {
         deletePage(yearPage.id);
@@ -196,7 +242,7 @@ export default function CRMHub() {
             <div className="flex items-center gap-3 mb-2">
               <Users size={32} className="text-[#37352f] dark:text-[#e6e6e4]" />
               <h1 className="text-4xl font-bold text-[#37352f] dark:text-[#e6e6e4]">
-                고객관리양식
+                {heading}
               </h1>
             </div>
             <p className="text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
@@ -269,6 +315,7 @@ export default function CRMHub() {
               const yearNum = yearPage.title.match(/^(\d{4})/)?.[1] ?? "";
               const monthMap = getMonthMap(yearPage.id);
               const existingCount = Object.keys(monthMap).length;
+              const etcPageId = getEtcPageId(yearPage.id);
               const expanded = expandedYears.has(yearPage.id);
 
               return (
@@ -317,6 +364,11 @@ export default function CRMHub() {
                           <div key={name} className="relative group/month">
                             <button
                               onClick={() => handleMonthClick(yearPage.id, monthNum)}
+                              onMouseEnter={() => {
+                                // 클릭 전에 미리 받아두면 전환이 즉시 일어남
+                                warmPageEditorChunks();
+                                if (monthPageId) router.prefetch(`/p/${monthPageId}`);
+                              }}
                               className={`w-full py-3 rounded-lg text-sm font-medium transition-all ${
                                 exists
                                   ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-950/40"
@@ -341,6 +393,35 @@ export default function CRMHub() {
                           </div>
                         );
                       })}
+                      {/* 기타: 특정 월에 속하지 않는 고객 모음 */}
+                      <div className="relative group/month">
+                        <button
+                          onClick={() => handleEtcClick(yearPage.id)}
+                          onMouseEnter={() => {
+                            warmPageEditorChunks();
+                            if (etcPageId) router.prefetch(`/p/${etcPageId}`);
+                          }}
+                          className={`w-full py-3 rounded-lg text-sm font-medium transition-all ${
+                            etcPageId
+                              ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-950/40"
+                              : "bg-[#f1f1ef] dark:bg-[#2f2f2f] text-[#37352f] dark:text-[#e6e6e4] hover:bg-[#37352f] hover:text-white dark:hover:bg-[#e6e6e4] dark:hover:text-[#191919]"
+                          }`}
+                        >
+                          기타
+                        </button>
+                        {etcPageId && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteMonth(etcPageId, "기타", yearNum);
+                            }}
+                            title={`${yearNum}년 기타 삭제`}
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-400 hover:bg-red-500 text-white flex items-center justify-center opacity-0 group-hover/month:opacity-100 transition-opacity shadow-sm"
+                          >
+                            <X size={10} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

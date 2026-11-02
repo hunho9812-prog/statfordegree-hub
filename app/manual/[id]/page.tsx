@@ -1,6 +1,6 @@
-import ManualPostView from "@/components/ManualPostView";
+import ManualPostViewWrapper from "@/components/ManualPostViewWrapper";
 
 export default async function ManualPostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <ManualPostView postId={Number(id)} />;
+  return <ManualPostViewWrapper postId={Number(id)} />;
 }

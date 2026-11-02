@@ -8,27 +8,41 @@ import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
 
+// 세션 내 모듈 레벨 캐시(검색어+페이지 기준) — 이전에 본 목록으로 다시 돌아오면
+// 로딩 문구 없이 즉시 보여주고 뒤에서 조용히 최신화합니다(stale-while-revalidate).
+// 처음 보는 검색어/페이지는 여전히 네트워크 왕복만큼 딜레이가 있습니다.
+const listCache = new Map<string, { posts: ManualPost[]; total: number }>();
+
 export default function ManualBoard() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const searchQ = searchParams.get("q") ?? "";
   const currentPage = Number(searchParams.get("page") ?? "1");
+  const cacheKey = `${searchQ}::${currentPage}`;
 
-  const [posts, setPosts] = useState<ManualPost[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState<ManualPost[]>(() => listCache.get(cacheKey)?.posts ?? []);
+  const [total, setTotal] = useState(() => listCache.get(cacheKey)?.total ?? 0);
+  const [loading, setLoading] = useState(() => !listCache.has(cacheKey));
   const [searchInput, setSearchInput] = useState(searchQ);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const load = useCallback(async () => {
-    setLoading(true);
+    const cached = listCache.get(cacheKey);
+    if (cached) {
+      setPosts(cached.posts);
+      setTotal(cached.total);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     const result = await fetchPosts({ search: searchQ || undefined, page: currentPage, pageSize: PAGE_SIZE });
+    listCache.set(cacheKey, result);
     setPosts(result.posts);
     setTotal(result.total);
     setLoading(false);
-  }, [searchQ, currentPage]);
+  }, [searchQ, currentPage, cacheKey]);
 
   useEffect(() => { load(); }, [load]);
 

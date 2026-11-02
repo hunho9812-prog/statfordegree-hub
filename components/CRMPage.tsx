@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, memo } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/lib/store";
+import { useShallow } from "zustand/react/shallow";
 import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColumnDef, CustomColumnType, CrmTag } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -525,14 +526,20 @@ function StatusOptionRow({ status, onSave, onDelete }: { status: StatusOption; o
   );
 }
 
-function StatusEditor({ onClose }: { onClose: () => void }) {
-  const { customerStatuses, upsertCustomerStatus, deleteCustomerStatus } = useWorkspaceStore();
+function StatusEditor({ onClose, idPrefix }: { onClose: () => void; idPrefix: string }) {
+  const allCustomerStatuses = useWorkspaceStore((s) => s.customerStatuses);
+  const customerStatuses = useMemo(
+    () => allCustomerStatuses.filter((s) => isOwnScopeId(idPrefix, s.id)),
+    [allCustomerStatuses, idPrefix]
+  );
+  const upsertCustomerStatus = useWorkspaceStore((s) => s.upsertCustomerStatus);
+  const deleteCustomerStatus = useWorkspaceStore((s) => s.deleteCustomerStatus);
   const [newLabel, setNewLabel] = useState("");
   const [newCategory, setNewCategory] = useState<StatusCategory>("할 일");
   const [newColor, setNewColor] = useState(COLOR_PRESETS[0]);
   const addStatus = () => {
     if (!newLabel.trim()) return;
-    upsertCustomerStatus({ id: uuidv4(), label: newLabel.trim(), color: newColor.color, textColor: newColor.textColor, category: newCategory });
+    upsertCustomerStatus({ id: newScopedId(idPrefix), label: newLabel.trim(), color: newColor.color, textColor: newColor.textColor, category: newCategory });
     setNewLabel("");
   };
   return (
@@ -1032,16 +1039,47 @@ function AddTriggerRow({ onAdd, colSpan }: { onAdd: () => void; colSpan: number 
 
 // ─── Move modal ───────────────────────────────────────────────────────────────
 
+// 페이지 ID의 -month-YYYY-MM / -etc-YYYY 접미사를 떼어 CRM 네임스페이스 접두사를 뽑아냄
+// (예: "fluento-crm-month-2026-08" → "fluento-crm"). 이걸로 이동 목록을 같은 네임스페이스의
+// 년도/월 페이지로만 한정해서, 플루엔토 고객이 스탯포디그리 월로(혹은 그 반대로) 이동되지 않게 함.
+function deriveCrmIdPrefix(pageId: string | null): string {
+  const m = pageId?.match(/^(.+)-(?:month|etc)-\d{4}(?:-\d{2})?$/);
+  return m ? m[1] : "crm";
+}
+
+// customColumns/customerStatuses는 워크스페이스 전체에서 하나로 공유되는 배열이라, 여기서
+// 브랜드별 아이템인지를 "ID 접두사"로만 구분한다(스키마 변경 없이 페이지 ID와 동일한 방식).
+// 기본(crm) 스코프는 과거에 접두사 없이 만들어진 기존 항목을 전부 그대로 포함해 데이터가
+// 사라지지 않게 하고, 새 브랜드(fluento-crm 등) 스코프는 자기 접두사가 붙은 항목만 포함한다.
+function isOwnScopeId(idPrefix: string, id: string): boolean {
+  if (idPrefix === "crm") return !id.startsWith("fluento-crm-");
+  return id.startsWith(`${idPrefix}-`);
+}
+
+// 새 커스텀 컬럼/상태를 만들 때 붙일 브랜드 스코프 ID
+function newScopedId(idPrefix: string): string {
+  return idPrefix === "crm" ? uuidv4() : `${idPrefix}-${uuidv4()}`;
+}
+
 function MoveModal({ currentMonthPageId, onMove, onClose }: { currentMonthPageId: string | null; onMove: (targetMonthPageId: string | null) => void; onClose: () => void }) {
-  const { pages } = useWorkspaceStore();
+  const pages = useWorkspaceStore((s) => s.pages);
   const [selected, setSelected] = useState<string | null>(null);
-  const yearPages = Object.values(pages).filter((p) => /^(\d{4})년/.test(p.title)).sort((a, b) => {
+  const idPrefix = deriveCrmIdPrefix(currentMonthPageId);
+  const yearIdPrefix = `${idPrefix}-year-`;
+  const yearPages = Object.values(pages).filter((p) => p.id.startsWith(yearIdPrefix) && /^(\d{4})년/.test(p.title)).sort((a, b) => {
     const ay = parseInt(a.title.match(/^(\d{4})/)?.[1] ?? "0");
     const by = parseInt(b.title.match(/^(\d{4})/)?.[1] ?? "0");
     return by - ay;
   });
-  const getMonths = (yearPageId: string) =>
-    (pages[yearPageId]?.children ?? []).map((id) => pages[id]).filter(Boolean).filter((p) => /^\d{1,2}월$/.test(p.title)).sort((a, b) => parseInt(a.title) - parseInt(b.title));
+  const getMonths = (yearPageId: string) => {
+    const children = (pages[yearPageId]?.children ?? []).map((id) => pages[id]).filter(Boolean);
+    const months = children
+      .filter((p) => /^\d{1,2}월$/.test(p.title))
+      .sort((a, b) => parseInt(a.title) - parseInt(b.title));
+    // "기타"(특정 월에 속하지 않는 고객 모음)도 이동 대상 목록 맨 뒤에 포함
+    const etc = children.filter((p) => p.title === "기타");
+    return [...months, ...etc];
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -1086,16 +1124,16 @@ function MoveModal({ currentMonthPageId, onMove, onClose }: { currentMonthPageId
 
 // ─── Data row ─────────────────────────────────────────────────────────────────
 
-function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, draggable, onDragStart, onDragOver, onDrop, compact, assignees, tags }: {
+const DataRow = memo(function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, draggable, onDragStart, onDragOver, onDrop, compact, assignees, tags }: {
   customer: Customer;
   statuses: StatusOption[];
   allCols: AnyCol[];
-  onUpdate: (updates: Partial<Omit<Customer, "id" | "created_at">>) => void;
-  onDelete: () => void;
-  onMove: (targetMonthPageId: string | null) => void;
+  onUpdate: (id: string, updates: Partial<Omit<Customer, "id" | "created_at">>) => void;
+  onDelete: (id: string) => void;
+  onMove: (id: string, targetMonthPageId: string | null) => void;
   draggable?: boolean;
-  onDragStart?: () => void;
-  onDragOver?: (e: React.DragEvent) => void;
+  onDragStart?: (id: string) => void;
+  onDragOver?: (e: React.DragEvent, id: string) => void;
   onDrop?: () => void;
   compact?: boolean;
   assignees: string[];
@@ -1106,15 +1144,15 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
   const [isDragOver, setIsDragOver] = useState(false);
 
   function handleDeleteClick() {
-    if (confirmDelete) { onDelete(); }
+    if (confirmDelete) { onDelete(customer.id); }
     else { setConfirmDelete(true); setTimeout(() => setConfirmDelete(false), 3000); }
   }
 
   return (
     <tr
       draggable={draggable}
-      onDragStart={onDragStart}
-      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); onDragOver?.(e); }}
+      onDragStart={() => onDragStart?.(customer.id)}
+      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); onDragOver?.(e, customer.id); }}
       onDragLeave={() => setIsDragOver(false)}
       onDrop={() => { setIsDragOver(false); onDrop?.(); }}
       className={`border-t border-[#e9e9e7] dark:border-[#2f2f2f] hover:bg-gray-50 dark:hover:bg-[#1f1f1f] group transition-colors ${isDragOver ? "border-t-2 border-t-blue-400" : ""}`}
@@ -1129,7 +1167,7 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
         // Special case: _route uses a dedicated dropdown (not overridable)
         if (col.id === "_route") return (
           <td key={col.id} className={`${cellCls} min-w-[80px]`}>
-            <TagsCell value={customer.route} onChange={(v) => onUpdate({ route: v })} tags={tags} />
+            <TagsCell value={customer.route} onChange={(v) => onUpdate(customer.id, { route: v })} tags={tags} />
           </td>
         );
 
@@ -1145,11 +1183,11 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
 
         const setVal = (v: string | number | boolean | null) => {
           if (col.kind === "builtin" && col.field) {
-            onUpdate({ [col.field]: v } as Partial<Omit<Customer, "id" | "created_at">>);
+            onUpdate(customer.id, { [col.field]: v } as Partial<Omit<Customer, "id" | "created_at">>);
           } else {
             const cfv: boolean | string | null =
               typeof v === "number" ? String(v) : v;
-            onUpdate({ custom_fields: { ...customer.custom_fields, [col.id]: cfv } });
+            onUpdate(customer.id, { custom_fields: { ...customer.custom_fields, [col.id]: cfv } });
           }
         };
 
@@ -1216,11 +1254,11 @@ function DataRow({ customer, statuses, allCols, onUpdate, onDelete, onMove, drag
             <span>{confirmDelete ? "삭제?" : "삭제"}</span>
           </button>
         </div>
-        {showMoveModal && <MoveModal currentMonthPageId={customer.monthPageId} onMove={onMove} onClose={() => setShowMoveModal(false)} />}
+        {showMoveModal && <MoveModal currentMonthPageId={customer.monthPageId} onMove={(target) => onMove(customer.id, target)} onClose={() => setShowMoveModal(false)} />}
       </td>
     </tr>
   );
-}
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1247,14 +1285,54 @@ export default function CRMPage({
     return `/accounting/cash-receipts?month=${m[1]}-${m[2]}`;
   }, [monthPageId]);
 
+  // 이 페이지가 속한 CRM 네임스페이스(스탯포디그리="crm", 플루엔토="fluento-crm" 등).
+  // 커스텀 컬럼/상태는 워크스페이스 전체에서 하나의 배열로 공유되므로, 화면에는 이
+  // idPrefix에 해당하는 항목만 걸러서 보여준다 → 다른 브랜드의 컬럼/상태가 섞여 보이지 않음.
+  const idPrefix = deriveCrmIdPrefix(monthPageId);
+
   const {
-    customers, customerStatuses, customColumns,
+    customers, customerStatuses: allCustomerStatuses, customColumns: allCustomColumns,
     createCustomer, updateCustomer, deleteCustomer, restoreCustomer, reorderCustomers,
     upsertCustomColumn, deleteCustomColumn, reorderCustomColumns,
     crmColOrder, crmColLabels, crmHiddenCols, crmColTypes,
     setCrmColOrder, setCrmColLabel, setCrmHiddenCols, setCrmColType,
     crmAssignees, crmTags, setCrmAssignees, setCrmTags,
-  } = useWorkspaceStore();
+  } = useWorkspaceStore(
+    useShallow((s) => ({
+      customers: s.customers,
+      customerStatuses: s.customerStatuses,
+      customColumns: s.customColumns,
+      createCustomer: s.createCustomer,
+      updateCustomer: s.updateCustomer,
+      deleteCustomer: s.deleteCustomer,
+      restoreCustomer: s.restoreCustomer,
+      reorderCustomers: s.reorderCustomers,
+      upsertCustomColumn: s.upsertCustomColumn,
+      deleteCustomColumn: s.deleteCustomColumn,
+      reorderCustomColumns: s.reorderCustomColumns,
+      crmColOrder: s.crmColOrder,
+      crmColLabels: s.crmColLabels,
+      crmHiddenCols: s.crmHiddenCols,
+      crmColTypes: s.crmColTypes,
+      setCrmColOrder: s.setCrmColOrder,
+      setCrmColLabel: s.setCrmColLabel,
+      setCrmHiddenCols: s.setCrmHiddenCols,
+      setCrmColType: s.setCrmColType,
+      crmAssignees: s.crmAssignees,
+      crmTags: s.crmTags,
+      setCrmAssignees: s.setCrmAssignees,
+      setCrmTags: s.setCrmTags,
+    }))
+  );
+
+  const customerStatuses = useMemo(
+    () => allCustomerStatuses.filter((s) => isOwnScopeId(idPrefix, s.id)),
+    [allCustomerStatuses, idPrefix]
+  );
+  const customColumns = useMemo(
+    () => allCustomColumns.filter((c) => isOwnScopeId(idPrefix, c.id)),
+    [allCustomColumns, idPrefix]
+  );
 
   const [showStatusEditor, setShowStatusEditor] = useState(false);
   const [showAssigneeEditor, setShowAssigneeEditor] = useState(false);
@@ -1382,6 +1460,21 @@ export default function CRMPage({
     updateCustomer(id, updates);
   }, [updateCustomer, pushUndoSnapshot]);
 
+  // 안정적인 참조를 DataRow(React.memo)에 넘기기 위한 콜백들 —
+  // 매 렌더마다 새 클로저를 만들면 memo가 무력화되므로 id를 인자로 받는 형태로 고정
+  const handleDeleteCustomer = useCallback((id: string) => {
+    pushUndoSnapshot(true);
+    deleteCustomer(id);
+  }, [deleteCustomer, pushUndoSnapshot]);
+
+  const handleMoveCustomer = useCallback((id: string, targetMonthPageId: string | null) => {
+    handleUpdate(id, { monthPageId: targetMonthPageId });
+  }, [handleUpdate]);
+
+  const handleDropOnCurrentMonth = useCallback(() => {
+    handleRowDrop(monthPageId);
+  }, [handleRowDrop, monthPageId]);
+
   // ─── Filters & sort ───────────────────────────────────────────────────────
   const [activeFilters, setActiveFilters] = useState<Record<string, ColFilter>>({});
   const [sortConfig, setSortConfig] = useState<{ field: string; dir: "asc" | "desc" } | null>(null);
@@ -1495,7 +1588,7 @@ export default function CRMPage({
   // Insert a new custom column to the left or right of a given column
   const insertCol = useCallback((atColId: string, side: "left" | "right") => {
     pushUndoSnapshot(true);
-    const newId = uuidv4();
+    const newId = newScopedId(idPrefix);
     const currentOrder = crmColOrder ?? [
       ...DEFAULT_COL_ORDER.slice(0, 7),
       ...sortedCustomCols.map((c) => c.id),
@@ -1506,12 +1599,12 @@ export default function CRMPage({
     newOrder.splice(atIdx === -1 ? newOrder.length : (side === "left" ? atIdx : atIdx + 1), 0, newId);
     upsertCustomColumn({ id: newId, label: "새 열", type: "checkbox", order: sortedCustomCols.length });
     setCrmColOrder(newOrder);
-  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder, pushUndoSnapshot]);
+  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder, pushUndoSnapshot, idPrefix]);
 
   // Add a new custom column (inserted at the end before _submit_date)
   const addColumn = useCallback(() => {
     pushUndoSnapshot(true);
-    const newId = uuidv4();
+    const newId = newScopedId(idPrefix);
     const currentOrder = crmColOrder ?? [
       ...DEFAULT_COL_ORDER.slice(0, 7),
       ...sortedCustomCols.map((c) => c.id),
@@ -1522,10 +1615,13 @@ export default function CRMPage({
     newOrder.splice(insertAt === -1 ? newOrder.length : insertAt, 0, newId);
     upsertCustomColumn({ id: newId, label: "새 열", type: "checkbox", order: sortedCustomCols.length });
     setCrmColOrder(newOrder);
-  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder, pushUndoSnapshot]);
+  }, [crmColOrder, sortedCustomCols, upsertCustomColumn, setCrmColOrder, pushUndoSnapshot, idPrefix]);
 
   // ─── Customers visible in this month scope ────────────────────────────────
-  const monthScoped = monthPageId ? customers.filter((c) => c.monthPageId === monthPageId) : customers;
+  const monthScoped = useMemo(
+    () => (monthPageId ? customers.filter((c) => c.monthPageId === monthPageId) : customers),
+    [customers, monthPageId]
+  );
   // undo 스냅샷 캡처용 ref 동기화 (매 렌더마다 최신값 유지)
   monthScopedRef.current = monthScoped;
 
@@ -1542,47 +1638,74 @@ export default function CRMPage({
     return v === null || v === undefined ? "" : String(v);
   }, []);
 
-  let visibleCustomers = monthScoped;
-  for (const [colId, filt] of Object.entries(activeFilters) as [string, ColFilter][]) {
-    if (filt.kind === "multiselect") {
-      if (filt.selected.length > 0)
-        visibleCustomers = visibleCustomers.filter((c) => filt.selected.includes(getColVal(c, colId)));
-    } else if (filt.kind === "checkbox") {
-      if (filt.value !== null)
-        visibleCustomers = visibleCustomers.filter((c) => {
-          const v = !!c.custom_fields?.[colId];
-          return filt.value === "checked" ? v : !v;
-        });
-    } else if (filt.kind === "text") {
-      if (filt.value.trim())
-        visibleCustomers = visibleCustomers.filter((c) =>
-          getColVal(c, colId).toLowerCase().includes(filt.value.toLowerCase())
-        );
-    }
-  }
-
-  if (sortConfig) {
-    const { field, dir } = sortConfig;
-    // 열 유형에 맞게 실제 값으로 비교 (빈 값은 방향과 관계없이 항상 맨 뒤)
-    const sortType = allCols.find((c) => c.id === field)?.effectiveType ?? "text";
-    const sign = dir === "asc" ? 1 : -1;
-    visibleCustomers = [...visibleCustomers].sort((a, b) => {
-      const as = getColVal(a, field);
-      const bs = getColVal(b, field);
-      if (sortType === "checkbox") {
-        const av = as === "true" || as === "1" ? 1 : 0;
-        const bv = bs === "true" || bs === "1" ? 1 : 0;
-        return sign * (av - bv);
+  const visibleCustomers = useMemo(() => {
+    let result = monthScoped;
+    for (const [colId, filt] of Object.entries(activeFilters) as [string, ColFilter][]) {
+      if (filt.kind === "multiselect") {
+        if (filt.selected.length > 0)
+          result = result.filter((c) => filt.selected.includes(getColVal(c, colId)));
+      } else if (filt.kind === "checkbox") {
+        if (filt.value !== null)
+          result = result.filter((c) => {
+            const v = !!c.custom_fields?.[colId];
+            return filt.value === "checked" ? v : !v;
+          });
+      } else if (filt.kind === "text") {
+        if (filt.value.trim())
+          result = result.filter((c) =>
+            getColVal(c, colId).toLowerCase().includes(filt.value.toLowerCase())
+          );
       }
-      if (as === "" || bs === "") return as === bs ? 0 : as === "" ? 1 : -1;
-      if (sortType === "number") return sign * (Number(as) - Number(bs));
-      return sign * as.localeCompare(bs, "ko");
-    });
-  }
+    }
 
-  const totalRevenue = visibleCustomers.reduce((sum, c) => sum + (c.total_amount ?? 0), 0);
-  const settlementTotal = visibleCustomers.reduce((sum, c) => sum + (c.settlement_amount ?? 0), 0);
-  const balanceTotal = visibleCustomers.reduce((sum, c) => sum + (c.balance ?? 0), 0);
+    if (sortConfig) {
+      const { field, dir } = sortConfig;
+      const spec = BUILTIN_BY_ID[field];
+      // 커스텀 열은 체크박스뿐 아니라 텍스트·숫자·담당자 유형도 있으므로 유형을 보고 비교한다
+      const colType = allCols.find((c) => c.id === field)?.effectiveType;
+      const mul = dir === "asc" ? 1 : -1;
+
+      const rawOf = (c: Customer): boolean | string | number | null => {
+        if (spec) return (c[spec.field] as boolean | string | number | null) ?? null;
+        return c.custom_fields?.[field] ?? null;
+      };
+      // 빈 값은 null로 정규화해서 오름/내림 어느 쪽이든 항상 아래로 보낸다
+      const norm = (v: boolean | string | number | null): string | number | null => {
+        if (typeof v === "boolean") return v ? 1 : 0;
+        if (v === null || v === undefined) return null;
+        if (typeof v === "number") return v;
+        const t = v.trim();
+        if (t === "") return null;
+        if (colType === "number") {
+          const n = Number(t.replace(/,/g, ""));
+          if (!Number.isNaN(n)) return n;
+        }
+        return t;
+      };
+
+      result = [...result].sort((a, b) => {
+        const av = norm(rawOf(a));
+        const bv = norm(rawOf(b));
+        if (av === null && bv === null) return 0;
+        if (av === null) return 1;
+        if (bv === null) return -1;
+        if (typeof av === "number" && typeof bv === "number") return (av - bv) * mul;
+        return String(av).localeCompare(String(bv), "ko", { numeric: true }) * mul;
+      });
+    }
+
+    return result;
+  }, [monthScoped, activeFilters, sortConfig, getColVal, allCols]);
+
+  const { totalRevenue, settlementTotal, balanceTotal } = useMemo(() => {
+    let totalRevenue = 0, settlementTotal = 0, balanceTotal = 0;
+    for (const c of visibleCustomers) {
+      totalRevenue += c.total_amount ?? 0;
+      settlementTotal += c.settlement_amount ?? 0;
+      balanceTotal += c.balance ?? 0;
+    }
+    return { totalRevenue, settlementTotal, balanceTotal };
+  }, [visibleCustomers]);
 
   // colSpan: all visible cols + action column
   const totalColSpan = allCols.length + 1;
@@ -1819,13 +1942,13 @@ export default function CRMPage({
               customer={c}
               statuses={customerStatuses}
               allCols={allCols}
-              onUpdate={(updates) => handleUpdate(c.id, updates)}
-              onDelete={() => { pushUndoSnapshot(true); deleteCustomer(c.id); }}
-              onMove={(targetMonthPageId) => handleUpdate(c.id, { monthPageId: targetMonthPageId })}
+              onUpdate={handleUpdate}
+              onDelete={handleDeleteCustomer}
+              onMove={handleMoveCustomer}
               draggable
-              onDragStart={() => handleRowDragStart(c.id)}
-              onDragOver={(e) => handleRowDragOver(e, c.id)}
-              onDrop={() => handleRowDrop(monthPageId)}
+              onDragStart={handleRowDragStart}
+              onDragOver={handleRowDragOver}
+              onDrop={handleDropOnCurrentMonth}
               compact={compact}
               assignees={crmAssignees}
               tags={crmTags}
@@ -1861,7 +1984,7 @@ export default function CRMPage({
       ) : (
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#191919]">{header}{table}</div>
       )}
-      {showStatusEditor && <StatusEditor onClose={() => setShowStatusEditor(false)} />}
+      {showStatusEditor && <StatusEditor onClose={() => setShowStatusEditor(false)} idPrefix={idPrefix} />}
       {showAssigneeEditor && <AssigneeEditor assignees={crmAssignees} onSave={setCrmAssignees} onClose={() => setShowAssigneeEditor(false)} />}
       {showTagsEditor && <TagsEditor tags={crmTags} onSave={setCrmTags} onClose={() => setShowTagsEditor(false)} />}
     </>

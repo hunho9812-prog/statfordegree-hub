@@ -1,5 +1,5 @@
-import ManualPostEditor from "@/components/ManualPostEditor";
+import ManualPostEditorWrapper from "@/components/ManualPostEditorWrapper";
 
 export default function ManualWritePage() {
-  return <ManualPostEditor />;
+  return <ManualPostEditorWrapper />;
 }
