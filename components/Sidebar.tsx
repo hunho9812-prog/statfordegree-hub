@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  CheckSquare,
   Users,
   BookOpen,
   Sun,
@@ -17,11 +16,21 @@ import {
   UserCog,
   ClipboardList,
   BarChart2,
-  LineChart,
+  Receipt,
+  KeyRound,
+  FolderOpen,
 } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { useAuth } from "./AuthProvider";
+
+const STAT_SHORTCUTS = [
+  { href: "/accounting", label: "회계", icon: Receipt },
+  { href: "/manual", label: "메뉴얼", icon: BookOpen },
+  { href: "/crm", label: "고객관리", icon: Users },
+  { href: "/statfordegree/keywords", label: "키워드 관리", icon: KeyRound },
+  { href: "/statfordegree/content", label: "콘텐츠 관리", icon: FolderOpen },
+];
 
 export default function Sidebar() {
   const router = useRouter();
@@ -74,21 +83,13 @@ export default function Sidebar() {
             <BarChart2 size={16} />
           </button>
         </Link>
-        <Link href="/tasks">
-          <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="업무 보드">
-            <CheckSquare size={16} />
-          </button>
-        </Link>
-        <Link href="/crm">
-          <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="고객관리">
-            <Users size={16} />
-          </button>
-        </Link>
-        <Link href="/manual">
-          <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="메뉴얼">
-            <BookOpen size={16} />
-          </button>
-        </Link>
+        {STAT_SHORTCUTS.map(({ href, label, icon: Icon }) => (
+          <Link key={href} href={href}>
+            <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title={label}>
+              <Icon size={16} />
+            </button>
+          </Link>
+        ))}
 
         <Link href="/admin">
           <button className={cn("w-8 h-8 flex items-center justify-center rounded-md text-[#9b9a97]", hover)} title="팀원관리">
@@ -161,7 +162,7 @@ export default function Sidebar() {
             className={cn(
               "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-colors",
               hover,
-              (pathname === "/statfordegree" || pathname === "/tasks" || pathname === "/crm" || pathname.startsWith("/manual") || pathname === "/stats")
+              (pathname === "/statfordegree" || STAT_SHORTCUTS.some(({ href }) => pathname.startsWith(href)))
                 ? "bg-[rgba(55,53,47,0.08)] dark:bg-[rgba(255,255,255,0.06)] text-[#37352f] dark:text-[#e6e6e4]"
                 : "text-[#37352f] dark:text-[#e6e6e4]"
             )}
@@ -176,34 +177,15 @@ export default function Sidebar() {
 
           {statOpen && (
             <div className="mt-[1px] mb-[1px] ml-[21px] pl-[13px] border-l border-[#dfe3df] dark:border-[#3a3a3a] flex flex-col gap-[1px]">
-              <Link href="/stats">
-                <div className={cn("flex items-center gap-2 px-[10px] py-[7px] rounded-[8px] text-[13px] cursor-pointer transition-colors",
-                  pathname === "/stats" ? "bg-[#e7ebe7] dark:bg-[rgba(94,124,100,0.15)] text-[#2f3430] dark:text-[#e6e6e4]" : "text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)]")}>
-                  <LineChart size={14} className="text-[#9aa39b]" />
-                  <span>통계</span>
-                </div>
-              </Link>
-              <Link href="/tasks">
-                <div className={cn("flex items-center gap-2 px-[10px] py-[7px] rounded-[8px] text-[13px] cursor-pointer transition-colors",
-                  pathname === "/tasks" ? "bg-[#e7ebe7] dark:bg-[rgba(94,124,100,0.15)] text-[#2f3430] dark:text-[#e6e6e4]" : "text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)]")}>
-                  <CheckSquare size={14} className="text-[#9aa39b]" />
-                  <span>업무 보드</span>
-                </div>
-              </Link>
-              <Link href="/crm">
-                <div className={cn("flex items-center gap-2 px-[10px] py-[7px] rounded-[8px] text-[13px] cursor-pointer transition-colors",
-                  pathname === "/crm" ? "bg-[#e7ebe7] dark:bg-[rgba(94,124,100,0.15)] text-[#2f3430] dark:text-[#e6e6e4]" : "text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)]")}>
-                  <Users size={14} className="text-[#9aa39b]" />
-                  <span>고객관리</span>
-                </div>
-              </Link>
-              <Link href="/manual">
-                <div className={cn("flex items-center gap-2 px-[10px] py-[7px] rounded-[8px] text-[13px] cursor-pointer transition-colors",
-                  pathname.startsWith("/manual") ? "bg-[#e7ebe7] dark:bg-[rgba(94,124,100,0.15)] text-[#2f3430] dark:text-[#e6e6e4]" : "text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)]")}>
-                  <BookOpen size={14} className="text-[#9aa39b]" />
-                  <span>메뉴얼</span>
-                </div>
-              </Link>
+              {STAT_SHORTCUTS.map(({ href, label, icon: Icon }) => (
+                <Link key={href} href={href}>
+                  <div className={cn("flex items-center gap-2 px-[10px] py-[7px] rounded-[8px] text-[13px] cursor-pointer transition-colors",
+                    pathname.startsWith(href) ? "bg-[#e7ebe7] dark:bg-[rgba(94,124,100,0.15)] text-[#2f3430] dark:text-[#e6e6e4]" : "text-[#5b635c] dark:text-[#a0a8a0] hover:bg-[#eef0ed] dark:hover:bg-[rgba(255,255,255,0.06)]")}>
+                    <Icon size={14} className="text-[#9aa39b]" />
+                    <span>{label}</span>
+                  </div>
+                </Link>
+              ))}
             </div>
           )}
         </div>
