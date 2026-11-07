@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 export interface GenieLedgerEntry {
@@ -36,9 +36,16 @@ function rowToEntry(r: GenieLedgerRow): GenieLedgerEntry {
   };
 }
 
+const REALTIME_DEBOUNCE_MS = 400;
+
+// 세션 내 모듈 레벨 캐시 — 페이지를 벗어났다가 다시 들어와도 이전 데이터를
+// 즉시 보여주고(깜빡이는 로딩 없이) 뒤에서 조용히 최신화합니다(stale-while-revalidate).
+let cachedEntries: GenieLedgerEntry[] | null = null;
+
 export function useGenieLedger() {
-  const [entries, setEntries] = useState<GenieLedgerEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [entries, setEntries] = useState<GenieLedgerEntry[]>(() => cachedEntries ?? []);
+  const [loading, setLoading] = useState(() => cachedEntries === null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reload = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -47,18 +54,31 @@ export function useGenieLedger() {
       .select("*")
       .order("year", { ascending: true })
       .order("month", { ascending: true });
-    if (data) setEntries((data as GenieLedgerRow[]).map(rowToEntry));
+    if (data) {
+      const next = (data as GenieLedgerRow[]).map(rowToEntry);
+      cachedEntries = next;
+      setEntries(next);
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => {
     reload();
     if (!isSupabaseConfigured || !supabase) return;
+
+    const scheduleReload = () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      debounceTimer.current = setTimeout(reload, REALTIME_DEBOUNCE_MS);
+    };
+
     const ch = supabase!
       .channel("genie_ledger")
-      .on("postgres_changes", { event: "*", schema: "public", table: "genie_ledger" }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "genie_ledger" }, scheduleReload)
       .subscribe();
-    return () => { supabase?.removeChannel(ch); };
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      supabase?.removeChannel(ch);
+    };
   }, [reload]);
 
   const upsert = useCallback(async (entry: GenieLedgerEntry): Promise<{ success: boolean; error?: string }> => {
