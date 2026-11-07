@@ -2496,8 +2496,70 @@ export async function _reloadCustomers() {
   // 로컬에 고객이 있는데 next가 비어있으면 fetch 오류로 간주하고 건너뜀
   const currentCount = useWorkspaceStore.getState().customers.length;
   if (next.length === 0 && currentCount > 0) return;
-  // Supabase가 진실의 원천 — 전체 교체 (localOnly 로직을 쓰면 삭제된 고객이 되살아나는 버그 발생)
-  useWorkspaceStore.setState({ customers: next });
+  const effective = next.filter((c) => !pendingDeletedCustomerIds.has(c.id));
+  useWorkspaceStore.setState((latest) => {
+    const localById = new Map(latest.customers.map((c) => [c.id, c]));
+    // Supabase 버전과 로컬 버전 중 updated_at이 더 최신인 것을 채택
+    // → 현재 편집 중인 행(디바운스 대기 중)은 로컬 버전 유지
+    const merged = effective
+      .map((supaC) => {
+        const localC = localById.get(supaC.id);
+        return localC && localC.updated_at > supaC.updated_at ? localC : supaC;
+      })
+      .sort((a, b) => {
+        const ao = a.display_order ?? Infinity;
+        const bo = b.display_order ?? Infinity;
+        if (ao !== bo) return ao - bo;
+        return a.created_at.localeCompare(b.created_at);
+      });
+    return { customers: merged };
+  });
+}
+
+export async function _reloadPages() {
+  const next = await dbPages.fetchAll();
+  const currentCount = Object.keys(useWorkspaceStore.getState().pages).length;
+  if (Object.keys(next).length === 0 && currentCount > 0) return;
+  useWorkspaceStore.setState({ pages: next });
+}
+
+export async function _reloadTasks() {
+  const next = await dbTasks.fetchAll();
+  const DEFAULT_TASK_TITLES = ["팀 메뉴얼 초안 작성", "업무 프로세스 정리"];
+  const cleaned = next.filter(
+    (t) => !DEFAULT_TASK_TITLES.includes(t.title) && !pendingDeletedTaskIds.has(t.id)
+  );
+  const currentCount = useWorkspaceStore.getState().tasks.length;
+  if (cleaned.length === 0 && currentCount > 0) return;
+  useWorkspaceStore.setState((latest) => {
+    const localById = new Map(latest.tasks.map((t) => [t.id, t]));
+    // tasks도 customers와 동일하게 updatedAt 기준으로 최신 버전 채택
+    // → 현재 편집/이동 중인 태스크는 로컬 버전 유지, 타 PC 변경은 반영
+    const merged = cleaned.map((supaT) => {
+      const localT = localById.get(supaT.id);
+      return localT && localT.updatedAt > supaT.updatedAt ? localT : supaT;
+    });
+    return { tasks: merged };
+  });
+}
+
+export async function _reloadManualPages() {
+  const [manualNodesData, manualRoots] = await Promise.all([
+    dbManualNodes.fetchAll(),
+    dbManualPageRoots.fetchAll(),
+  ]);
+  const manualPages: Record<string, ManualPageData> = {};
+  for (const { pageId, node } of manualNodesData) {
+    if (!manualPages[pageId]) manualPages[pageId] = { rootItems: [], items: {} };
+    manualPages[pageId].items[node.id] = node;
+  }
+  for (const [pid, rootItems] of Object.entries(manualRoots)) {
+    if (!manualPages[pid]) manualPages[pid] = { rootItems: [], items: {} };
+    manualPages[pid].rootItems = rootItems;
+  }
+  const currentCount = Object.keys(useWorkspaceStore.getState().manualPages).length;
+  if (Object.keys(manualPages).length === 0 && currentCount > 0) return;
+  useWorkspaceStore.setState({ manualPages });
 }
 
 export async function _reloadColumns() {
@@ -2516,17 +2578,19 @@ export async function _reloadStatuses() {
 
 export async function _reloadWorkspaceConfig() {
   if (!supabase) return;
-  const [colOrder, colLabels, hiddenCols, colTypes] = await Promise.all([
+  const [colOrder, colLabels, hiddenCols, colTypes, rootPageIds] = await Promise.all([
     dbWorkspaceConfig.get("crmColOrder"),
     dbWorkspaceConfig.get("crmColLabels"),
     dbWorkspaceConfig.get("crmHiddenCols"),
     dbWorkspaceConfig.get("crmColTypes"),
+    dbWorkspaceConfig.get("rootPageIds"),
   ]);
   useWorkspaceStore.setState({
     ...(colOrder !== null && { crmColOrder: colOrder as string[] }),
     ...(colLabels !== null && { crmColLabels: colLabels as Record<string, string> }),
     ...(hiddenCols !== null && { crmHiddenCols: hiddenCols as string[] }),
     ...(colTypes !== null && { crmColTypes: colTypes as Record<string, CustomColumnType> }),
+    ...(rootPageIds !== null && { rootPageIds: rootPageIds as string[] }),
   });
 }
 

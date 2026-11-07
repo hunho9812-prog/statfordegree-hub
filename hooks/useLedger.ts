@@ -1,15 +1,31 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { dbLedger, type LedgerEntry } from "@/lib/db-ledger";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
+const REALTIME_DEBOUNCE_MS = 400;
+
+// 세션 내 모듈 레벨 캐시 — 페이지를 벗어났다가 다시 들어와도 이전 데이터를
+// 즉시 보여주고(깜빡이는 로딩 없이) 뒤에서 조용히 최신화합니다(stale-while-revalidate).
+let cachedEntries: LedgerEntry[] | null = null;
+
 export function useLedger() {
-  const [entries, setEntries] = useState<LedgerEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [entries, setEntries] = useState<LedgerEntry[]>(() => cachedEntries ?? []);
+  const [loading, setLoading] = useState(() => cachedEntries === null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const setEntriesAndCache: typeof setEntries = useCallback((update) => {
+    setEntries((prev) => {
+      const next = typeof update === "function" ? (update as (p: LedgerEntry[]) => LedgerEntry[])(prev) : update;
+      cachedEntries = next;
+      return next;
+    });
+  }, []);
 
   const reload = useCallback(async () => {
     const data = await dbLedger.fetchAll();
+    cachedEntries = data;
     setEntries(data);
     setLoading(false);
   }, []);
@@ -19,20 +35,27 @@ export function useLedger() {
 
     if (!isSupabaseConfigured || !supabase) return;
 
+    // 여러 행이 연속으로 바뀌어도 이벤트마다 재조회하지 않고 묶어서 한 번만 조회
+    const scheduleReload = () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      debounceTimer.current = setTimeout(reload, REALTIME_DEBOUNCE_MS);
+    };
+
     const channel = supabase
       .channel("realtime:public:ledger")
-      .on("postgres_changes", { event: "*", schema: "public", table: "ledger" }, () => {
-        reload();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "ledger" }, scheduleReload)
       .subscribe();
 
-    return () => { supabase?.removeChannel(channel); };
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      supabase?.removeChannel(channel);
+    };
   }, [reload]);
 
   const upsert = useCallback(async (entry: LedgerEntry): Promise<{ success: boolean; error?: string }> => {
     const result = await dbLedger.upsert(entry);
     if (result.success) {
-      setEntries((prev) => {
+      setEntriesAndCache((prev) => {
         const idx = prev.findIndex((e) => e.year === entry.year && e.month === entry.month);
         if (idx >= 0) {
           const next = [...prev];
@@ -43,17 +66,17 @@ export function useLedger() {
       });
     }
     return result;
-  }, []);
+  }, [setEntriesAndCache]);
 
   const remove = useCallback(async (year: number, month: number): Promise<{ success: boolean; error?: string }> => {
     try {
       await dbLedger.delete(year, month);
-      setEntries((prev) => prev.filter((e) => !(e.year === year && e.month === month)));
+      setEntriesAndCache((prev) => prev.filter((e) => !(e.year === year && e.month === month)));
       return { success: true };
     } catch (e) {
       return { success: false, error: String(e) };
     }
-  }, []);
+  }, [setEntriesAndCache]);
 
   return { entries, loading, reload, upsert, remove };
 }

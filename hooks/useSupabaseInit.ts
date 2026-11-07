@@ -1,21 +1,33 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useWorkspaceStore, runMigrationIfNeeded, forceReseedManualPages } from "@/lib/store";
+import {
+  useWorkspaceStore,
+  runMigrationIfNeeded,
+  forceReseedManualPages,
+  _reloadPages,
+  _reloadTasks,
+  _reloadCustomers,
+  _reloadStatuses,
+  _reloadColumns,
+  _reloadManualPages,
+  _reloadWorkspaceConfig,
+} from "@/lib/store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/AuthProvider";
 
-// 실시간 변경을 감지할 테이블 목록
-const REALTIME_TABLES = [
-  "pages",
-  "tasks",
-  "customers",
-  "customer_statuses",
-  "table_columns",
-  "manual_nodes",
-  "manual_page_roots",
-  "workspace_config",
-];
+// 테이블별 부분 reload — 변경된 테이블만 다시 가져와서, 서로 무관한 테이블 변경이
+// (예: 매뉴얼 문서 자동저장) CRM/업무 전체 재조회·리렌더를 유발하지 않도록 함
+const TABLE_RELOADERS: Record<string, () => Promise<void>> = {
+  pages: _reloadPages,
+  tasks: _reloadTasks,
+  customers: _reloadCustomers,
+  customer_statuses: _reloadStatuses,
+  table_columns: _reloadColumns,
+  manual_nodes: _reloadManualPages,
+  manual_page_roots: _reloadManualPages,
+  workspace_config: _reloadWorkspaceConfig,
+};
 
 // updateCustomer는 로컬 state만 수정하므로 CRM도 짧은 디바운스로 처리
 const CRM_TABLES = new Set(["customers", "customer_statuses", "table_columns", "workspace_config"]);
@@ -25,8 +37,8 @@ const CRM_DEBOUNCE_MS = 300;
 export function useSupabaseInit() {
   const loadFromSupabase = useWorkspaceStore((s) => s.loadFromSupabase);
   const { user } = useAuth();
-  const fullDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const crmDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 테이블별 디바운스 타이머 (한 테이블의 연속 변경을 묶어서 한 번만 재조회)
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // 탭/창이 다시 보이게 될 때 자동 새로고침
   useEffect(() => {
@@ -49,17 +61,17 @@ export function useSupabaseInit() {
       .then(() => forceReseedManualPages())
       .then(() => loadFromSupabase());
 
-    // 일반 테이블 변경 → 400ms 후 전체 로드
-    const scheduleFullReload = () => {
-      if (fullDebounceTimer.current) clearTimeout(fullDebounceTimer.current);
-      fullDebounceTimer.current = setTimeout(() => loadFromSupabase(), FULL_DEBOUNCE_MS);
-    };
-
-    // CRM 테이블 변경 → 2000ms 후 전체 로드
-    // loadFromSupabase 내부에 로컬 신규 고객 보존 로직이 있어 race condition 없음
-    const scheduleCrmReload = () => {
-      if (crmDebounceTimer.current) clearTimeout(crmDebounceTimer.current);
-      crmDebounceTimer.current = setTimeout(() => loadFromSupabase(), CRM_DEBOUNCE_MS);
+    // 테이블 변경 → 디바운스 후 그 테이블만 부분 재조회
+    // (다른 테이블의 변경과 전혀 상관없는 전체 재조회가 발생하지 않도록 함)
+    const scheduleReload = (table: string) => {
+      const reloadFn = TABLE_RELOADERS[table];
+      if (!reloadFn) return;
+      const delay = CRM_TABLES.has(table) ? CRM_DEBOUNCE_MS : FULL_DEBOUNCE_MS;
+      if (debounceTimers.current[table]) clearTimeout(debounceTimers.current[table]);
+      debounceTimers.current[table] = setTimeout(() => {
+        delete debounceTimers.current[table];
+        reloadFn();
+      }, delay);
     };
 
     let channels: ReturnType<typeof supabase.channel>[] = [];
@@ -71,11 +83,11 @@ export function useSupabaseInit() {
         supabase!.realtime.setAuth(session.access_token);
       }
 
-      channels = REALTIME_TABLES.map((table) =>
+      channels = Object.keys(TABLE_RELOADERS).map((table) =>
         supabase!
           .channel(`realtime:public:${table}`)
           .on("postgres_changes", { event: "*", schema: "public", table },
-            CRM_TABLES.has(table) ? scheduleCrmReload : scheduleFullReload)
+            () => scheduleReload(table))
           .subscribe((_, err) => {
             if (err) console.error(`[Realtime] ${table} 구독 오류:`, err);
           })
@@ -84,8 +96,8 @@ export function useSupabaseInit() {
 
     return () => {
       cancelled = true;
-      if (fullDebounceTimer.current) clearTimeout(fullDebounceTimer.current);
-      if (crmDebounceTimer.current) clearTimeout(crmDebounceTimer.current);
+      Object.values(debounceTimers.current).forEach(clearTimeout);
+      debounceTimers.current = {};
       channels.forEach((ch) => supabase?.removeChannel(ch));
     };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
