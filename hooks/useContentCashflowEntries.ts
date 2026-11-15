@@ -50,6 +50,15 @@ export function useContentCashflowEntries() {
     [reload]
   );
 
+  const update = useCallback(
+    async (id: string, entry: { type: CashflowEntryType; amount: number; occurredOn: string; memo: string }) => {
+      const result = await dbContentCashflowEntries.update(id, entry);
+      if (result.success) await reload();
+      return result;
+    },
+    [reload]
+  );
+
   const remove = useCallback(async (id: string) => {
     await dbContentCashflowEntries.remove(id);
     setEntries((prev) => {
@@ -59,5 +68,5 @@ export function useContentCashflowEntries() {
     });
   }, []);
 
-  return { entries, loading, add, remove };
+  return { entries, loading, add, update, remove };
 }

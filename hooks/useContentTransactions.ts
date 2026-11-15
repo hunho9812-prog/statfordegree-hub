@@ -50,6 +50,15 @@ export function useContentTransactions() {
     [reload]
   );
 
+  const update = useCallback(
+    async (id: string, entry: { type: TransactionType; amount: number; occurredOn: string; memo: string }) => {
+      const result = await dbContentTransactions.update(id, entry);
+      if (result.success) await reload();
+      return result;
+    },
+    [reload]
+  );
+
   const remove = useCallback(async (id: string) => {
     await dbContentTransactions.remove(id);
     setEntries((prev) => {
@@ -59,5 +68,5 @@ export function useContentTransactions() {
     });
   }, []);
 
-  return { entries, loading, add, remove };
+  return { entries, loading, add, update, remove };
 }
