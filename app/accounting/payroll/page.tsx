@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2, RotateCcw, Loader2 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { usePageTitles } from "@/hooks/usePageTitles";
+import { useAuth } from "@/components/AuthProvider";
+import { EditableTitle } from "@/components/EditableTitle";
+
+const PAGE_TITLE_KEY = "accounting_payroll_title";
+const DEFAULT_PAGE_TITLE = "인건비";
 
 interface LaborItem {
   id: string;
@@ -37,6 +43,10 @@ function calcTax(pay: number) {
 
 export default function PayrollPage() {
   const router = useRouter();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const { getTitle, setTitle } = usePageTitles();
+  const pageTitle = getTitle(PAGE_TITLE_KEY, DEFAULT_PAGE_TITLE);
   const [items, setItems] = useState<LaborItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -116,7 +126,12 @@ export default function PayrollPage() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-white dark:hover:bg-[#252525] border border-[#e9e9e7] dark:border-[#2f2f2f] transition-colors">
             <ArrowLeft size={14} /> 회계
           </button>
-          <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">인건비</h1>
+          <EditableTitle
+            value={pageTitle}
+            isAdmin={isAdmin}
+            onSave={(next) => setTitle(PAGE_TITLE_KEY, next)}
+            className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]"
+          />
         </div>
 
         {/* Form */}

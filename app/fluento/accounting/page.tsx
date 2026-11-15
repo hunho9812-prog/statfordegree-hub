@@ -2,13 +2,23 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
+import { usePageTitles } from "@/hooks/usePageTitles";
+import { EditableTitle } from "@/components/EditableTitle";
+
+const PAGE_TITLE_KEY = "fluento_accounting_title";
+const DEFAULT_PAGE_TITLE = "회계";
 
 const CARDS = [
-  { emoji: "📒", iconBg: "from-green-400 to-emerald-600", title: "장부",   href: "/fluento/ledger" },
-  { emoji: "🧮", iconBg: "from-lime-400 to-green-600",    title: "계산기", href: "/fluento/calculator" },
+  { key: "fluento_ledger_title", emoji: "📒", iconBg: "from-green-400 to-emerald-600", title: "장부",   href: "/fluento/ledger" },
+  { key: "fluento_calculator_title", emoji: "🧮", iconBg: "from-lime-400 to-green-600",    title: "계산기", href: "/fluento/calculator" },
 ];
 
 export default function FluentoAccountingPage() {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const { getTitle, setTitle } = usePageTitles();
+
   return (
     <div className="flex-1 overflow-y-auto bg-[#f5f5f7] dark:bg-[#191919]">
       <div className="px-8 pt-6">
@@ -20,7 +30,12 @@ export default function FluentoAccountingPage() {
           >
             <ArrowLeft size={14} /> 플루엔토
           </Link>
-          <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">회계</h1>
+          <EditableTitle
+            value={getTitle(PAGE_TITLE_KEY, DEFAULT_PAGE_TITLE)}
+            isAdmin={isAdmin}
+            onSave={(next) => setTitle(PAGE_TITLE_KEY, next)}
+            className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]"
+          />
         </div>
       </div>
 
@@ -36,7 +51,7 @@ export default function FluentoAccountingPage() {
               <div className={`w-[68px] h-[68px] rounded-[18px] bg-gradient-to-br ${card.iconBg} flex items-center justify-center text-3xl shadow-md`}>
                 {card.emoji}
               </div>
-              <p className="font-medium text-sm text-[#37352f] dark:text-[#e6e6e4]">{card.title}</p>
+              <p className="font-medium text-sm text-[#37352f] dark:text-[#e6e6e4]">{getTitle(card.key, card.title)}</p>
             </Link>
           ))}
         </div>

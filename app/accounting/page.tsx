@@ -2,16 +2,26 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
+import { usePageTitles } from "@/hooks/usePageTitles";
+import { EditableTitle } from "@/components/EditableTitle";
+
+const PAGE_TITLE_KEY = "accounting_title";
+const DEFAULT_PAGE_TITLE = "회계";
 
 const CARDS = [
-  { emoji: "📊", iconBg: "from-indigo-400 to-blue-600",   title: "통계",      href: "/accounting/stats" },
-  { emoji: "🔄", iconBg: "from-blue-400 to-indigo-500",   title: "자동이체",   href: "/accounting/transfer" },
-  { emoji: "👷", iconBg: "from-cyan-400 to-sky-500",      title: "인건비",    href: "/accounting/payroll" },
-  { emoji: "📒", iconBg: "from-green-400 to-emerald-500", title: "장부",      href: "/accounting/ledger" },
-  { emoji: "🧾", iconBg: "from-orange-400 to-amber-500",  title: "현금영수증", href: "/accounting/cash-receipts" },
+  { key: "accounting_stats_title", emoji: "📊", iconBg: "from-indigo-400 to-blue-600",   title: "통계",      href: "/accounting/stats" },
+  { key: "accounting_transfer_title", emoji: "🔄", iconBg: "from-blue-400 to-indigo-500",   title: "자동이체",   href: "/accounting/transfer" },
+  { key: "accounting_payroll_title", emoji: "👷", iconBg: "from-cyan-400 to-sky-500",      title: "인건비",    href: "/accounting/payroll" },
+  { key: "accounting_ledger_title", emoji: "📒", iconBg: "from-green-400 to-emerald-500", title: "장부",      href: "/accounting/ledger" },
+  { key: "accounting_cash_receipts_title", emoji: "🧾", iconBg: "from-orange-400 to-amber-500",  title: "현금영수증", href: "/accounting/cash-receipts" },
 ];
 
 export default function AccountingPage() {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const { getTitle, setTitle } = usePageTitles();
+
   return (
     <div className="flex-1 overflow-y-auto bg-[#f5f5f7] dark:bg-[#191919]">
       <div className="px-8 pt-6">
@@ -23,7 +33,12 @@ export default function AccountingPage() {
           >
             <ArrowLeft size={14} /> 스탯포디그리
           </Link>
-          <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">회계</h1>
+          <EditableTitle
+            value={getTitle(PAGE_TITLE_KEY, DEFAULT_PAGE_TITLE)}
+            isAdmin={isAdmin}
+            onSave={(next) => setTitle(PAGE_TITLE_KEY, next)}
+            className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]"
+          />
         </div>
       </div>
 
@@ -39,7 +54,7 @@ export default function AccountingPage() {
               <div className={`w-[68px] h-[68px] rounded-[18px] bg-gradient-to-br ${card.iconBg} flex items-center justify-center text-3xl shadow-md`}>
                 {card.emoji}
               </div>
-              <p className="font-medium text-sm text-[#37352f] dark:text-[#e6e6e4]">{card.title}</p>
+              <p className="font-medium text-sm text-[#37352f] dark:text-[#e6e6e4]">{card.key ? getTitle(card.key, card.title) : card.title}</p>
             </Link>
           ))}
         </div>

@@ -4,7 +4,13 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronLeft, ChevronRight, Save, CheckCircle, XCircle, BarChart2, Trash2 } from "lucide-react";
 import { useLedger } from "@/hooks/useLedger";
+import { usePageTitles } from "@/hooks/usePageTitles";
+import { useAuth } from "@/components/AuthProvider";
+import { EditableTitle } from "@/components/EditableTitle";
 import { cn } from "@/lib/utils";
+
+const PAGE_TITLE_KEY = "accounting_ledger_title";
+const DEFAULT_PAGE_TITLE = "장부";
 
 function fmt(v: number) {
   const abs = Math.abs(Math.round(v));
@@ -63,6 +69,10 @@ const EMPTY: DataState = { sales: "", bizCost: "", laborTotal: "", nonOpIncome: 
 
 export default function LedgerPage() {
   const router = useRouter();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const { getTitle, setTitle } = usePageTitles();
+  const pageTitle = getTitle(PAGE_TITLE_KEY, DEFAULT_PAGE_TITLE);
   const { entries, upsert, remove } = useLedger();
   const [month, setMonth] = useState(getYM());
   const [data, setData] = useState<DataState>(EMPTY);
@@ -159,12 +169,12 @@ export default function LedgerPage() {
     });
     if (result.success) {
       setSaveStatus("saved");
-      showToast({ type: "success", msg: `${yr}년 ${mo}월 장부가 저장됐습니다.` });
+      showToast({ type: "success", msg: `${yr}년 ${mo}월 ${pageTitle}가 저장됐습니다.` });
     } else {
       setSaveStatus("unsaved");
       showToast({ type: "error", msg: result.error ?? "저장에 실패했습니다." });
     }
-  }, [month, data, upsert, showToast]);
+  }, [month, data, upsert, showToast, pageTitle]);
 
 
   const goToMonth = (mo: number) => {
@@ -196,7 +206,12 @@ export default function LedgerPage() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-white dark:hover:bg-[#252525] border border-[#e9e9e7] dark:border-[#2f2f2f] transition-colors">
               <ArrowLeft size={14} /> 회계
             </button>
-            <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">장부</h1>
+            <EditableTitle
+              value={pageTitle}
+              isAdmin={isAdmin}
+              onSave={(next) => setTitle(PAGE_TITLE_KEY, next)}
+              className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]"
+            />
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => router.push("/accounting/stats")}
@@ -348,10 +363,10 @@ export default function LedgerPage() {
               <div className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500">
                 <Trash2 size={16} />
               </div>
-              <h2 className="font-bold text-[#37352f] dark:text-[#e6e6e4]">장부 삭제</h2>
+              <h2 className="font-bold text-[#37352f] dark:text-[#e6e6e4]">{pageTitle} 삭제</h2>
             </div>
             <p className="text-sm text-[#9b9a97] mb-5">
-              <span className="font-semibold text-[#37352f] dark:text-[#e6e6e4]">{deleteTarget.year}년 {deleteTarget.month}월</span> 장부 데이터를 삭제할까요?<br />
+              <span className="font-semibold text-[#37352f] dark:text-[#e6e6e4]">{deleteTarget.year}년 {deleteTarget.month}월</span> {pageTitle} 데이터를 삭제할까요?<br />
               삭제한 데이터는 복구할 수 없습니다.
             </p>
             <div className="flex gap-2">

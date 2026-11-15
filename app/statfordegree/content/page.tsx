@@ -2,12 +2,22 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { usePageTitles } from "@/hooks/usePageTitles";
+import { useAuth } from "@/components/AuthProvider";
+import { EditableTitle } from "@/components/EditableTitle";
+
+const PAGE_TITLE_KEY = "statfordegree_content_title";
+const DEFAULT_PAGE_TITLE = "콘텐츠 관리";
 
 const CARDS = [
-  { emoji: "📒", iconBg: "from-rose-400 to-red-500", title: "장부", href: "/statfordegree/content/ledger" },
+  { key: "content_ledger_title", emoji: "📒", iconBg: "from-rose-400 to-red-500", title: "현금흐름표", href: "/statfordegree/content/ledger" },
+  { key: "content_transactions_title", emoji: "🧾", iconBg: "from-emerald-400 to-teal-500", title: "거래 기록", href: "/statfordegree/content/transactions" },
 ];
 
 export default function ContentManagementPage() {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const { getTitle, setTitle } = usePageTitles();
   return (
     <div className="flex-1 overflow-y-auto bg-[#f5f5f7] dark:bg-[#191919]">
       <div className="px-8 pt-6">
@@ -19,7 +29,12 @@ export default function ContentManagementPage() {
           >
             <ArrowLeft size={14} /> 스탯포디그리
           </Link>
-          <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">콘텐츠 관리</h1>
+          <EditableTitle
+            value={getTitle(PAGE_TITLE_KEY, DEFAULT_PAGE_TITLE)}
+            isAdmin={isAdmin}
+            onSave={(next) => setTitle(PAGE_TITLE_KEY, next)}
+            className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]"
+          />
         </div>
       </div>
 
@@ -35,7 +50,7 @@ export default function ContentManagementPage() {
               <div className={`w-[68px] h-[68px] rounded-[18px] bg-gradient-to-br ${card.iconBg} flex items-center justify-center text-3xl shadow-md`}>
                 {card.emoji}
               </div>
-              <p className="font-medium text-sm text-[#37352f] dark:text-[#e6e6e4]">{card.title}</p>
+              <p className="font-medium text-sm text-[#37352f] dark:text-[#e6e6e4]">{getTitle(card.key, card.title)}</p>
             </Link>
           ))}
         </div>

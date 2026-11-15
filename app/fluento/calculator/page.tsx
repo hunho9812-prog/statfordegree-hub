@@ -6,6 +6,12 @@ import { ArrowLeft, Plus, Trash2, Pencil, Loader2, X, BookOpen } from "lucide-re
 import { v4 as uuidv4 } from "uuid";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useFluentoLedger } from "@/hooks/useFluentoLedger";
+import { usePageTitles } from "@/hooks/usePageTitles";
+import { useAuth } from "@/components/AuthProvider";
+import { EditableTitle } from "@/components/EditableTitle";
+
+const PAGE_TITLE_KEY = "fluento_calculator_title";
+const DEFAULT_PAGE_TITLE = "계산기";
 
 interface CostEntry {
   id: string;
@@ -25,6 +31,10 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 export default function FluentoCalculatorPage() {
   const router = useRouter();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const { getTitle, setTitle } = usePageTitles();
+  const pageTitle = getTitle(PAGE_TITLE_KEY, DEFAULT_PAGE_TITLE);
   const { entries: ledgerEntries } = useFluentoLedger();
 
   const [entries, setEntries] = useState<CostEntry[]>([]);
@@ -143,7 +153,12 @@ export default function FluentoCalculatorPage() {
           </button>
           <h1 className="text-xl font-bold flex-1">
             💡 <span className="bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">플루엔토</span>
-            <span className="text-[#37352f] dark:text-[#e6e6e4] ml-2">계산기</span>
+            <EditableTitle
+              value={pageTitle}
+              isAdmin={isAdmin}
+              onSave={(next) => setTitle(PAGE_TITLE_KEY, next)}
+              className="text-[#37352f] dark:text-[#e6e6e4] ml-2"
+            />
           </h1>
           <button onClick={() => router.push("/fluento/ledger")}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30 border border-green-200 dark:border-green-800 transition-colors font-medium">

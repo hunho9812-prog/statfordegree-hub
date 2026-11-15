@@ -5,8 +5,14 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Pencil, Trash2, GripVertical, Check, X, ExternalLink, RefreshCw, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { useKeywords } from "@/hooks/useKeywords";
 import { type KeywordEntry } from "@/lib/db-keywords";
+import { usePageTitles } from "@/hooks/usePageTitles";
+import { useAuth } from "@/components/AuthProvider";
+import { EditableTitle } from "@/components/EditableTitle";
 import { cn } from "@/lib/utils";
 import { v4 as uuidv4 } from "uuid";
+
+const PAGE_TITLE_KEY = "statfordegree_keywords_title";
+const DEFAULT_PAGE_TITLE = "키워드 관리";
 
 const EMPTY_FORM = { keyword: "", is_exposed: true, link: "", check_date: "" };
 
@@ -15,6 +21,9 @@ type SortDir = "asc" | "desc";
 
 export default function KeywordsPage() {
   const router = useRouter();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const { getTitle, setTitle } = usePageTitles();
   const { entries, loading, reload, upsert, remove, reorder } = useKeywords();
 
   const [form, setForm] = useState(EMPTY_FORM);
@@ -152,7 +161,12 @@ export default function KeywordsPage() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-white dark:hover:bg-[#252525] border border-[#e9e9e7] dark:border-[#2f2f2f] transition-colors">
               <ArrowLeft size={14} /> 스탯포디그리
             </button>
-            <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">키워드 관리</h1>
+            <EditableTitle
+              value={getTitle(PAGE_TITLE_KEY, DEFAULT_PAGE_TITLE)}
+              isAdmin={isAdmin}
+              onSave={(next) => setTitle(PAGE_TITLE_KEY, next)}
+              className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]"
+            />
           </div>
           <button onClick={() => reload()}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-white dark:hover:bg-[#252525] border border-[#e9e9e7] dark:border-[#2f2f2f] transition-colors">
