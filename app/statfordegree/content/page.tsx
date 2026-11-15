@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { usePageTitles } from "@/hooks/usePageTitles";
+import { useAuth } from "@/components/AuthProvider";
+import { EditableTitle } from "@/components/EditableTitle";
+
+const PAGE_TITLE_KEY = "statfordegree_content_title";
+const DEFAULT_PAGE_TITLE = "콘텐츠 관리";
 
 const CARDS = [
   { key: "content_ledger_title", emoji: "📒", iconBg: "from-rose-400 to-red-500", title: "현금흐름표", href: "/statfordegree/content/ledger" },
@@ -10,7 +15,9 @@ const CARDS = [
 ];
 
 export default function ContentManagementPage() {
-  const { getTitle } = usePageTitles();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const { getTitle, setTitle } = usePageTitles();
   return (
     <div className="flex-1 overflow-y-auto bg-[#f5f5f7] dark:bg-[#191919]">
       <div className="px-8 pt-6">
@@ -22,7 +29,12 @@ export default function ContentManagementPage() {
           >
             <ArrowLeft size={14} /> 스탯포디그리
           </Link>
-          <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">콘텐츠 관리</h1>
+          <EditableTitle
+            value={getTitle(PAGE_TITLE_KEY, DEFAULT_PAGE_TITLE)}
+            isAdmin={isAdmin}
+            onSave={(next) => setTitle(PAGE_TITLE_KEY, next)}
+            className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]"
+          />
         </div>
       </div>
 

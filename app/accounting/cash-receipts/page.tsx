@@ -11,7 +11,13 @@ import { v4 as uuidv4 } from "uuid";
 import { useCashReceipts } from "@/hooks/useCashReceipts";
 import { type CashReceipt } from "@/lib/db-cash-receipts";
 import { useWorkspaceStore } from "@/lib/store";
+import { usePageTitles } from "@/hooks/usePageTitles";
+import { useAuth } from "@/components/AuthProvider";
+import { EditableTitle } from "@/components/EditableTitle";
 import { cn } from "@/lib/utils";
+
+const PAGE_TITLE_KEY = "accounting_cash_receipts_title";
+const DEFAULT_PAGE_TITLE = "현금영수증";
 
 // ── Column config ─────────────────────────────────────────────────────────────
 
@@ -344,6 +350,10 @@ function CashReceiptsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { rows, loading, reload, upsert, remove, reorder } = useCashReceipts();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const { getTitle, setTitle } = usePageTitles();
+  const pageTitle = getTitle(PAGE_TITLE_KEY, DEFAULT_PAGE_TITLE);
   const customers = useWorkspaceStore((s) => s.customers);
   const pages = useWorkspaceStore((s) => s.pages);
 
@@ -552,7 +562,12 @@ function CashReceiptsInner() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-white dark:hover:bg-[#252525] border border-[#e9e9e7] dark:border-[#2f2f2f] transition-colors">
               <ArrowLeft size={14} /> 회계
             </button>
-            <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">현금영수증</h1>
+            <EditableTitle
+              value={pageTitle}
+              isAdmin={isAdmin}
+              onSave={(next) => setTitle(PAGE_TITLE_KEY, next)}
+              className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]"
+            />
           </div>
           <button onClick={() => reload()}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#9b9a97] hover:bg-white dark:hover:bg-[#252525] border border-[#e9e9e7] dark:border-[#2f2f2f] transition-colors">

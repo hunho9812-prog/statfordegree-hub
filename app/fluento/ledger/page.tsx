@@ -4,7 +4,13 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronLeft, ChevronRight, Save, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import { useFluentoLedger } from "@/hooks/useFluentoLedger";
+import { usePageTitles } from "@/hooks/usePageTitles";
+import { useAuth } from "@/components/AuthProvider";
+import { EditableTitle } from "@/components/EditableTitle";
 import { cn } from "@/lib/utils";
+
+const PAGE_TITLE_KEY = "fluento_ledger_title";
+const DEFAULT_PAGE_TITLE = "장부";
 
 function fmt(v: number) {
   const abs = Math.abs(Math.round(v));
@@ -61,6 +67,10 @@ const EMPTY: DataState = { sales: "", bizCost: "", laborCost: "", nonOpIncome: "
 
 export default function FluentoLedgerPage() {
   const router = useRouter();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const { getTitle, setTitle } = usePageTitles();
+  const pageTitle = getTitle(PAGE_TITLE_KEY, DEFAULT_PAGE_TITLE);
   const { entries, upsert, remove } = useFluentoLedger();
   const [month, setMonth] = useState(getYM());
   const [data, setData] = useState<DataState>(EMPTY);
@@ -137,12 +147,12 @@ export default function FluentoLedgerPage() {
     });
     if (result.success) {
       setSaveStatus("saved");
-      showToast({ type: "success", msg: `${yr}년 ${mo}월 장부가 저장됐습니다.` });
+      showToast({ type: "success", msg: `${yr}년 ${mo}월 ${pageTitle}가 저장됐습니다.` });
     } else {
       setSaveStatus("unsaved");
       showToast({ type: "error", msg: result.error ?? "저장에 실패했습니다." });
     }
-  }, [month, data, upsert, showToast]);
+  }, [month, data, upsert, showToast, pageTitle]);
 
   const handleSaveRef = useRef(handleSave);
   useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
@@ -191,7 +201,12 @@ export default function FluentoLedgerPage() {
             </button>
             <h1 className="text-xl font-bold">
               💡 <span className="bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">플루엔토</span>
-              <span className="text-[#37352f] dark:text-[#e6e6e4] ml-2">장부</span>
+              <EditableTitle
+                value={pageTitle}
+                isAdmin={isAdmin}
+                onSave={(next) => setTitle(PAGE_TITLE_KEY, next)}
+                className="text-[#37352f] dark:text-[#e6e6e4] ml-2"
+              />
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -329,7 +344,7 @@ export default function FluentoLedgerPage() {
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setDeleteTarget(null)}>
           <div className="bg-white dark:bg-[#252525] rounded-2xl border border-[#e9e9e7] dark:border-[#3f3f3f] shadow-xl p-6 w-80 mx-4" onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-bold text-[#37352f] dark:text-[#e6e6e4] mb-1">{deleteTarget.year}년 {deleteTarget.month}월 장부 삭제</p>
+            <p className="text-sm font-bold text-[#37352f] dark:text-[#e6e6e4] mb-1">{deleteTarget.year}년 {deleteTarget.month}월 {pageTitle} 삭제</p>
             <p className="text-xs text-red-400 mb-5">삭제한 데이터는 복구할 수 없습니다.</p>
             <div className="flex gap-2">
               <button onClick={() => setDeleteTarget(null)}
