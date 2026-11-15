@@ -26,14 +26,14 @@ export function EditableTitle({
 
   if (!editing) {
     return (
-      <span className="inline-flex items-center gap-1.5 group">
+      <span className="inline-flex items-center gap-1.5">
         <span className={className}>{value}</span>
         <button
           onClick={() => {
             setDraft(value);
             setEditing(true);
           }}
-          className="opacity-0 group-hover:opacity-100 text-[#9b9a97] hover:text-blue-500 transition-opacity"
+          className="text-[#9b9a97] hover:text-blue-500 transition-colors"
           title="이름 수정"
         >
           <Pencil size={14} />
