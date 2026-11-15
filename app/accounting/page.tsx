@@ -10,7 +10,7 @@ const PAGE_TITLE_KEY = "accounting_title";
 const DEFAULT_PAGE_TITLE = "회계";
 
 const CARDS = [
-  { emoji: "📊", iconBg: "from-indigo-400 to-blue-600",   title: "통계",      href: "/accounting/stats" },
+  { key: "accounting_stats_title", emoji: "📊", iconBg: "from-indigo-400 to-blue-600",   title: "통계",      href: "/accounting/stats" },
   { key: "accounting_transfer_title", emoji: "🔄", iconBg: "from-blue-400 to-indigo-500",   title: "자동이체",   href: "/accounting/transfer" },
   { key: "accounting_payroll_title", emoji: "👷", iconBg: "from-cyan-400 to-sky-500",      title: "인건비",    href: "/accounting/payroll" },
   { key: "accounting_ledger_title", emoji: "📒", iconBg: "from-green-400 to-emerald-500", title: "장부",      href: "/accounting/ledger" },

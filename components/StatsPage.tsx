@@ -9,6 +9,12 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { useLedger } from "@/hooks/useLedger";
+import { usePageTitles } from "@/hooks/usePageTitles";
+import { useAuth } from "@/components/AuthProvider";
+import { EditableTitle } from "@/components/EditableTitle";
+
+const PAGE_TITLE_KEY = "accounting_stats_title";
+const DEFAULT_PAGE_TITLE = "통계";
 
 type ChartType = "line" | "bar";
 type GroupBy = "monthly" | "quarterly" | "yearly";
@@ -29,6 +35,9 @@ function fmt(v: number): string {
 
 export default function StatsPage() {
   const router = useRouter();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const { getTitle, setTitle } = usePageTitles();
   const { entries, loading } = useLedger();
 
   const currentYear = new Date().getFullYear();
@@ -185,7 +194,12 @@ export default function StatsPage() {
             >
               <ArrowLeft size={14} /> 대시보드
             </button>
-            <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]">통계</h1>
+            <EditableTitle
+              value={getTitle(PAGE_TITLE_KEY, DEFAULT_PAGE_TITLE)}
+              isAdmin={isAdmin}
+              onSave={(next) => setTitle(PAGE_TITLE_KEY, next)}
+              className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4]"
+            />
           </div>
           <button
             onClick={() => router.push("/ledger")}
