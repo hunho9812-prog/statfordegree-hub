@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, memo } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useWorkspaceStore } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
 import type { Customer, CustomerRoute, StatusOption, StatusCategory, CustomColumnDef, CustomColumnType, CrmTag } from "@/lib/types";
@@ -29,6 +29,9 @@ function getAssigneeStyle(name: string, assignees: string[]) {
   const idx = assignees.indexOf(name);
   return ASSIGNEE_PALETTE[idx >= 0 ? idx % ASSIGNEE_PALETTE.length : 0];
 }
+
+// 담당자 필터 버튼 — 고정 3명, 순서 고정. 담당자 추가 시 이 배열만 수정하면 된다.
+const CRM_OWNER_FILTERS = ["김은호", "김현호", "김세윤"];
 
 const TAG_COLOR_PRESETS: CrmTag[] = [
   { label: "", bg: "#eef2ff", text: "#4338ca" },
@@ -917,15 +920,16 @@ const EMPTY_FORM = {
   submit_date: "", status: "", memo: "", monthPageId: null as string | null,
 };
 
-function AddCustomerRow({ statuses, allCols, onSave, onCancel, assignees, tags }: {
+function AddCustomerRow({ statuses, allCols, onSave, onCancel, assignees, tags, defaultAssignee }: {
   statuses: StatusOption[];
   allCols: AnyCol[];
   onSave: (c: Omit<Customer, "id" | "created_at" | "updated_at">) => void;
   onCancel: () => void;
   assignees: string[];
   tags: CrmTag[];
+  defaultAssignee?: string;
 }) {
-  const [form, setForm] = useState({ ...EMPTY_FORM, assignee: assignees[0] ?? EMPTY_FORM.assignee });
+  const [form, setForm] = useState({ ...EMPTY_FORM, assignee: defaultAssignee ?? assignees[0] ?? EMPTY_FORM.assignee });
   const nameRef = useRef<HTMLInputElement>(null);
   useEffect(() => { nameRef.current?.focus(); }, []);
 
@@ -1266,6 +1270,11 @@ function formatWon(n: number): string {
   return `₩${Math.round(n).toLocaleString()}`;
 }
 
+// 월 이동 시 담당자 필터를 유지하기 위한 세션 내 기억값.
+// URL 쿼리(?owner=)가 "진짜" 상태이고(새로고침 시 이걸로 복원), 다른 월로 넘어가서
+// URL에 owner가 안 실려 있을 때만 이 값으로 보충해 다시 URL에 반영한다.
+let rememberedOwnerFilter: string | null = null;
+
 // ─── Main CRMPage ─────────────────────────────────────────────────────────────
 
 export default function CRMPage({
@@ -1276,6 +1285,35 @@ export default function CRMPage({
   embedded?: boolean;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // ─── 담당자 필터 (URL ?owner=) ─────────────────────────────────────────────
+  const rawOwnerParam = searchParams.get("owner");
+  const activeOwner = rawOwnerParam && CRM_OWNER_FILTERS.includes(rawOwnerParam) ? rawOwnerParam : null;
+
+  // 다른 월로 이동해 URL에 owner가 안 실려 있으면, 이전에 선택해 둔 담당자를 이어서 적용한다.
+  const restoredPathnameRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (restoredPathnameRef.current === pathname) return;
+    restoredPathnameRef.current = pathname;
+    if (activeOwner) {
+      rememberedOwnerFilter = activeOwner;
+    } else if (rememberedOwnerFilter) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("owner", rememberedOwnerFilter);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  const toggleOwnerFilter = useCallback((name: string) => {
+    const next = activeOwner === name ? null : name;
+    rememberedOwnerFilter = next;
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set("owner", next); else params.delete("owner");
+    router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
+  }, [activeOwner, pathname, router, searchParams]);
 
   // monthPageId가 "crm-month-YYYY-MM" 형식이면 현금영수증 링크 생성
   const cashReceiptsHref = useMemo(() => {
@@ -1338,7 +1376,8 @@ export default function CRMPage({
   const [showAssigneeEditor, setShowAssigneeEditor] = useState(false);
   const [showTagsEditor, setShowTagsEditor] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [compact, setCompact] = useState(false);
+  // 컴팩트 모드는 페이지에 들어올 때마다 항상 ON으로 시작 (저장하지 않는 일회성 토글)
+  const [compact, setCompact] = useState(true);
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
 
   // ─── Column resize ────────────────────────────────────────────────────────
@@ -1631,6 +1670,16 @@ export default function CRMPage({
     [monthScoped, crmAssignees],
   );
 
+  // 담당자 필터 버튼에 표시할 "해당 월 인원 수" — 필터와 무관하게 해당 월 전체 기준
+  const ownerFilterCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const name of CRM_OWNER_FILTERS) counts[name] = 0;
+    for (const c of monthScoped) {
+      if (c.assignee && counts[c.assignee] !== undefined) counts[c.assignee]++;
+    }
+    return counts;
+  }, [monthScoped]);
+
   // 열 ID → 고객 값 추출 헬퍼
   const getColVal = useCallback((c: Customer, colId: string): string => {
     const spec = BUILTIN_BY_ID[colId];
@@ -1640,6 +1689,9 @@ export default function CRMPage({
 
   const visibleCustomers = useMemo(() => {
     let result = monthScoped;
+    if (activeOwner) {
+      result = result.filter((c) => c.assignee === activeOwner);
+    }
     for (const [colId, filt] of Object.entries(activeFilters) as [string, ColFilter][]) {
       if (filt.kind === "multiselect") {
         if (filt.selected.length > 0)
@@ -1695,7 +1747,7 @@ export default function CRMPage({
     }
 
     return result;
-  }, [monthScoped, activeFilters, sortConfig, getColVal, allCols]);
+  }, [monthScoped, activeOwner, activeFilters, sortConfig, getColVal, allCols]);
 
   const { totalRevenue, settlementTotal, balanceTotal } = useMemo(() => {
     let totalRevenue = 0, settlementTotal = 0, balanceTotal = 0;
@@ -1817,11 +1869,17 @@ export default function CRMPage({
       <div className={`flex items-center justify-between ${embedded ? "px-4 py-3" : "px-8 py-4"}`}>
         <div className="flex items-center gap-2 flex-wrap">
           {!embedded && <h1 className="text-xl font-bold text-[#37352f] dark:text-[#e6e6e4] mr-1">고객 관리</h1>}
-          <span className="text-sm text-[#9b9a97] dark:text-[#6b6b6b]">총 {visibleCustomers.length}명</span>
-          {monthScoped.length !== visibleCustomers.length && <span className="text-blue-400 text-xs">(필터 적용 중)</span>}
+          {activeOwner ? (
+            <span className="text-sm text-[#9b9a97] dark:text-[#6b6b6b]">
+              {activeOwner} · {visibleCustomers.length}명 / 전체 {monthScoped.length}명
+            </span>
+          ) : (
+            <span className="text-sm text-[#9b9a97] dark:text-[#6b6b6b]">총 {visibleCustomers.length}명</span>
+          )}
+          {hasActiveFilter && <span className="text-blue-400 text-xs">(필터 적용 중)</span>}
           <button onClick={() => setCompact((v) => !v)} title="컴팩트 모드 토글"
             className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${compact ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400" : "border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f]"}`}>
-            컴팩트
+            {compact ? "컴팩트 해제" : "컴팩트"}
           </button>
           <button onClick={() => setShowAddForm(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
@@ -1833,6 +1891,18 @@ export default function CRMPage({
               <Receipt size={13} /> 현금영수증
             </button>
           )}
+          <div className="flex items-center gap-1">
+            {CRM_OWNER_FILTERS.map((name) => {
+              const active = activeOwner === name;
+              return (
+                <button key={name} onClick={() => toggleOwnerFilter(name)}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${active ? "border-blue-500 bg-blue-500 text-white hover:bg-blue-600" : "border-[#e9e9e7] dark:border-[#3f3f3f] text-[#9b9a97] hover:text-[#37352f] dark:hover:text-[#e6e6e4] hover:bg-[#f7f6f3] dark:hover:bg-[#2f2f2f]"}`}>
+                  {name}
+                  <span className={active ? "text-[10px] text-blue-100" : "text-[10px] text-[#b5b4b0] dark:text-[#5a5a5a]"}>{ownerFilterCounts[name] ?? 0}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {undoStack.length > 0 && (
@@ -1955,7 +2025,7 @@ export default function CRMPage({
             />
           ))}
           {showAddForm ? (
-            <AddCustomerRow statuses={customerStatuses} allCols={allCols} onSave={handleCreateCustomer} onCancel={() => setShowAddForm(false)} assignees={crmAssignees} tags={crmTags} />
+            <AddCustomerRow statuses={customerStatuses} allCols={allCols} onSave={handleCreateCustomer} onCancel={() => setShowAddForm(false)} assignees={crmAssignees} tags={crmTags} defaultAssignee={activeOwner ?? undefined} />
           ) : (
             <AddTriggerRow onAdd={() => setShowAddForm(true)} colSpan={totalColSpan} />
           )}
