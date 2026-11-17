@@ -33,6 +33,12 @@ function getAssigneeStyle(name: string, assignees: string[]) {
 // 담당자 필터 버튼 — 고정 3명, 순서 고정. 담당자 추가 시 이 배열만 수정하면 된다.
 const CRM_OWNER_FILTERS = ["김은호", "김현호", "김세윤"];
 
+// 담당자 값 비교용 정규화 — 과거 데이터에 섞여 들어간 앞뒤 공백이나
+// 자모 분리(NFD) 인코딩 때문에 화면엔 똑같이 보여도 "===" 비교가 깨지는 걸 방지한다.
+function normalizeOwnerName(v: string | null | undefined): string {
+  return (v ?? "").normalize("NFC").trim();
+}
+
 const TAG_COLOR_PRESETS: CrmTag[] = [
   { label: "", bg: "#eef2ff", text: "#4338ca" },
   { label: "", bg: "#eff6ff", text: "#1d4ed8" },
@@ -1675,7 +1681,8 @@ export default function CRMPage({
     const counts: Record<string, number> = {};
     for (const name of CRM_OWNER_FILTERS) counts[name] = 0;
     for (const c of monthScoped) {
-      if (c.assignee && counts[c.assignee] !== undefined) counts[c.assignee]++;
+      const owner = normalizeOwnerName(c.assignee);
+      if (owner && counts[owner] !== undefined) counts[owner]++;
     }
     return counts;
   }, [monthScoped]);
@@ -1690,7 +1697,7 @@ export default function CRMPage({
   const visibleCustomers = useMemo(() => {
     let result = monthScoped;
     if (activeOwner) {
-      result = result.filter((c) => c.assignee === activeOwner);
+      result = result.filter((c) => normalizeOwnerName(c.assignee) === activeOwner);
     }
     for (const [colId, filt] of Object.entries(activeFilters) as [string, ColFilter][]) {
       if (filt.kind === "multiselect") {
