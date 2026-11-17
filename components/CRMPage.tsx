@@ -935,7 +935,15 @@ function AddCustomerRow({ statuses, allCols, onSave, onCancel, assignees, tags, 
   tags: CrmTag[];
   defaultAssignee?: string;
 }) {
-  const [form, setForm] = useState({ ...EMPTY_FORM, assignee: defaultAssignee ?? assignees[0] ?? EMPTY_FORM.assignee });
+  const [form, setForm] = useState(() => {
+    const base = { ...EMPTY_FORM, assignee: assignees[0] ?? EMPTY_FORM.assignee };
+    if (!defaultAssignee) return base;
+    // 담당자 필터 버튼이 가리키는 열이 기본 _assignee 열이 아니라 커스텀 열(type: assignee)로
+    // 대체된 워크스페이스도 있으므로, 실제로 쓰이는 열에 기본값을 채운다.
+    const assigneeCol = allCols.find((c) => c.effectiveType === "assignee");
+    if (!assigneeCol || assigneeCol.id === "_assignee") return { ...base, assignee: defaultAssignee };
+    return { ...base, custom_fields: { ...base.custom_fields, [assigneeCol.id]: defaultAssignee } };
+  });
   const nameRef = useRef<HTMLInputElement>(null);
   useEffect(() => { nameRef.current?.focus(); }, []);
 
@@ -1676,17 +1684,6 @@ export default function CRMPage({
     [monthScoped, crmAssignees],
   );
 
-  // 담당자 필터 버튼에 표시할 "해당 월 인원 수" — 필터와 무관하게 해당 월 전체 기준
-  const ownerFilterCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const name of CRM_OWNER_FILTERS) counts[name] = 0;
-    for (const c of monthScoped) {
-      const owner = normalizeOwnerName(c.assignee);
-      if (owner && counts[owner] !== undefined) counts[owner]++;
-    }
-    return counts;
-  }, [monthScoped]);
-
   // 열 ID → 고객 값 추출 헬퍼
   const getColVal = useCallback((c: Customer, colId: string): string => {
     const spec = BUILTIN_BY_ID[colId];
@@ -1694,10 +1691,28 @@ export default function CRMPage({
     return v === null || v === undefined ? "" : String(v);
   }, []);
 
+  // 실제 "담당자" 열의 id — 기본 제공 _assignee 열이 숨겨지고 커스텀 "담당자" 열(type: assignee)로
+  // 대체된 워크스페이스도 있어서, c.assignee를 직접 보지 않고 현재 활성화된 담당자 유형 열을 찾는다.
+  const assigneeColId = useMemo(
+    () => allCols.find((c) => c.effectiveType === "assignee")?.id ?? "_assignee",
+    [allCols]
+  );
+
+  // 담당자 필터 버튼에 표시할 "해당 월 인원 수" — 필터와 무관하게 해당 월 전체 기준
+  const ownerFilterCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const name of CRM_OWNER_FILTERS) counts[name] = 0;
+    for (const c of monthScoped) {
+      const owner = normalizeOwnerName(getColVal(c, assigneeColId));
+      if (owner && counts[owner] !== undefined) counts[owner]++;
+    }
+    return counts;
+  }, [monthScoped, getColVal, assigneeColId]);
+
   const visibleCustomers = useMemo(() => {
     let result = monthScoped;
     if (activeOwner) {
-      result = result.filter((c) => normalizeOwnerName(c.assignee) === activeOwner);
+      result = result.filter((c) => normalizeOwnerName(getColVal(c, assigneeColId)) === activeOwner);
     }
     for (const [colId, filt] of Object.entries(activeFilters) as [string, ColFilter][]) {
       if (filt.kind === "multiselect") {
@@ -1754,7 +1769,7 @@ export default function CRMPage({
     }
 
     return result;
-  }, [monthScoped, activeOwner, activeFilters, sortConfig, getColVal, allCols]);
+  }, [monthScoped, activeOwner, assigneeColId, activeFilters, sortConfig, getColVal, allCols]);
 
   const { totalRevenue, settlementTotal, balanceTotal } = useMemo(() => {
     let totalRevenue = 0, settlementTotal = 0, balanceTotal = 0;
